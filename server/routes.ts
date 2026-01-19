@@ -1161,6 +1161,13 @@ export async function registerRoutes(
     }
   });
 
+  // Super admin emails - these users automatically get super admin access
+  // Configure via SUPER_ADMIN_EMAILS environment variable (comma-separated)
+  const SUPER_ADMIN_EMAILS = (process.env.SUPER_ADMIN_EMAILS || "")
+    .split(",")
+    .map(e => e.trim().toLowerCase())
+    .filter(Boolean);
+
   // Set user type (employer or job seeker)
   app.post("/api/user/profile", isAuthenticated, async (req, res) => {
     try {
@@ -1172,11 +1179,15 @@ export async function registerRoutes(
       const firstName = claims.first_name;
       const lastName = claims.last_name;
 
+      // Auto-grant super admin for designated emails
+      const isSuperAdmin = SUPER_ADMIN_EMAILS.includes(email?.toLowerCase() || "");
+
       const userProfile = await storage.createUserProfile({
         userId,
         email,
         firstName,
         lastName,
+        isSuperAdmin,
         ...req.body,
       });
 
