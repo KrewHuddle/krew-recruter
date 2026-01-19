@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -55,24 +55,26 @@ export default function SeekerProfile() {
 
   const [initialized, setInitialized] = useState(false);
 
-  if (profile && !initialized) {
-    setFormData({
-      name: profile.name || "",
-      headline: profile.headline || "",
-      city: profile.city || "",
-      state: profile.state || "",
-      summary: profile.summary || "",
-      experienceYears: profile.experienceYears || 0,
-      fohRoles: profile.fohRoles || [],
-      bohRoles: profile.bohRoles || [],
-      desiredPayMin: profile.desiredPayMin || 0,
-      desiredPayMax: profile.desiredPayMax || 0,
-      openToGigs: profile.openToGigs ?? true,
-      openToFullTime: profile.openToFullTime ?? true,
-      openToPartTime: profile.openToPartTime ?? true,
-    });
-    setInitialized(true);
-  }
+  useEffect(() => {
+    if (profile && !initialized) {
+      setFormData({
+        name: profile.name || "",
+        headline: profile.headline || "",
+        city: profile.city || "",
+        state: profile.state || "",
+        summary: profile.summary || "",
+        experienceYears: profile.experienceYears || 0,
+        fohRoles: profile.fohRoles || [],
+        bohRoles: profile.bohRoles || [],
+        desiredPayMin: profile.desiredPayMin || 0,
+        desiredPayMax: profile.desiredPayMax || 0,
+        openToGigs: profile.openToGigs ?? true,
+        openToFullTime: profile.openToFullTime ?? true,
+        openToPartTime: profile.openToPartTime ?? true,
+      });
+      setInitialized(true);
+    }
+  }, [profile, initialized]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: typeof formData) => {

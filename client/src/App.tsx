@@ -26,6 +26,8 @@ import Interviews from "@/pages/interviews";
 import Settings from "@/pages/settings";
 import SeekerDashboard from "@/pages/seeker-dashboard";
 import SeekerProfile from "@/pages/seeker-profile";
+import SeekerSaved from "@/pages/seeker-saved";
+import Onboarding from "@/pages/onboarding";
 import { Loader2 } from "lucide-react";
 
 function EmployerLayout({ children }: { children: React.ReactNode }) {
@@ -112,6 +114,25 @@ function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
   return <SeekerLayout>{children}</SeekerLayout>;
 }
 
+function ProtectedRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  return <>{children}</>;
+}
+
 function AppRouter() {
   return (
     <Switch>
@@ -122,6 +143,12 @@ function AppRouter() {
       <Route path="/jobs" component={JobSearch} />
       
       <Route path="/gigs" component={GigBoard} />
+      
+      <Route path="/onboarding">
+        <ProtectedRoute>
+          <Onboarding />
+        </ProtectedRoute>
+      </Route>
       
       <Route path="/seeker">
         <ProtectedSeekerRoute>
@@ -143,7 +170,7 @@ function AppRouter() {
       
       <Route path="/seeker/saved">
         <ProtectedSeekerRoute>
-          <SeekerDashboard />
+          <SeekerSaved />
         </ProtectedSeekerRoute>
       </Route>
       

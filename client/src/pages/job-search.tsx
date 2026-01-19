@@ -8,7 +8,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/use-auth";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import {
   Search,
   MapPin,
@@ -43,9 +46,18 @@ const schedules = [
   "Weekends",
 ];
 
+type SavedJob = {
+  id: string;
+  jobId: string;
+  userId: string;
+  savedAt: string;
+};
+
 export default function JobSearch() {
   const searchParams = useSearch();
   const [, setLocation] = useLocation();
+  const { isAuthenticated } = useAuth();
+  const { toast } = useToast();
   
   const params = new URLSearchParams(searchParams);
   const initialQuery = params.get("q") || "";
@@ -56,10 +68,42 @@ export default function JobSearch() {
   const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
   const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [savedJobs, setSavedJobs] = useState<Set<string>>(new Set());
 
   const { data: jobs, isLoading } = useQuery<JobWithDetails[]>({
     queryKey: ["/api/jobs/public", searchQuery, locationQuery],
+  });
+
+  const { data: savedJobsData } = useQuery<SavedJob[]>({
+    queryKey: ["/api/saved-jobs"],
+    enabled: isAuthenticated,
+  });
+
+  const savedJobIds = new Set(savedJobsData?.map((s) => s.jobId) || []);
+
+  const saveJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest("POST", "/api/saved-jobs", { jobId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs"] });
+      toast({ title: "Job saved", description: "Added to your saved jobs" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to save job", variant: "destructive" });
+    },
+  });
+
+  const unsaveJobMutation = useMutation({
+    mutationFn: async (jobId: string) => {
+      return apiRequest("DELETE", `/api/saved-jobs/${jobId}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/saved-jobs"] });
+      toast({ title: "Job removed", description: "Removed from saved jobs" });
+    },
+    onError: () => {
+      toast({ title: "Error", description: "Failed to remove job", variant: "destructive" });
+    },
   });
 
   const handleSearch = (e: React.FormEvent) => {
@@ -71,15 +115,15 @@ export default function JobSearch() {
   };
 
   const toggleSave = (jobId: string) => {
-    setSavedJobs((prev) => {
-      const next = new Set(prev);
-      if (next.has(jobId)) {
-        next.delete(jobId);
-      } else {
-        next.add(jobId);
-      }
-      return next;
-    });
+    if (!isAuthenticated) {
+      window.location.href = "/api/login";
+      return;
+    }
+    if (savedJobIds.has(jobId)) {
+      unsaveJobMutation.mutate(jobId);
+    } else {
+      saveJobMutation.mutate(jobId);
+    }
   };
 
   const toggleType = (type: string) => {
@@ -343,9 +387,10 @@ export default function JobSearch() {
                           variant="ghost"
                           size="icon"
                           onClick={() => toggleSave(job.id)}
+                          disabled={saveJobMutation.isPending || unsaveJobMutation.isPending}
                           data-testid={`button-save-${job.id}`}
                         >
-                          {savedJobs.has(job.id) ? (
+                          {savedJobIds.has(job.id) ? (
                             <BookmarkCheck className="h-5 w-5 text-primary" />
                           ) : (
                             <Bookmark className="h-5 w-5" />
