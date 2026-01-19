@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
+import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
@@ -79,6 +80,10 @@ export async function registerRoutes(
   // Setup auth first
   await setupAuth(app);
   registerAuthRoutes(app);
+  
+  // Setup object storage
+  registerObjectStorageRoutes(app);
+  const objectStorageService = new ObjectStorageService();
 
   // ============ TENANT ROUTES ============
 
@@ -700,11 +705,18 @@ export async function registerRoutes(
       const tenantId = (req as any).tenantId;
       const invites = await storage.getInterviewInvitesByTenant(tenantId);
       
-      // Get template info
+      // Get template info and response counts
       const invitesWithTemplates = await Promise.all(
         invites.map(async (invite) => {
           const template = await storage.getInterviewTemplate(invite.templateId);
-          return { ...invite, template };
+          const questions = await storage.getQuestionsByTemplate(invite.templateId);
+          const responses = await storage.getInterviewResponsesByInvite(invite.id);
+          return { 
+            ...invite, 
+            template,
+            questionCount: questions.length,
+            responseCount: responses.length,
+          };
         })
       );
       
@@ -712,6 +724,262 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching invites:", error);
       res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+
+  // Create interview invite with token
+  app.post(
+    "/api/interviews/invites",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const { templateId, applicationId, workerUserId, candidateName, candidateEmail, deadlineAt } = req.body;
+        
+        if (!templateId) {
+          return res.status(400).json({ error: "Template ID is required" });
+        }
+        
+        // Generate secure invite token
+        const inviteToken = randomBytes(32).toString("hex");
+        
+        const invite = await storage.createInterviewInvite({
+          tenantId,
+          templateId,
+          applicationId: applicationId || null,
+          workerUserId: workerUserId || null,
+          inviteToken,
+          candidateName: candidateName || null,
+          candidateEmail: candidateEmail || null,
+          deadlineAt: deadlineAt ? new Date(deadlineAt) : undefined,
+        });
+        
+        res.json(invite);
+      } catch (error) {
+        console.error("Error creating invite:", error);
+        res.status(500).json({ error: "Failed to create invite" });
+      }
+    }
+  );
+
+  // Get invite with responses (for review)
+  app.get("/api/interviews/invites/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const invite = await storage.getInterviewInvite(id);
+      if (!invite) {
+        return res.status(404).json({ error: "Invite not found" });
+      }
+      
+      const tenantId = (req as any).tenantId;
+      if (invite.tenantId !== tenantId) {
+        return res.status(403).json({ error: "Access denied" });
+      }
+      
+      const template = await storage.getInterviewTemplate(invite.templateId);
+      const questions = await storage.getQuestionsByTemplate(invite.templateId);
+      const responses = await storage.getInterviewResponsesByInvite(invite.id);
+      
+      // Generate signed URLs for video responses
+      const responsesWithUrls = await Promise.all(
+        responses.map(async (response) => {
+          if (response.type === "VIDEO" && response.videoPath) {
+            try {
+              const signedUrl = await objectStorageService.getObjectEntityReadURL(response.videoPath);
+              return { ...response, videoPath: signedUrl };
+            } catch (err) {
+              console.error("Error generating signed URL:", err);
+              return response;
+            }
+          }
+          return response;
+        })
+      );
+      
+      res.json({
+        ...invite,
+        template,
+        questions,
+        responses: responsesWithUrls,
+      });
+    } catch (error) {
+      console.error("Error fetching invite:", error);
+      res.status(500).json({ error: "Failed to fetch invite" });
+    }
+  });
+
+  // ============ PUBLIC INTERVIEW ROUTES (Candidate) ============
+  
+  // Get interview by token (public - for candidates)
+  app.get("/api/public/interview/:token", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "EXPIRED") {
+        return res.status(410).json({ error: "This interview has expired" });
+      }
+      
+      if (invite.deadlineAt && new Date(invite.deadlineAt) < new Date()) {
+        await storage.updateInterviewInvite(invite.id, { status: "EXPIRED" });
+        return res.status(410).json({ error: "This interview has expired" });
+      }
+      
+      const template = await storage.getInterviewTemplate(invite.templateId);
+      const questions = await storage.getQuestionsByTemplate(invite.templateId);
+      const existingResponses = await storage.getInterviewResponsesByInvite(invite.id);
+      
+      // Get tenant for branding
+      const tenant = await storage.getTenant(invite.tenantId);
+      
+      res.json({
+        invite: {
+          id: invite.id,
+          status: invite.status,
+          candidateName: invite.candidateName,
+          deadlineAt: invite.deadlineAt,
+        },
+        template: {
+          id: template?.id,
+          name: template?.name,
+          role: template?.role,
+        },
+        questions: questions.map(q => ({
+          id: q.id,
+          promptText: q.promptText,
+          responseType: q.responseType,
+          timeLimitSeconds: q.timeLimitSeconds,
+          maxRetakes: q.maxRetakes,
+          sortOrder: q.sortOrder,
+        })),
+        existingResponses: existingResponses.map(r => ({
+          questionId: r.questionId,
+          type: r.type,
+          hasVideo: !!r.videoPath,
+          hasText: !!r.text,
+        })),
+        organization: tenant?.name || "Hiring Company",
+      });
+    } catch (error) {
+      console.error("Error fetching public interview:", error);
+      res.status(500).json({ error: "Failed to fetch interview" });
+    }
+  });
+  
+  // Start interview (update status to IN_PROGRESS)
+  app.post("/api/public/interview/:token/start", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "PENDING") {
+        await storage.updateInterviewInvite(invite.id, { status: "IN_PROGRESS" });
+      }
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error starting interview:", error);
+      res.status(500).json({ error: "Failed to start interview" });
+    }
+  });
+  
+  // Get upload URL for video response
+  app.post("/api/public/interview/:token/upload-url", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "COMPLETED" || invite.status === "EXPIRED") {
+        return res.status(400).json({ error: "Cannot upload to a completed or expired interview" });
+      }
+      
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
+    }
+  });
+  
+  // Submit response to a question
+  app.post("/api/public/interview/:token/respond", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const { questionId, type, videoPath, text } = req.body;
+      
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "COMPLETED" || invite.status === "EXPIRED") {
+        return res.status(400).json({ error: "Cannot respond to a completed or expired interview" });
+      }
+      
+      // Check if response already exists
+      const existing = await storage.getInterviewResponse(invite.id, questionId);
+      
+      let response;
+      if (existing) {
+        response = await storage.updateInterviewResponse(existing.id, {
+          type,
+          videoPath,
+          text,
+        });
+      } else {
+        response = await storage.createInterviewResponse({
+          tenantId: invite.tenantId,
+          inviteId: invite.id,
+          questionId,
+          type,
+          videoPath,
+          text,
+        });
+      }
+      
+      res.json(response);
+    } catch (error) {
+      console.error("Error submitting response:", error);
+      res.status(500).json({ error: "Failed to submit response" });
+    }
+  });
+  
+  // Complete interview
+  app.post("/api/public/interview/:token/complete", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      await storage.updateInterviewInvite(invite.id, {
+        status: "COMPLETED",
+        completedAt: new Date(),
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error completing interview:", error);
+      res.status(500).json({ error: "Failed to complete interview" });
     }
   });
 

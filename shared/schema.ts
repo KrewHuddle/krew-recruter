@@ -425,14 +425,18 @@ export const interviewInvites = pgTable("interview_invites", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   templateId: varchar("template_id").notNull().references(() => interviewTemplates.id, { onDelete: "cascade" }),
-  applicationId: varchar("application_id").notNull().references(() => applications.id, { onDelete: "cascade" }),
-  workerUserId: varchar("worker_user_id").notNull(),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "cascade" }),
+  workerUserId: varchar("worker_user_id"),
+  inviteToken: varchar("invite_token").notNull().unique(),
+  candidateName: text("candidate_name"),
+  candidateEmail: text("candidate_email"),
   status: interviewInviteStatusEnum("status").notNull().default("PENDING"),
   deadlineAt: timestamp("deadline_at"),
   createdAt: timestamp("created_at").defaultNow(),
   completedAt: timestamp("completed_at"),
 }, (table) => [
   index("idx_invite_application").on(table.applicationId),
+  index("idx_invite_token").on(table.inviteToken),
 ]);
 
 export const interviewInvitesRelations = relations(interviewInvites, ({ one, many }) => ({

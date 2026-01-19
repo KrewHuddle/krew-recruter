@@ -30,6 +30,7 @@ import SeekerProfile from "@/pages/seeker-profile";
 import SeekerSaved from "@/pages/seeker-saved";
 import Onboarding from "@/pages/onboarding";
 import AdminDashboard from "@/pages/admin-dashboard";
+import CandidateInterview from "@/pages/candidate-interview";
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
 
@@ -324,6 +325,9 @@ function AppRouter() {
           <AdminDashboard />
         </ProtectedAdminRoute>
       </Route>
+      
+      {/* Public interview route for candidates */}
+      <Route path="/interview/:token" component={CandidateInterview} />
       
       <Route component={NotFound} />
     </Switch>

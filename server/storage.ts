@@ -54,6 +54,8 @@ import {
   type InsertTenantBilling,
   type WorkerPayoutAccount,
   type InsertWorkerPayoutAccount,
+  type InterviewResponse,
+  type InsertInterviewResponse,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -120,8 +122,16 @@ export interface IStorage {
 
   // Interview Invites
   getInterviewInvitesByTenant(tenantId: string): Promise<InterviewInvite[]>;
+  getInterviewInvite(id: string): Promise<InterviewInvite | undefined>;
+  getInterviewInviteByToken(token: string): Promise<InterviewInvite | undefined>;
   createInterviewInvite(data: InsertInterviewInvite): Promise<InterviewInvite>;
   updateInterviewInvite(id: string, data: Partial<InsertInterviewInvite>): Promise<InterviewInvite | undefined>;
+
+  // Interview Responses
+  getInterviewResponsesByInvite(inviteId: string): Promise<InterviewResponse[]>;
+  getInterviewResponse(inviteId: string, questionId: string): Promise<InterviewResponse | undefined>;
+  createInterviewResponse(data: InsertInterviewResponse): Promise<InterviewResponse>;
+  updateInterviewResponse(id: string, data: Partial<InsertInterviewResponse>): Promise<InterviewResponse | undefined>;
 
   // Dashboard Stats
   getDashboardStats(tenantId: string): Promise<{
@@ -465,6 +475,22 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(interviewInvites.createdAt));
   }
 
+  async getInterviewInvite(id: string): Promise<InterviewInvite | undefined> {
+    const [invite] = await db
+      .select()
+      .from(interviewInvites)
+      .where(eq(interviewInvites.id, id));
+    return invite || undefined;
+  }
+
+  async getInterviewInviteByToken(token: string): Promise<InterviewInvite | undefined> {
+    const [invite] = await db
+      .select()
+      .from(interviewInvites)
+      .where(eq(interviewInvites.inviteToken, token));
+    return invite || undefined;
+  }
+
   async createInterviewInvite(data: InsertInterviewInvite): Promise<InterviewInvite> {
     const [invite] = await db.insert(interviewInvites).values(data).returning();
     return invite;
@@ -477,6 +503,40 @@ export class DatabaseStorage implements IStorage {
       .where(eq(interviewInvites.id, id))
       .returning();
     return invite || undefined;
+  }
+
+  // Interview Responses
+  async getInterviewResponsesByInvite(inviteId: string): Promise<InterviewResponse[]> {
+    return db
+      .select()
+      .from(interviewResponses)
+      .where(eq(interviewResponses.inviteId, inviteId))
+      .orderBy(interviewResponses.createdAt);
+  }
+
+  async getInterviewResponse(inviteId: string, questionId: string): Promise<InterviewResponse | undefined> {
+    const [response] = await db
+      .select()
+      .from(interviewResponses)
+      .where(and(
+        eq(interviewResponses.inviteId, inviteId),
+        eq(interviewResponses.questionId, questionId)
+      ));
+    return response || undefined;
+  }
+
+  async createInterviewResponse(data: InsertInterviewResponse): Promise<InterviewResponse> {
+    const [response] = await db.insert(interviewResponses).values(data).returning();
+    return response;
+  }
+
+  async updateInterviewResponse(id: string, data: Partial<InsertInterviewResponse>): Promise<InterviewResponse | undefined> {
+    const [response] = await db
+      .update(interviewResponses)
+      .set(data)
+      .where(eq(interviewResponses.id, id))
+      .returning();
+    return response || undefined;
   }
 
   // Dashboard Stats
