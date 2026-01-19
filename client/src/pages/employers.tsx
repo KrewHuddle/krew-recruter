@@ -160,12 +160,12 @@ export default function Employers() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <a href="/api/login">
+            <a href="/login">
               <Button variant="ghost" data-testid="button-login">
                 Sign in
               </Button>
             </a>
-            <a href="/api/login">
+            <a href="/login">
               <Button data-testid="button-get-started">Get Started</Button>
             </a>
           </div>
@@ -194,7 +194,7 @@ export default function Employers() {
               workers, find the right talent when you need it.
             </p>
             <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
-              <a href="/api/login">
+              <a href="/login">
                 <Button size="lg" className="gap-2" data-testid="button-hero-cta">
                   Start Hiring for Free
                   <ArrowRight className="h-4 w-4" />
@@ -332,7 +332,7 @@ export default function Employers() {
                       </li>
                     ))}
                   </ul>
-                  <a href="/api/login" className="block mt-8">
+                  <a href="/login" className="block mt-8">
                     <Button
                       className="w-full"
                       variant={plan.popular ? "default" : "outline"}
@@ -404,7 +404,7 @@ export default function Employers() {
                 to find and hire the best talent.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/api/login">
+                <a href="/login">
                   <Button
                     size="lg"
                     variant="secondary"

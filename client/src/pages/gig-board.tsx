@@ -119,7 +119,7 @@ export default function GigBoard() {
                     Join as Worker
                   </Button>
                 </Link>
-                <a href="/api/login">
+                <a href="/login">
                   <Button data-testid="button-login">Sign In</Button>
                 </a>
               </>
@@ -340,7 +340,7 @@ export default function GigBoard() {
                   <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
-              <a href="/api/login">
+              <a href="/login">
                 <Button variant="outline" size="lg">
                   Post Gig Shifts
                 </Button>

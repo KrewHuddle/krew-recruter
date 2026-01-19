@@ -116,7 +116,7 @@ export default function JobSearch() {
 
   const toggleSave = (jobId: string) => {
     if (!isAuthenticated) {
-      window.location.href = "/api/login";
+      window.location.href = "/login";
       return;
     }
     if (savedJobIds.has(jobId)) {
@@ -201,7 +201,7 @@ export default function JobSearch() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <a href="/api/login">
+            <a href="/login">
               <Button variant="ghost" data-testid="button-login">
                 Sign in
               </Button>

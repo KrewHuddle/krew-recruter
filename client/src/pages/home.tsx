@@ -94,12 +94,12 @@ export default function Home() {
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <a href="/api/login">
+            <a href="/login">
               <Button variant="ghost" data-testid="button-login">
                 Sign in
               </Button>
             </a>
-            <a href="/api/login">
+            <a href="/login">
               <Button data-testid="button-post-job">Post a Job</Button>
             </a>
           </div>
@@ -387,7 +387,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/jobs"><span className="hover:text-foreground cursor-pointer">Browse Jobs</span></Link></li>
                 <li><Link href="/gigs"><span className="hover:text-foreground cursor-pointer">Gig Shifts</span></Link></li>
-                <li><a href="/api/login" className="hover:text-foreground">Create Profile</a></li>
+                <li><a href="/login" className="hover:text-foreground">Create Profile</a></li>
               </ul>
             </div>
             <div>
@@ -395,7 +395,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/employers"><span className="hover:text-foreground cursor-pointer">Post a Job</span></Link></li>
                 <li><Link href="/employers"><span className="hover:text-foreground cursor-pointer">Pricing</span></Link></li>
-                <li><a href="/api/login" className="hover:text-foreground">Employer Sign In</a></li>
+                <li><a href="/login" className="hover:text-foreground">Employer Sign In</a></li>
               </ul>
             </div>
             <div>

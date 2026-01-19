@@ -31,6 +31,7 @@ import SeekerSaved from "@/pages/seeker-saved";
 import Onboarding from "@/pages/onboarding";
 import AdminDashboard from "@/pages/admin-dashboard";
 import CandidateInterview from "@/pages/candidate-interview";
+import Login from "@/pages/login";
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
 
@@ -98,7 +99,7 @@ function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
     return null;
   }
 
@@ -133,7 +134,7 @@ function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
     return null;
   }
 
@@ -162,7 +163,7 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
     return null;
   }
 
@@ -207,7 +208,7 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated) {
-    window.location.href = "/api/login";
+    window.location.href = "/login";
     return null;
   }
 
@@ -223,6 +224,8 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Home} />
+      
+      <Route path="/login" component={Login} />
       
       <Route path="/employers" component={Employers} />
       
