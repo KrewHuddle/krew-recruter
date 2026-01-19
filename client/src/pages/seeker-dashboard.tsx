@@ -5,7 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Briefcase,
   Clock,
@@ -21,6 +23,9 @@ import {
   Eye,
   Calendar,
   TrendingUp,
+  Loader2,
+  ExternalLink,
+  Wallet,
 } from "lucide-react";
 import type { Application, Job, WorkerProfile } from "@shared/schema";
 
@@ -37,8 +42,16 @@ const stageLabels: Record<string, { label: string; color: string }> = {
   REJECTED: { label: "Not Selected", color: "bg-gray-500" },
 };
 
+type PayoutAccount = {
+  id: string;
+  stripeAccountId: string | null;
+  onboardingComplete: boolean;
+  payoutsEnabled: boolean;
+};
+
 export default function SeekerDashboard() {
   const { user } = useAuth();
+  const { toast } = useToast();
 
   const { data: profile, isLoading: profileLoading } = useQuery<WorkerProfile>({
     queryKey: ["/api/profile"],
@@ -50,6 +63,25 @@ export default function SeekerDashboard() {
 
   const { data: savedJobs, isLoading: savedLoading } = useQuery<any[]>({
     queryKey: ["/api/saved-jobs"],
+  });
+
+  const { data: payoutAccount, isLoading: payoutLoading } = useQuery<PayoutAccount | null>({
+    queryKey: ["/api/worker/payout-account"],
+  });
+
+  const onboardMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/worker/payout-account/onboard", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to start payout setup", variant: "destructive" });
+    },
   });
 
   const profileCompleteness = profile
@@ -315,6 +347,76 @@ export default function SeekerDashboard() {
                   Set Up Alerts
                 </Button>
               </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Gig Payouts</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {payoutLoading ? (
+                <div className="space-y-2">
+                  <Skeleton className="h-8 w-8 rounded-full mx-auto" />
+                  <Skeleton className="h-4 w-32 mx-auto" />
+                </div>
+              ) : payoutAccount?.payoutsEnabled ? (
+                <div className="text-center py-2">
+                  <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
+                    <CheckCircle2 className="h-6 w-6 text-green-500" />
+                  </div>
+                  <p className="font-medium text-green-600 mb-1">Payouts Enabled</p>
+                  <p className="text-sm text-muted-foreground">
+                    You can receive payments for gig shifts
+                  </p>
+                </div>
+              ) : payoutAccount?.onboardingComplete ? (
+                <div className="text-center py-2">
+                  <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-2">
+                    <Clock className="h-6 w-6 text-yellow-500" />
+                  </div>
+                  <p className="font-medium text-yellow-600 mb-1">Pending Verification</p>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Your account is being reviewed
+                  </p>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => onboardMutation.mutate()}
+                    disabled={onboardMutation.isPending}
+                    data-testid="button-payout-update"
+                  >
+                    {onboardMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <ExternalLink className="h-4 w-4 mr-2" />
+                    )}
+                    Update Info
+                  </Button>
+                </div>
+              ) : (
+                <div className="text-center py-2">
+                  <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
+                    <Wallet className="h-6 w-6 text-primary" />
+                  </div>
+                  <p className="text-sm text-muted-foreground mb-3">
+                    Set up your payout account to get paid for gig shifts
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => onboardMutation.mutate()}
+                    disabled={onboardMutation.isPending}
+                    data-testid="button-payout-setup"
+                  >
+                    {onboardMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <DollarSign className="h-4 w-4 mr-2" />
+                    )}
+                    Set Up Payouts
+                  </Button>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

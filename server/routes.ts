@@ -350,6 +350,97 @@ export async function registerRoutes(
     }
   );
 
+  // CSV Import Jobs
+  app.post(
+    "/api/jobs/import",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const { jobs: jobsToImport } = req.body;
+        
+        if (!Array.isArray(jobsToImport) || jobsToImport.length === 0) {
+          return res.status(400).json({ error: "No jobs provided for import" });
+        }
+
+        if (jobsToImport.length > 100) {
+          return res.status(400).json({ error: "Maximum 100 jobs can be imported at once" });
+        }
+
+        const results: { success: number; failed: number; errors: string[] } = {
+          success: 0,
+          failed: 0,
+          errors: [],
+        };
+
+        const locations = await storage.getLocationsByTenant(tenantId);
+        const locationMap = new Map(locations.map(l => [l.name.toLowerCase(), l.id]));
+
+        for (let i = 0; i < jobsToImport.length; i++) {
+          const row = jobsToImport[i];
+          try {
+            const title = row.title?.trim();
+            const role = row.role?.trim();
+
+            if (!title || !role) {
+              results.failed++;
+              results.errors.push(`Row ${i + 1}: Title and role are required`);
+              continue;
+            }
+
+            // Validate job type
+            const jobType = row.jobType?.toUpperCase() || "FULL_TIME";
+            if (!["FULL_TIME", "PART_TIME"].includes(jobType)) {
+              results.failed++;
+              results.errors.push(`Row ${i + 1}: Invalid job type "${row.jobType}"`);
+              continue;
+            }
+
+            // Look up location by name
+            let locationId = null;
+            if (row.location) {
+              locationId = locationMap.get(row.location.toLowerCase().trim()) || null;
+            }
+
+            // Parse pay range
+            const payRangeMin = row.payRangeMin ? parseInt(row.payRangeMin, 10) : null;
+            const payRangeMax = row.payRangeMax ? parseInt(row.payRangeMax, 10) : null;
+
+            // Parse schedule tags
+            const scheduleTags = row.scheduleTags
+              ? row.scheduleTags.split(",").map((t: string) => t.trim()).filter(Boolean)
+              : null;
+
+            await storage.createJob({
+              tenantId,
+              title,
+              role,
+              description: row.description || null,
+              jobType: jobType as "FULL_TIME" | "PART_TIME",
+              locationId,
+              payRangeMin,
+              payRangeMax,
+              scheduleTags,
+              status: "DRAFT",
+            });
+
+            results.success++;
+          } catch (error) {
+            results.failed++;
+            results.errors.push(`Row ${i + 1}: ${error instanceof Error ? error.message : "Unknown error"}`);
+          }
+        }
+
+        res.json(results);
+      } catch (error) {
+        console.error("Error importing jobs:", error);
+        res.status(500).json({ error: "Failed to import jobs" });
+      }
+    }
+  );
+
   // ============ APPLICATION ROUTES ============
 
   app.get("/api/applications", isAuthenticated, requireTenant, async (req, res) => {
