@@ -165,6 +165,28 @@ npm run build        # Build for production
 - Interview templates with question management
 - Settings with org/team/billing/integrations tabs
 
+### Stripe Monetization (January 2026)
+- **Subscription Billing**: Integrated Stripe for employer subscriptions (Free/Pro/Enterprise tiers)
+  - Checkout flow with monthly/yearly toggle
+  - Customer portal for subscription management
+  - Products synced via stripe-replit-sync
+- **Worker Payouts**: Stripe Connect Express for gig workers
+  - Onboarding flow on seeker dashboard
+  - Account status tracking (enabled/pending/not setup)
+- **CSV Job Import**: Bulk import jobs from CSV files
+  - Server-side Zod validation with limits
+  - Preview table and error reporting
+  - Template download
+
+### API Additions
+- `GET /api/billing/plans` - List subscription plans with prices
+- `GET /api/billing/status` - Current subscription status
+- `POST /api/billing/checkout` - Create checkout session
+- `POST /api/billing/portal` - Open customer portal
+- `GET /api/worker/payout-account` - Worker payout account status
+- `POST /api/worker/payout-account/onboard` - Start Stripe Connect onboarding
+- `POST /api/jobs/import` - Bulk import jobs from CSV
+
 ### Branding Update
 - Updated color scheme from teal to purple/magenta to match company logo
 - Logo integrated across all sidebars (employer and seeker) and public pages

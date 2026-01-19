@@ -351,6 +351,25 @@ export async function registerRoutes(
   );
 
   // CSV Import Jobs
+  const REQUIRED_CSV_HEADERS = ["title", "role"];
+  const VALID_CSV_HEADERS = ["title", "role", "description", "jobType", "location", "payRangeMin", "payRangeMax", "scheduleTags"];
+  
+  const csvJobRowSchema = z.object({
+    title: z.string().min(1, "Title is required").max(200),
+    role: z.string().min(1, "Role is required").max(100),
+    description: z.string().max(5000).optional().nullable(),
+    jobType: z.string().optional(),
+    location: z.string().max(200).optional(),
+    payRangeMin: z.union([z.string(), z.number()]).optional(),
+    payRangeMax: z.union([z.string(), z.number()]).optional(),
+    scheduleTags: z.string().max(500).optional(),
+  });
+
+  const csvImportSchema = z.object({
+    jobs: z.array(csvJobRowSchema).min(1, "At least one job is required").max(100, "Maximum 100 jobs allowed"),
+    headers: z.array(z.string()).min(1, "Headers are required for CSV import"),
+  });
+
   app.post(
     "/api/jobs/import",
     isAuthenticated,
@@ -359,14 +378,29 @@ export async function registerRoutes(
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId;
-        const { jobs: jobsToImport } = req.body;
         
-        if (!Array.isArray(jobsToImport) || jobsToImport.length === 0) {
-          return res.status(400).json({ error: "No jobs provided for import" });
+        // Validate input schema
+        const parseResult = csvImportSchema.safeParse(req.body);
+        if (!parseResult.success) {
+          const issues = parseResult.error.issues.map(i => `${i.path.join(".")}: ${i.message}`);
+          return res.status(400).json({ error: "Invalid input", details: issues.slice(0, 5) });
         }
 
-        if (jobsToImport.length > 100) {
-          return res.status(400).json({ error: "Maximum 100 jobs can be imported at once" });
+        const { jobs: jobsToImport, headers } = parseResult.data;
+
+        // Validate required headers (always required)
+        const missingHeaders = REQUIRED_CSV_HEADERS.filter(h => !headers.includes(h));
+        if (missingHeaders.length > 0) {
+          return res.status(400).json({ 
+            error: "Missing required headers", 
+            details: [`Required headers: ${REQUIRED_CSV_HEADERS.join(", ")}. Found: ${headers.join(", ")}`] 
+          });
+        }
+        
+        // Check for unknown headers (warning, logged but not rejected)
+        const unknownHeaders = headers.filter(h => !VALID_CSV_HEADERS.includes(h));
+        if (unknownHeaders.length > 0) {
+          console.log(`CSV import has unknown headers that will be ignored: ${unknownHeaders.join(", ")}`);
         }
 
         const results: { success: number; failed: number; errors: string[] } = {
@@ -381,8 +415,8 @@ export async function registerRoutes(
         for (let i = 0; i < jobsToImport.length; i++) {
           const row = jobsToImport[i];
           try {
-            const title = row.title?.trim();
-            const role = row.role?.trim();
+            const title = row.title.trim().slice(0, 200);
+            const role = row.role.trim().slice(0, 100);
 
             if (!title || !role) {
               results.failed++;
@@ -391,10 +425,10 @@ export async function registerRoutes(
             }
 
             // Validate job type
-            const jobType = row.jobType?.toUpperCase() || "FULL_TIME";
-            if (!["FULL_TIME", "PART_TIME"].includes(jobType)) {
+            const jobTypeInput = row.jobType?.toUpperCase() || "FULL_TIME";
+            if (!["FULL_TIME", "PART_TIME"].includes(jobTypeInput)) {
               results.failed++;
-              results.errors.push(`Row ${i + 1}: Invalid job type "${row.jobType}"`);
+              results.errors.push(`Row ${i + 1}: Invalid job type "${row.jobType}". Use FULL_TIME or PART_TIME`);
               continue;
             }
 
@@ -404,21 +438,34 @@ export async function registerRoutes(
               locationId = locationMap.get(row.location.toLowerCase().trim()) || null;
             }
 
-            // Parse pay range
-            const payRangeMin = row.payRangeMin ? parseInt(row.payRangeMin, 10) : null;
-            const payRangeMax = row.payRangeMax ? parseInt(row.payRangeMax, 10) : null;
+            // Parse and validate pay range
+            const payRangeMin = row.payRangeMin ? parseInt(String(row.payRangeMin), 10) : null;
+            const payRangeMax = row.payRangeMax ? parseInt(String(row.payRangeMax), 10) : null;
+            
+            if (payRangeMin !== null && (isNaN(payRangeMin) || payRangeMin < 0 || payRangeMin > 1000000)) {
+              results.failed++;
+              results.errors.push(`Row ${i + 1}: Invalid payRangeMin value`);
+              continue;
+            }
+            if (payRangeMax !== null && (isNaN(payRangeMax) || payRangeMax < 0 || payRangeMax > 1000000)) {
+              results.failed++;
+              results.errors.push(`Row ${i + 1}: Invalid payRangeMax value`);
+              continue;
+            }
 
-            // Parse schedule tags
+            // Parse schedule tags (limit to 10 tags)
             const scheduleTags = row.scheduleTags
-              ? row.scheduleTags.split(",").map((t: string) => t.trim()).filter(Boolean)
+              ? row.scheduleTags.split(",").map((t: string) => t.trim().slice(0, 50)).filter(Boolean).slice(0, 10)
               : null;
+
+            const description = row.description?.slice(0, 5000) || null;
 
             await storage.createJob({
               tenantId,
               title,
               role,
-              description: row.description || null,
-              jobType: jobType as "FULL_TIME" | "PART_TIME",
+              description,
+              jobType: jobTypeInput as "FULL_TIME" | "PART_TIME",
               locationId,
               payRangeMin,
               payRangeMax,

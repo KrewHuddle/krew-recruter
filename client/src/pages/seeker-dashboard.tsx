@@ -350,7 +350,7 @@ export default function SeekerDashboard() {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card data-testid="card-gig-payouts">
             <CardHeader>
               <CardTitle className="text-base">Gig Payouts</CardTitle>
             </CardHeader>
@@ -361,21 +361,21 @@ export default function SeekerDashboard() {
                   <Skeleton className="h-4 w-32 mx-auto" />
                 </div>
               ) : payoutAccount?.payoutsEnabled ? (
-                <div className="text-center py-2">
+                <div className="text-center py-2" data-testid="payout-status-enabled">
                   <div className="h-12 w-12 rounded-full bg-green-500/10 flex items-center justify-center mx-auto mb-2">
                     <CheckCircle2 className="h-6 w-6 text-green-500" />
                   </div>
-                  <p className="font-medium text-green-600 mb-1">Payouts Enabled</p>
+                  <p className="font-medium text-green-600 mb-1" data-testid="text-payout-enabled">Payouts Enabled</p>
                   <p className="text-sm text-muted-foreground">
                     You can receive payments for gig shifts
                   </p>
                 </div>
               ) : payoutAccount?.onboardingComplete ? (
-                <div className="text-center py-2">
+                <div className="text-center py-2" data-testid="payout-status-pending">
                   <div className="h-12 w-12 rounded-full bg-yellow-500/10 flex items-center justify-center mx-auto mb-2">
                     <Clock className="h-6 w-6 text-yellow-500" />
                   </div>
-                  <p className="font-medium text-yellow-600 mb-1">Pending Verification</p>
+                  <p className="font-medium text-yellow-600 mb-1" data-testid="text-payout-pending">Pending Verification</p>
                   <p className="text-sm text-muted-foreground mb-3">
                     Your account is being reviewed
                   </p>
@@ -395,7 +395,7 @@ export default function SeekerDashboard() {
                   </Button>
                 </div>
               ) : (
-                <div className="text-center py-2">
+                <div className="text-center py-2" data-testid="payout-status-not-setup">
                   <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center mx-auto mb-2">
                     <Wallet className="h-6 w-6 text-primary" />
                   </div>

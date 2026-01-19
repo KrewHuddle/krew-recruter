@@ -56,21 +56,69 @@ type ImportResult = {
   errors: string[];
 };
 
-function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split("\n");
-  if (lines.length < 2) return [];
+type ParsedCSV = {
+  headers: string[];
+  rows: Record<string, string>[];
+  error?: string;
+};
+
+const REQUIRED_HEADERS = ["title", "role"];
+const VALID_HEADERS = ["title", "role", "description", "jobType", "location", "payRangeMin", "payRangeMax", "scheduleTags"];
+
+function parseCSV(text: string): ParsedCSV {
+  const lines = text.trim().split(/\r?\n/);
+  if (lines.length < 2) {
+    return { headers: [], rows: [], error: "CSV must have a header row and at least one data row" };
+  }
   
+  // Parse headers
   const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g, ""));
+  
+  // Validate required headers
+  const missingHeaders = REQUIRED_HEADERS.filter(h => !headers.includes(h));
+  if (missingHeaders.length > 0) {
+    return { 
+      headers: [], 
+      rows: [], 
+      error: `Missing required headers: ${missingHeaders.join(", ")}. Required: ${REQUIRED_HEADERS.join(", ")}` 
+    };
+  }
+  
+  // Warn about unknown headers (but don't block)
+  const unknownHeaders = headers.filter(h => !VALID_HEADERS.includes(h));
+  const warnings: string[] = [];
+  if (unknownHeaders.length > 0) {
+    warnings.push(`Ignored unknown columns: ${unknownHeaders.join(", ")}`);
+  }
+  
   const rows: Record<string, string>[] = [];
+  let unbalancedQuoteRows: number[] = [];
   
   for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue; // Skip empty lines
+    
+    // Check for unbalanced quotes (multiline fields not supported)
+    const quoteCount = (line.match(/"/g) || []).length;
+    if (quoteCount % 2 !== 0) {
+      unbalancedQuoteRows.push(i + 1);
+      continue; // Skip this row as it's malformed
+    }
+    
     const values: string[] = [];
     let current = "";
     let inQuotes = false;
     
-    for (const char of lines[i]) {
+    for (let j = 0; j < line.length; j++) {
+      const char = line[j];
       if (char === '"') {
-        inQuotes = !inQuotes;
+        // Handle escaped quotes (double quotes inside quoted field)
+        if (inQuotes && line[j + 1] === '"') {
+          current += '"';
+          j++;
+        } else {
+          inQuotes = !inQuotes;
+        }
       } else if (char === "," && !inQuotes) {
         values.push(current.trim());
         current = "";
@@ -80,14 +128,40 @@ function parseCSV(text: string): Record<string, string>[] {
     }
     values.push(current.trim());
     
+    // Check for field count mismatch
+    if (values.length !== headers.length) {
+      unbalancedQuoteRows.push(i + 1);
+      continue;
+    }
+    
+    // Only use valid headers
     const row: Record<string, string> = {};
     headers.forEach((header, idx) => {
-      row[header] = values[idx] || "";
+      if (VALID_HEADERS.includes(header)) {
+        row[header] = values[idx] || "";
+      }
     });
     rows.push(row);
   }
   
-  return rows;
+  if (unbalancedQuoteRows.length > 0) {
+    const rowsList = unbalancedQuoteRows.slice(0, 5).join(", ");
+    warnings.push(`Skipped ${unbalancedQuoteRows.length} malformed row(s): ${rowsList}${unbalancedQuoteRows.length > 5 ? "..." : ""}`);
+  }
+  
+  if (rows.length === 0) {
+    return { 
+      headers: [], 
+      rows: [], 
+      error: "No valid rows found. Check that your CSV has proper formatting (no multiline fields, balanced quotes)." 
+    };
+  }
+  
+  return { 
+    headers: headers.filter(h => VALID_HEADERS.includes(h)), 
+    rows,
+    error: warnings.length > 0 ? warnings.join(". ") : undefined
+  };
 }
 
 export default function Jobs() {
@@ -97,7 +171,8 @@ export default function Jobs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [importResult, setImportResult] = useState<ImportResult | null>(null);
-  const [parsedJobs, setParsedJobs] = useState<Record<string, string>[]>([]);
+  const [parsedData, setParsedData] = useState<ParsedCSV | null>(null);
+  const [parseWarning, setParseWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { data: jobs, isLoading } = useQuery<JobWithRelations[]>({
@@ -107,8 +182,8 @@ export default function Jobs() {
   });
 
   const importMutation = useMutation({
-    mutationFn: async (jobsData: Record<string, string>[]) => {
-      const res = await apiRequest("POST", "/api/jobs/import", { jobs: jobsData });
+    mutationFn: async (data: { jobs: Record<string, string>[]; headers: string[] }) => {
+      const res = await apiRequest("POST", "/api/jobs/import", data);
       return res.json();
     },
     onSuccess: (result: ImportResult) => {
@@ -130,20 +205,29 @@ export default function Jobs() {
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
-      const rows = parseCSV(text);
-      setParsedJobs(rows);
+      const result = parseCSV(text);
+      
+      if (result.rows.length === 0 && result.error) {
+        toast({ title: result.error, variant: "destructive" });
+        setParsedData(null);
+        setParseWarning(null);
+      } else {
+        setParsedData(result);
+        setParseWarning(result.error || null);
+      }
       setImportResult(null);
     };
     reader.readAsText(file);
   };
 
   const handleImport = () => {
-    if (parsedJobs.length === 0) return;
-    importMutation.mutate(parsedJobs);
+    if (!parsedData || parsedData.rows.length === 0) return;
+    importMutation.mutate({ jobs: parsedData.rows, headers: parsedData.headers });
   };
 
   const resetImport = () => {
-    setParsedJobs([]);
+    setParsedData(null);
+    setParseWarning(null);
     setImportResult(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -151,7 +235,7 @@ export default function Jobs() {
   };
 
   const downloadTemplate = () => {
-    const template = "title,role,description,jobType,location,payRangeMin,payRangeMax,scheduleTags\nServer,Server,\"Looking for experienced server\",FULL_TIME,\"Downtown Location\",15,20,\"Morning,Evening\"";
+    const template = "title,role,description,jobType,location,payRangeMin,payRangeMax,scheduleTags\nServer,Server,\"Looking for an experienced server to join our team\",FULL_TIME,\"Downtown Location\",15,20,\"Morning,Evening\"";
     const blob = new Blob([template], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -215,8 +299,8 @@ export default function Jobs() {
                     <div>
                       <p className="font-medium">CSV File</p>
                       <p className="text-sm text-muted-foreground">
-                        {parsedJobs.length > 0 
-                          ? `${parsedJobs.length} job(s) ready to import` 
+                        {parsedData && parsedData.rows.length > 0 
+                          ? `${parsedData.rows.length} job(s) ready to import` 
                           : "Select a CSV file to import"}
                       </p>
                     </div>
@@ -251,8 +335,14 @@ export default function Jobs() {
                   className="hidden"
                 />
 
-                {parsedJobs.length > 0 && !importResult && (
-                  <div className="max-h-48 overflow-auto rounded-lg border border-border">
+                {parseWarning && !importResult && (
+                  <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/5 text-sm text-muted-foreground" data-testid="import-parse-warning">
+                    {parseWarning}
+                  </div>
+                )}
+
+                {parsedData && parsedData.rows.length > 0 && !importResult && (
+                  <div className="max-h-48 overflow-auto rounded-lg border border-border" data-testid="import-preview-table">
                     <table className="w-full text-sm">
                       <thead className="bg-muted sticky top-0">
                         <tr>
@@ -263,46 +353,46 @@ export default function Jobs() {
                         </tr>
                       </thead>
                       <tbody>
-                        {parsedJobs.slice(0, 10).map((job, i) => (
-                          <tr key={i} className="border-t border-border">
-                            <td className="p-2">{job.title || "-"}</td>
-                            <td className="p-2">{job.role || "-"}</td>
-                            <td className="p-2">{job.jobType || "FULL_TIME"}</td>
-                            <td className="p-2">{job.location || "-"}</td>
+                        {parsedData.rows.slice(0, 10).map((job, i) => (
+                          <tr key={i} className="border-t border-border" data-testid={`import-preview-row-${i}`}>
+                            <td className="p-2" data-testid={`import-preview-title-${i}`}>{job.title || "-"}</td>
+                            <td className="p-2" data-testid={`import-preview-role-${i}`}>{job.role || "-"}</td>
+                            <td className="p-2" data-testid={`import-preview-type-${i}`}>{job.jobType || "FULL_TIME"}</td>
+                            <td className="p-2" data-testid={`import-preview-location-${i}`}>{job.location || "-"}</td>
                           </tr>
                         ))}
                       </tbody>
                     </table>
-                    {parsedJobs.length > 10 && (
-                      <p className="p-2 text-sm text-muted-foreground text-center border-t border-border">
-                        ...and {parsedJobs.length - 10} more
+                    {parsedData.rows.length > 10 && (
+                      <p className="p-2 text-sm text-muted-foreground text-center border-t border-border" data-testid="import-preview-more">
+                        ...and {parsedData.rows.length - 10} more
                       </p>
                     )}
                   </div>
                 )}
 
                 {importResult && (
-                  <div className="space-y-3">
-                    <div className="flex items-center gap-4 p-4 rounded-lg bg-muted">
+                  <div className="space-y-3" data-testid="import-result">
+                    <div className="flex items-center gap-4 p-4 rounded-lg bg-muted" data-testid="import-result-summary">
                       {importResult.success > 0 && (
-                        <div className="flex items-center gap-2 text-green-600">
+                        <div className="flex items-center gap-2 text-green-600" data-testid="import-success-count">
                           <CheckCircle2 className="h-5 w-5" />
                           <span>{importResult.success} imported</span>
                         </div>
                       )}
                       {importResult.failed > 0 && (
-                        <div className="flex items-center gap-2 text-destructive">
+                        <div className="flex items-center gap-2 text-destructive" data-testid="import-failed-count">
                           <AlertCircle className="h-5 w-5" />
                           <span>{importResult.failed} failed</span>
                         </div>
                       )}
                     </div>
                     {importResult.errors.length > 0 && (
-                      <div className="max-h-32 overflow-auto rounded-lg border border-destructive/30 bg-destructive/5 p-3">
+                      <div className="max-h-32 overflow-auto rounded-lg border border-destructive/30 bg-destructive/5 p-3" data-testid="import-errors">
                         <p className="font-medium text-sm mb-1">Errors:</p>
                         <ul className="text-sm text-muted-foreground space-y-1">
                           {importResult.errors.map((err, i) => (
-                            <li key={i}>{err}</li>
+                            <li key={i} data-testid={`import-error-${i}`}>{err}</li>
                           ))}
                         </ul>
                       </div>
@@ -323,7 +413,7 @@ export default function Jobs() {
                   {!importResult && (
                     <Button
                       onClick={handleImport}
-                      disabled={parsedJobs.length === 0 || importMutation.isPending}
+                      disabled={!parsedData || parsedData.rows.length === 0 || importMutation.isPending}
                       data-testid="button-confirm-import"
                     >
                       {importMutation.isPending ? (
@@ -332,7 +422,7 @@ export default function Jobs() {
                           Importing...
                         </>
                       ) : (
-                        `Import ${parsedJobs.length} Job(s)`
+                        `Import ${parsedData?.rows.length || 0} Job(s)`
                       )}
                     </Button>
                   )}
