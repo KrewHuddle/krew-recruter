@@ -6,6 +6,8 @@ import {
   applications,
   gigPosts,
   gigAssignments,
+  gigPayouts,
+  gigRatings,
   interviewTemplates,
   interviewQuestions,
   interviewInvites,
@@ -32,6 +34,10 @@ import {
   type InsertGigPost,
   type GigAssignment,
   type InsertGigAssignment,
+  type GigPayout,
+  type InsertGigPayout,
+  type GigRating,
+  type InsertGigRating,
   type InterviewTemplate,
   type InsertInterviewTemplate,
   type InterviewQuestion,
@@ -105,8 +111,27 @@ export interface IStorage {
 
   // Gig Assignments
   getGigAssignmentsByGig(gigPostId: string): Promise<GigAssignment[]>;
+  getGigAssignmentsByWorker(workerUserId: string): Promise<GigAssignment[]>;
+  getGigAssignment(id: string): Promise<GigAssignment | undefined>;
+  getGigAssignmentByGigAndWorker(gigPostId: string, workerUserId: string): Promise<GigAssignment | undefined>;
   createGigAssignment(data: InsertGigAssignment): Promise<GigAssignment>;
   updateGigAssignment(id: string, data: Partial<InsertGigAssignment>): Promise<GigAssignment | undefined>;
+  
+  // Gig Payouts
+  getGigPayoutsByTenant(tenantId: string): Promise<GigPayout[]>;
+  getGigPayoutsByWorker(workerUserId: string): Promise<GigPayout[]>;
+  getGigPayoutByAssignment(gigAssignmentId: string): Promise<GigPayout | undefined>;
+  getAllGigPayouts(): Promise<GigPayout[]>;
+  getPlatformRevenue(): Promise<{ totalRevenue: number; totalPayouts: number; platformFees: number; completedPayouts: number; pendingPayouts: number }>;
+  createGigPayout(data: InsertGigPayout): Promise<GigPayout>;
+  updateGigPayout(id: string, data: Partial<InsertGigPayout>): Promise<GigPayout | undefined>;
+  
+  // Gig Ratings
+  getGigRatingsByAssignment(gigAssignmentId: string): Promise<GigRating[]>;
+  getGigRatingsByUser(userId: string): Promise<GigRating[]>;
+  getAverageRatingForUser(userId: string): Promise<number | null>;
+  createGigRating(data: InsertGigRating): Promise<GigRating>;
+  hasUserRatedAssignment(gigAssignmentId: string, raterUserId: string): Promise<boolean>;
 
   // Interview Templates
   getInterviewTemplatesByTenant(tenantId: string): Promise<InterviewTemplate[]>;
@@ -409,6 +434,113 @@ export class DatabaseStorage implements IStorage {
       .where(eq(gigAssignments.id, id))
       .returning();
     return assignment || undefined;
+  }
+
+  async getGigAssignmentsByWorker(workerUserId: string): Promise<GigAssignment[]> {
+    return db.select().from(gigAssignments).where(eq(gigAssignments.workerUserId, workerUserId)).orderBy(desc(gigAssignments.createdAt));
+  }
+
+  async getGigAssignment(id: string): Promise<GigAssignment | undefined> {
+    const [assignment] = await db.select().from(gigAssignments).where(eq(gigAssignments.id, id));
+    return assignment || undefined;
+  }
+
+  async getGigAssignmentByGigAndWorker(gigPostId: string, workerUserId: string): Promise<GigAssignment | undefined> {
+    const [assignment] = await db.select().from(gigAssignments).where(
+      and(eq(gigAssignments.gigPostId, gigPostId), eq(gigAssignments.workerUserId, workerUserId))
+    );
+    return assignment || undefined;
+  }
+
+  // Gig Payouts
+  async getGigPayoutsByTenant(tenantId: string): Promise<GigPayout[]> {
+    return db.select().from(gigPayouts).where(eq(gigPayouts.tenantId, tenantId)).orderBy(desc(gigPayouts.createdAt));
+  }
+
+  async getGigPayoutsByWorker(workerUserId: string): Promise<GigPayout[]> {
+    return db.select().from(gigPayouts).where(eq(gigPayouts.workerUserId, workerUserId)).orderBy(desc(gigPayouts.createdAt));
+  }
+
+  async getGigPayoutByAssignment(gigAssignmentId: string): Promise<GigPayout | undefined> {
+    const [payout] = await db.select().from(gigPayouts).where(eq(gigPayouts.gigAssignmentId, gigAssignmentId));
+    return payout || undefined;
+  }
+
+  async getAllGigPayouts(): Promise<GigPayout[]> {
+    return db.select().from(gigPayouts).orderBy(desc(gigPayouts.createdAt)).limit(100);
+  }
+
+  async getPlatformRevenue(): Promise<{ totalRevenue: number; totalPayouts: number; platformFees: number; completedPayouts: number; pendingPayouts: number }> {
+    const allPayouts = await db.select().from(gigPayouts);
+    
+    let totalRevenue = 0;
+    let totalPayouts = 0;
+    let platformFees = 0;
+    let completedPayouts = 0;
+    let pendingPayouts = 0;
+    
+    for (const payout of allPayouts) {
+      totalRevenue += payout.amountCents;
+      platformFees += payout.platformFeeCents;
+      totalPayouts += payout.netAmountCents;
+      
+      if (payout.status === "COMPLETED") {
+        completedPayouts++;
+      } else if (payout.status === "PENDING" || payout.status === "PROCESSING") {
+        pendingPayouts++;
+      }
+    }
+    
+    return {
+      totalRevenue: totalRevenue / 100,
+      totalPayouts: totalPayouts / 100,
+      platformFees: platformFees / 100,
+      completedPayouts,
+      pendingPayouts,
+    };
+  }
+
+  async createGigPayout(data: InsertGigPayout): Promise<GigPayout> {
+    const [payout] = await db.insert(gigPayouts).values(data).returning();
+    return payout;
+  }
+
+  async updateGigPayout(id: string, data: Partial<InsertGigPayout>): Promise<GigPayout | undefined> {
+    const [payout] = await db
+      .update(gigPayouts)
+      .set(data)
+      .where(eq(gigPayouts.id, id))
+      .returning();
+    return payout || undefined;
+  }
+
+  // Gig Ratings
+  async getGigRatingsByAssignment(gigAssignmentId: string): Promise<GigRating[]> {
+    return db.select().from(gigRatings).where(eq(gigRatings.gigAssignmentId, gigAssignmentId));
+  }
+
+  async getGigRatingsByUser(userId: string): Promise<GigRating[]> {
+    return db.select().from(gigRatings).where(eq(gigRatings.ratedUserId, userId)).orderBy(desc(gigRatings.createdAt));
+  }
+
+  async getAverageRatingForUser(userId: string): Promise<number | null> {
+    const result = await db
+      .select({ avgRating: sql<number>`avg(${gigRatings.rating})` })
+      .from(gigRatings)
+      .where(eq(gigRatings.ratedUserId, userId));
+    return result[0]?.avgRating || null;
+  }
+
+  async createGigRating(data: InsertGigRating): Promise<GigRating> {
+    const [rating] = await db.insert(gigRatings).values(data).returning();
+    return rating;
+  }
+
+  async hasUserRatedAssignment(gigAssignmentId: string, raterUserId: string): Promise<boolean> {
+    const [existing] = await db.select().from(gigRatings).where(
+      and(eq(gigRatings.gigAssignmentId, gigAssignmentId), eq(gigRatings.raterUserId, raterUserId))
+    );
+    return !!existing;
   }
 
   // Interview Templates

@@ -741,6 +741,31 @@ export const insertGigPayoutSchema = createInsertSchema(gigPayouts).omit({ id: t
 export type InsertGigPayout = z.infer<typeof insertGigPayoutSchema>;
 export type GigPayout = typeof gigPayouts.$inferSelect;
 
+// ============ GIG RATINGS ============
+
+export const gigRatings = pgTable("gig_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  gigAssignmentId: varchar("gig_assignment_id").notNull().references(() => gigAssignments.id, { onDelete: "cascade" }),
+  raterUserId: varchar("rater_user_id").notNull(),
+  ratedUserId: varchar("rated_user_id").notNull(),
+  raterType: text("rater_type").notNull(), // 'EMPLOYER' or 'WORKER'
+  rating: integer("rating").notNull(), // 1-5 stars
+  review: text("review"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_rating_assignment").on(table.gigAssignmentId),
+  index("idx_rating_rater").on(table.raterUserId),
+  index("idx_rating_rated").on(table.ratedUserId),
+]);
+
+export const gigRatingsRelations = relations(gigRatings, ({ one }) => ({
+  gigAssignment: one(gigAssignments, { fields: [gigRatings.gigAssignmentId], references: [gigAssignments.id] }),
+}));
+
+export const insertGigRatingSchema = createInsertSchema(gigRatings).omit({ id: true, createdAt: true });
+export type InsertGigRating = z.infer<typeof insertGigRatingSchema>;
+export type GigRating = typeof gigRatings.$inferSelect;
+
 // ============ JOB IMPORTS ============
 
 export const jobImports = pgTable("job_imports", {

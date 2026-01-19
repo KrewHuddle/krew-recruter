@@ -573,6 +573,30 @@ export async function registerRoutes(
     }
   });
 
+  // Get single gig by ID
+  app.get("/api/gigs/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tenantId = (req as any).tenantId;
+      const gig = await storage.getGigPost(id);
+      
+      if (!gig) {
+        return res.status(404).json({ error: "Gig not found" });
+      }
+      
+      // Enforce tenant ownership
+      if (gig.tenantId !== tenantId) {
+        return res.status(404).json({ error: "Gig not found" });
+      }
+      
+      const location = gig.locationId ? await storage.getLocation(gig.locationId) : undefined;
+      res.json({ ...gig, location });
+    } catch (error) {
+      console.error("Error fetching gig:", error);
+      res.status(500).json({ error: "Failed to fetch gig" });
+    }
+  });
+
   app.post(
     "/api/gigs",
     isAuthenticated,
@@ -598,6 +622,14 @@ export async function registerRoutes(
     async (req, res) => {
       try {
         const { id } = req.params;
+        const tenantId = (req as any).tenantId;
+        
+        // Verify gig belongs to this tenant
+        const existingGig = await storage.getGigPost(id);
+        if (!existingGig || existingGig.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Gig not found" });
+        }
+        
         const gig = await storage.updateGigPost(id, req.body);
         res.json(gig);
       } catch (error) {
@@ -615,11 +647,465 @@ export async function registerRoutes(
     async (req, res) => {
       try {
         const { id } = req.params;
+        const tenantId = (req as any).tenantId;
+        
+        // Verify gig belongs to this tenant
+        const existingGig = await storage.getGigPost(id);
+        if (!existingGig || existingGig.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Gig not found" });
+        }
+        
         await storage.deleteGigPost(id);
         res.json({ success: true });
       } catch (error) {
         console.error("Error deleting gig:", error);
         res.status(500).json({ error: "Failed to delete gig" });
+      }
+    }
+  );
+
+  // Get gig applicants (employer view)
+  app.get(
+    "/api/gigs/:id/applicants",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const tenantId = (req as any).tenantId;
+        
+        // Verify gig belongs to this tenant
+        const gig = await storage.getGigPost(id);
+        if (!gig || gig.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Gig not found" });
+        }
+        
+        const assignments = await storage.getGigAssignmentsByGig(id);
+        
+        // Get worker profiles for each assignment
+        const applicantsWithProfiles = await Promise.all(
+          assignments.map(async (assignment) => {
+            const workerProfile = await storage.getWorkerProfile(assignment.workerUserId);
+            const userProfile = await storage.getUserProfile(assignment.workerUserId);
+            const avgRating = await storage.getAverageRatingForUser(assignment.workerUserId);
+            return { 
+              ...assignment, 
+              workerProfile, 
+              userProfile,
+              avgRating: avgRating ? Number(avgRating).toFixed(1) : null
+            };
+          })
+        );
+        
+        res.json(applicantsWithProfiles);
+      } catch (error) {
+        console.error("Error fetching gig applicants:", error);
+        res.status(500).json({ error: "Failed to fetch applicants" });
+      }
+    }
+  );
+
+  // Worker applies to gig
+  app.post("/api/gigs/:id/apply", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      // Verify user is a job seeker
+      const userProfile = await storage.getUserProfile(userId);
+      if (!userProfile || userProfile.userType !== "JOB_SEEKER") {
+        return res.status(403).json({ error: "Only job seekers can apply for gigs" });
+      }
+      
+      const { id } = req.params;
+      const gig = await storage.getGigPost(id);
+      
+      if (!gig) {
+        return res.status(404).json({ error: "Gig not found" });
+      }
+      
+      if (gig.status !== "OPEN") {
+        return res.status(400).json({ error: "Gig is not accepting applications" });
+      }
+      
+      // Check if already applied (including cancelled - allow re-apply only if not cancelled)
+      const existing = await storage.getGigAssignmentByGigAndWorker(id, userId);
+      if (existing && existing.status !== "CANCELLED") {
+        return res.status(400).json({ error: "Already applied to this gig" });
+      }
+      
+      // If previously cancelled, update status instead of creating new
+      if (existing && existing.status === "CANCELLED") {
+        const assignment = await storage.updateGigAssignment(existing.id, { status: "PENDING" });
+        return res.json(assignment);
+      }
+      
+      // Create assignment with PENDING status
+      const assignment = await storage.createGigAssignment({
+        tenantId: gig.tenantId,
+        gigPostId: id,
+        workerUserId: userId,
+        status: "PENDING",
+      });
+      
+      res.json(assignment);
+    } catch (error) {
+      console.error("Error applying to gig:", error);
+      res.status(500).json({ error: "Failed to apply to gig" });
+    }
+  });
+
+  // Worker withdraws gig application
+  app.delete("/api/gigs/:id/apply", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      const { id } = req.params;
+      const assignment = await storage.getGigAssignmentByGigAndWorker(id, userId);
+      
+      if (!assignment) {
+        return res.status(404).json({ error: "Application not found" });
+      }
+      
+      if (assignment.status !== "PENDING") {
+        return res.status(400).json({ error: "Cannot withdraw after being confirmed" });
+      }
+      
+      await storage.updateGigAssignment(assignment.id, { status: "CANCELLED" });
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error withdrawing application:", error);
+      res.status(500).json({ error: "Failed to withdraw application" });
+    }
+  });
+
+  // Update gig assignment status (approve/reject/check-in/complete)
+  app.patch(
+    "/api/gigs/assignments/:id",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const { status } = req.body;
+        const tenantId = (req as any).tenantId;
+        
+        const assignment = await storage.getGigAssignment(id);
+        if (!assignment) {
+          return res.status(404).json({ error: "Assignment not found" });
+        }
+        
+        // Verify assignment belongs to this tenant
+        if (assignment.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Assignment not found" });
+        }
+        
+        // Validate status transition
+        const validTransitions: Record<string, string[]> = {
+          PENDING: ["CONFIRMED", "CANCELLED"],
+          CONFIRMED: ["CHECKED_IN", "CANCELLED"],
+          CHECKED_IN: ["COMPLETED", "NO_SHOW", "CANCELLED"],
+        };
+        
+        if (validTransitions[assignment.status] && !validTransitions[assignment.status].includes(status)) {
+          return res.status(400).json({ error: `Invalid status transition from ${assignment.status} to ${status}` });
+        }
+        
+        const updated = await storage.updateGigAssignment(id, { status });
+        res.json(updated);
+      } catch (error) {
+        console.error("Error updating assignment:", error);
+        res.status(500).json({ error: "Failed to update assignment" });
+      }
+    }
+  );
+
+  // Mark gig assignment as completed and create payout
+  app.post(
+    "/api/gigs/assignments/:id/complete",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
+    async (req, res) => {
+      try {
+        const { id } = req.params;
+        const tenantId = (req as any).tenantId;
+        const { hoursWorked } = req.body;
+        
+        const assignment = await storage.getGigAssignment(id);
+        if (!assignment) {
+          return res.status(404).json({ error: "Assignment not found" });
+        }
+        
+        // Verify assignment belongs to this tenant
+        if (assignment.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Assignment not found" });
+        }
+        
+        // Validate status transition - only CONFIRMED or CHECKED_IN can be completed
+        if (!["CONFIRMED", "CHECKED_IN"].includes(assignment.status)) {
+          return res.status(400).json({ error: `Cannot complete gig from ${assignment.status} status` });
+        }
+        
+        const gig = await storage.getGigPost(assignment.gigPostId);
+        if (!gig) {
+          return res.status(404).json({ error: "Gig not found" });
+        }
+        
+        // Calculate payout based on hours worked and pay rate
+        const hours = hoursWorked || ((new Date(gig.endAt).getTime() - new Date(gig.startAt).getTime()) / (1000 * 60 * 60));
+        const amountCents = Math.round(gig.payRate * hours * 100);
+        const platformFeeCents = Math.round(amountCents * 0.10); // 10% platform fee
+        const netAmountCents = amountCents - platformFeeCents;
+        
+        // Update assignment to completed
+        await storage.updateGigAssignment(id, { status: "COMPLETED" });
+        
+        // Create payout record
+        const payout = await storage.createGigPayout({
+          tenantId,
+          gigAssignmentId: id,
+          workerUserId: assignment.workerUserId,
+          amountCents,
+          platformFeeCents,
+          netAmountCents,
+          status: "PENDING",
+        });
+        
+        res.json({ assignment: await storage.getGigAssignment(id), payout });
+      } catch (error) {
+        console.error("Error completing gig:", error);
+        res.status(500).json({ error: "Failed to complete gig" });
+      }
+    }
+  );
+
+  // Rate completed gig
+  app.post("/api/gigs/assignments/:id/rate", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      const { id } = req.params;
+      const { rating, review, ratedUserId, raterType } = req.body;
+      
+      if (!rating || rating < 1 || rating > 5) {
+        return res.status(400).json({ error: "Rating must be between 1 and 5" });
+      }
+      
+      if (!["EMPLOYER", "WORKER"].includes(raterType)) {
+        return res.status(400).json({ error: "Invalid rater type" });
+      }
+      
+      const assignment = await storage.getGigAssignment(id);
+      if (!assignment) {
+        return res.status(404).json({ error: "Assignment not found" });
+      }
+      
+      if (assignment.status !== "COMPLETED") {
+        return res.status(400).json({ error: "Can only rate completed gigs" });
+      }
+      
+      // Verify the rater is authorized for this assignment
+      if (raterType === "WORKER") {
+        // Worker can only rate their own assignment
+        if (assignment.workerUserId !== userId) {
+          return res.status(403).json({ error: "Not authorized to rate this gig" });
+        }
+      } else {
+        // Employer must be a member of the tenant that owns the assignment
+        const membership = await storage.getTenantMembership(userId, assignment.tenantId);
+        if (!membership) {
+          return res.status(403).json({ error: "Not authorized to rate this gig" });
+        }
+      }
+      
+      // Check if already rated
+      const alreadyRated = await storage.hasUserRatedAssignment(id, userId);
+      if (alreadyRated) {
+        return res.status(400).json({ error: "Already rated this gig" });
+      }
+      
+      const gigRating = await storage.createGigRating({
+        gigAssignmentId: id,
+        raterUserId: userId,
+        ratedUserId,
+        raterType,
+        rating,
+        review,
+      });
+      
+      res.json(gigRating);
+    } catch (error) {
+      console.error("Error rating gig:", error);
+      res.status(500).json({ error: "Failed to rate gig" });
+    }
+  });
+
+  // Get ratings for a user
+  app.get("/api/users/:userId/ratings", async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const ratings = await storage.getGigRatingsByUser(userId);
+      const avgRating = await storage.getAverageRatingForUser(userId);
+      
+      res.json({ ratings, avgRating: avgRating ? Number(avgRating).toFixed(1) : null });
+    } catch (error) {
+      console.error("Error fetching ratings:", error);
+      res.status(500).json({ error: "Failed to fetch ratings" });
+    }
+  });
+
+  // Worker's gig applications and history
+  app.get("/api/worker/gigs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      const assignments = await storage.getGigAssignmentsByWorker(userId);
+      
+      // Get gig details for each assignment
+      const gigsWithDetails = await Promise.all(
+        assignments.map(async (assignment) => {
+          const gig = await storage.getGigPost(assignment.gigPostId);
+          const location = gig?.locationId ? await storage.getLocation(gig.locationId) : undefined;
+          const tenant = gig ? await storage.getTenant(gig.tenantId) : undefined;
+          const payout = await storage.getGigPayoutByAssignment(assignment.id);
+          const ratings = await storage.getGigRatingsByAssignment(assignment.id);
+          
+          return { 
+            ...assignment, 
+            gig: gig ? { ...gig, location, tenant } : null,
+            payout,
+            ratings
+          };
+        })
+      );
+      
+      res.json(gigsWithDetails);
+    } catch (error) {
+      console.error("Error fetching worker gigs:", error);
+      res.status(500).json({ error: "Failed to fetch gigs" });
+    }
+  });
+
+  // Worker's gig earnings summary
+  app.get("/api/worker/earnings", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      
+      const payouts = await storage.getGigPayoutsByWorker(userId);
+      
+      const totalEarnings = payouts
+        .filter(p => p.status === "COMPLETED")
+        .reduce((sum, p) => sum + p.netAmountCents, 0);
+      
+      const pendingEarnings = payouts
+        .filter(p => p.status === "PENDING" || p.status === "PROCESSING")
+        .reduce((sum, p) => sum + p.netAmountCents, 0);
+      
+      const completedGigs = payouts.filter(p => p.status === "COMPLETED").length;
+      
+      res.json({
+        totalEarnings: totalEarnings / 100,
+        pendingEarnings: pendingEarnings / 100,
+        completedGigs,
+        payouts: payouts.slice(0, 10), // Last 10 payouts
+      });
+    } catch (error) {
+      console.error("Error fetching earnings:", error);
+      res.status(500).json({ error: "Failed to fetch earnings" });
+    }
+  });
+
+  // Employer payouts list
+  app.get(
+    "/api/payouts",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const payouts = await storage.getGigPayoutsByTenant(tenantId);
+        
+        // Get assignment and worker details
+        const payoutsWithDetails = await Promise.all(
+          payouts.map(async (payout) => {
+            const assignment = await storage.getGigAssignment(payout.gigAssignmentId);
+            const gig = assignment ? await storage.getGigPost(assignment.gigPostId) : null;
+            const workerProfile = await storage.getWorkerProfile(payout.workerUserId);
+            const userProfile = await storage.getUserProfile(payout.workerUserId);
+            
+            return { ...payout, assignment, gig, workerProfile, userProfile };
+          })
+        );
+        
+        res.json(payoutsWithDetails);
+      } catch (error) {
+        console.error("Error fetching payouts:", error);
+        res.status(500).json({ error: "Failed to fetch payouts" });
+      }
+    }
+  );
+
+  // Process payout via Stripe Connect
+  app.post(
+    "/api/payouts/:id/process",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN"),
+    async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        const { id } = req.params;
+        
+        const payout = await storage.getGigPayoutByAssignment(id);
+        if (!payout) {
+          // Check if id is the payout ID itself
+          const payouts = await storage.getGigPayoutsByTenant((req as any).tenantId);
+          const foundPayout = payouts.find(p => p.id === id);
+          if (!foundPayout) {
+            return res.status(404).json({ error: "Payout not found" });
+          }
+        }
+        
+        // Get worker's payout account
+        const workerAccount = await storage.getWorkerPayoutAccount(payout?.workerUserId || "");
+        if (!workerAccount || !workerAccount.stripeAccountId || !workerAccount.payoutsEnabled) {
+          return res.status(400).json({ error: "Worker does not have a valid payout account" });
+        }
+        
+        // Create Stripe transfer
+        try {
+          const transfer = await stripeService.createTransfer(
+            payout!.netAmountCents,
+            workerAccount.stripeAccountId,
+            { gigAssignmentId: payout!.gigAssignmentId }
+          );
+          
+          // Update payout with transfer ID
+          await storage.updateGigPayout(payout!.id, {
+            stripeTransferId: transfer.id,
+            status: "COMPLETED",
+            approvedByUserId: userId,
+            approvedAt: new Date(),
+            paidAt: new Date(),
+          });
+          
+          res.json({ success: true, transferId: transfer.id });
+        } catch (stripeError: any) {
+          console.error("Stripe transfer failed:", stripeError);
+          await storage.updateGigPayout(payout!.id, { status: "FAILED" });
+          return res.status(500).json({ error: "Payment processing failed" });
+        }
+      } catch (error) {
+        console.error("Error processing payout:", error);
+        res.status(500).json({ error: "Failed to process payout" });
       }
     }
   );
@@ -1554,6 +2040,40 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // Get platform revenue analytics
+  app.get("/api/admin/revenue", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const revenue = await storage.getPlatformRevenue();
+      res.json(revenue);
+    } catch (error) {
+      console.error("Error fetching revenue:", error);
+      res.status(500).json({ error: "Failed to fetch revenue" });
+    }
+  });
+
+  // Get all payouts for admin
+  app.get("/api/admin/payouts", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const payouts = await storage.getAllGigPayouts();
+      
+      // Get details for each payout
+      const payoutsWithDetails = await Promise.all(
+        payouts.map(async (payout) => {
+          const assignment = await storage.getGigAssignment(payout.gigAssignmentId);
+          const gig = assignment ? await storage.getGigPost(assignment.gigPostId) : null;
+          const workerProfile = await storage.getUserProfile(payout.workerUserId);
+          const tenant = await storage.getTenant(payout.tenantId);
+          return { ...payout, assignment, gig, workerProfile, tenant };
+        })
+      );
+      
+      res.json(payoutsWithDetails);
+    } catch (error) {
+      console.error("Error fetching admin payouts:", error);
+      res.status(500).json({ error: "Failed to fetch payouts" });
     }
   });
 

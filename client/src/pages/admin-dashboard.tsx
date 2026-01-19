@@ -33,10 +33,13 @@ import {
   Shield,
   ShieldCheck,
   ShieldOff,
+  DollarSign,
+  TrendingUp,
+  CreditCard,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Tenant, UserProfile } from "@shared/schema";
+import type { Tenant, UserProfile, GigPayout, GigPost } from "@shared/schema";
 
 interface AdminStats {
   totalTenants: number;
@@ -44,6 +47,20 @@ interface AdminStats {
   totalJobs: number;
   totalApplications: number;
   totalGigs: number;
+}
+
+interface PlatformRevenue {
+  totalRevenue: number;
+  totalPayouts: number;
+  platformFees: number;
+  completedPayouts: number;
+  pendingPayouts: number;
+}
+
+interface AdminPayout extends GigPayout {
+  gig?: GigPost | null;
+  workerProfile?: UserProfile | null;
+  tenant?: Tenant | null;
 }
 
 const planColors: Record<string, string> = {
@@ -65,6 +82,14 @@ export default function AdminDashboard() {
 
   const { data: users, isLoading: usersLoading } = useQuery<UserProfile[]>({
     queryKey: ["/api/admin/users"],
+  });
+
+  const { data: revenue, isLoading: revenueLoading } = useQuery<PlatformRevenue>({
+    queryKey: ["/api/admin/revenue"],
+  });
+
+  const { data: payouts, isLoading: payoutsLoading } = useQuery<AdminPayout[]>({
+    queryKey: ["/api/admin/payouts"],
   });
 
   const updateTenantMutation = useMutation({
@@ -196,6 +221,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="revenue" data-testid="tab-revenue">
+            <DollarSign className="h-4 w-4 mr-2" />
+            Revenue
           </TabsTrigger>
         </TabsList>
 
@@ -343,6 +372,133 @@ export default function AdminDashboard() {
               ) : (
                 <div className="text-center py-8 text-muted-foreground">
                   No users yet
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="revenue">
+          <div className="grid gap-4 md:grid-cols-4 mb-6">
+            <Card data-testid="stat-total-revenue">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {revenueLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <div className="text-2xl font-bold">${revenue?.totalRevenue?.toFixed(2) || "0.00"}</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="stat-platform-fees">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Platform Fees (10%)</CardTitle>
+                <TrendingUp className="h-4 w-4 text-green-500" />
+              </CardHeader>
+              <CardContent>
+                {revenueLoading ? (
+                  <Skeleton className="h-8 w-24" />
+                ) : (
+                  <div className="text-2xl font-bold text-green-600">${revenue?.platformFees?.toFixed(2) || "0.00"}</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="stat-completed-payouts">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Completed Payouts</CardTitle>
+                <CreditCard className="h-4 w-4 text-muted-foreground" />
+              </CardHeader>
+              <CardContent>
+                {revenueLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-2xl font-bold">{revenue?.completedPayouts || 0}</div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card data-testid="stat-pending-payouts">
+              <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">Pending Payouts</CardTitle>
+                <Clock className="h-4 w-4 text-orange-500" />
+              </CardHeader>
+              <CardContent>
+                {revenueLoading ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-2xl font-bold text-orange-600">{revenue?.pendingPayouts || 0}</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Recent Payouts</CardTitle>
+              <CardDescription>
+                All gig payouts across the platform
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {payoutsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : payouts && payouts.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Worker</TableHead>
+                      <TableHead>Gig</TableHead>
+                      <TableHead>Organization</TableHead>
+                      <TableHead>Amount</TableHead>
+                      <TableHead>Platform Fee</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Date</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {payouts.map((payout) => (
+                      <TableRow key={payout.id} data-testid={`payout-row-${payout.id}`}>
+                        <TableCell className="font-medium">
+                          {payout.workerProfile
+                            ? `${payout.workerProfile.firstName} ${payout.workerProfile.lastName}`
+                            : "Unknown"}
+                        </TableCell>
+                        <TableCell>{payout.gig?.role || "N/A"}</TableCell>
+                        <TableCell className="text-muted-foreground">{payout.tenant?.name || "N/A"}</TableCell>
+                        <TableCell>${((payout.netAmountCents || 0) / 100).toFixed(2)}</TableCell>
+                        <TableCell className="text-green-600">${((payout.platformFeeCents || 0) / 100).toFixed(2)}</TableCell>
+                        <TableCell>
+                          <Badge
+                            variant={
+                              payout.status === "COMPLETED"
+                                ? "default"
+                                : payout.status === "PENDING"
+                                ? "secondary"
+                                : "destructive"
+                            }
+                          >
+                            {payout.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {payout.createdAt ? new Date(payout.createdAt).toLocaleDateString() : "N/A"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No payouts yet
                 </div>
               )}
             </CardContent>

@@ -22,12 +22,14 @@ import JobCreate from "@/pages/job-create";
 import Applicants from "@/pages/applicants";
 import Gigs from "@/pages/gigs";
 import GigCreate from "@/pages/gig-create";
+import GigDetail from "@/pages/gig-detail";
 import GigBoard from "@/pages/gig-board";
 import Interviews from "@/pages/interviews";
 import Settings from "@/pages/settings";
 import SeekerDashboard from "@/pages/seeker-dashboard";
 import SeekerProfile from "@/pages/seeker-profile";
 import SeekerSaved from "@/pages/seeker-saved";
+import SeekerGigs from "@/pages/seeker-gigs";
 import Onboarding from "@/pages/onboarding";
 import AdminDashboard from "@/pages/admin-dashboard";
 import CandidateInterview from "@/pages/candidate-interview";
@@ -263,6 +265,12 @@ function AppRouter() {
         </ProtectedSeekerRoute>
       </Route>
       
+      <Route path="/seeker/gigs">
+        <ProtectedSeekerRoute>
+          <SeekerGigs />
+        </ProtectedSeekerRoute>
+      </Route>
+      
       <Route path="/app">
         <ProtectedEmployerRoute>
           <Dashboard />
@@ -308,6 +316,12 @@ function AppRouter() {
       <Route path="/app/gigs/new">
         <ProtectedEmployerRoute>
           <GigCreate />
+        </ProtectedEmployerRoute>
+      </Route>
+      
+      <Route path="/app/gigs/:id">
+        <ProtectedEmployerRoute>
+          <GigDetail />
         </ProtectedEmployerRoute>
       </Route>
       

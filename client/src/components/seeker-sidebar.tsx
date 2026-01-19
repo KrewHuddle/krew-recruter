@@ -38,9 +38,9 @@ import logoImage from "@assets/3_1768835575859.png";
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/seeker" },
   { title: "Find Jobs", icon: Briefcase, href: "/jobs" },
-  { title: "Gig Shifts", icon: Clock, href: "/gigs" },
+  { title: "Find Gigs", icon: Clock, href: "/gigs" },
+  { title: "My Gigs", icon: FileText, href: "/seeker/gigs" },
   { title: "Saved Jobs", icon: Bookmark, href: "/seeker/saved" },
-  { title: "My Applications", icon: FileText, href: "/seeker/applications" },
 ];
 
 const accountItems = [

@@ -1,5 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { Link, useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,8 @@ import {
 } from "@/components/ui/select";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { useAuth } from "@/hooks/use-auth";
+import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 import {
   Clock,
   Search,
@@ -23,10 +25,12 @@ import {
   AlertTriangle,
   ArrowRight,
   Filter,
+  Check,
+  Loader2,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
 import { useState } from "react";
-import type { GigPost, Location, Tenant } from "@shared/schema";
+import type { GigPost, Location, Tenant, GigAssignment } from "@shared/schema";
 import { FOH_ROLES, BOH_ROLES } from "@shared/schema";
 
 type PublicGig = GigPost & {
@@ -38,14 +42,66 @@ const allRoles = [...FOH_ROLES, ...BOH_ROLES];
 
 export default function GigBoard() {
   const { user, isAuthenticated } = useAuth();
+  const [, navigate] = useLocation();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [dateFilter, setDateFilter] = useState<string>("all");
   const [payFilter, setPayFilter] = useState<string>("all");
+  const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
 
   const { data: gigs, isLoading } = useQuery<PublicGig[]>({
     queryKey: ["/api/gigs/public"],
   });
+
+  // Get worker's current applications
+  const { data: myGigs } = useQuery<{ gigPostId: string; status: string }[]>({
+    queryKey: ["/api/worker/gigs"],
+    enabled: isAuthenticated && user?.userType === "seeker",
+  });
+
+  const appliedGigIds = new Set(myGigs?.map((g) => g.gigPostId) || []);
+
+  const applyMutation = useMutation({
+    mutationFn: async (gigId: string) => {
+      setApplyingGigId(gigId);
+      const res = await apiRequest("POST", `/api/gigs/${gigId}/apply`);
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/worker/gigs"] });
+      toast({
+        title: "Applied successfully!",
+        description: "The employer will review your application.",
+      });
+      setApplyingGigId(null);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Application failed",
+        description: error.message || "Please try again",
+        variant: "destructive",
+      });
+      setApplyingGigId(null);
+    },
+  });
+
+  const handleApply = (gigId: string) => {
+    if (!isAuthenticated) {
+      navigate("/login");
+      return;
+    }
+    if (user?.userType !== "seeker") {
+      toast({
+        title: "Seeker account required",
+        description: "Please log in as a job seeker to apply for gigs.",
+        variant: "destructive",
+      });
+      return;
+    }
+    applyMutation.mutate(gigId);
+  };
 
   const filteredGigs = gigs?.filter((gig) => {
     const matchesSearch =
@@ -282,14 +338,33 @@ export default function GigBoard() {
                           <DollarSign className="h-5 w-5" />
                           {gig.payRate}/hr
                         </div>
-                        <Button
-                          size="sm"
-                          className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                          data-testid={`button-apply-gig-${gig.id}`}
-                        >
-                          Apply
-                          <ArrowRight className="h-3 w-3" />
-                        </Button>
+                        {appliedGigIds.has(gig.id) ? (
+                          <Badge variant="secondary" className="gap-1">
+                            <Check className="h-3 w-3" />
+                            Applied
+                          </Badge>
+                        ) : (
+                          <Button
+                            size="sm"
+                            className="gap-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            onClick={(e) => {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              handleApply(gig.id);
+                            }}
+                            disabled={applyingGigId === gig.id}
+                            data-testid={`button-apply-gig-${gig.id}`}
+                          >
+                            {applyingGigId === gig.id ? (
+                              <Loader2 className="h-3 w-3 animate-spin" />
+                            ) : (
+                              <>
+                                Apply
+                                <ArrowRight className="h-3 w-3" />
+                              </>
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </CardContent>
                   </Card>

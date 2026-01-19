@@ -25,7 +25,7 @@ export const users = pgTable("users", {
   emailVerifyToken: text("email_verify_token"),
   emailVerifyExpires: timestamp("email_verify_expires"),
   // OAuth fields
-  googleId: text("google_id").unique(),
+  googleId: text("google_id"),
   authProvider: text("auth_provider").default("email"), // 'email' | 'google'
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
