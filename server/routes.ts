@@ -2265,5 +2265,562 @@ export async function registerRoutes(
     }
   });
 
+  // ============ SUPER ADMIN FEATURE FLAGS ============
+
+  app.get("/api/admin/feature-flags", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const flags = await storage.getAllFeatureFlags();
+      res.json(flags);
+    } catch (error) {
+      console.error("Error fetching feature flags:", error);
+      res.status(500).json({ error: "Failed to fetch feature flags" });
+    }
+  });
+
+  app.post("/api/admin/feature-flags", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const flag = await storage.createFeatureFlag(req.body);
+      res.status(201).json(flag);
+    } catch (error) {
+      console.error("Error creating feature flag:", error);
+      res.status(500).json({ error: "Failed to create feature flag" });
+    }
+  });
+
+  app.patch("/api/admin/feature-flags/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const flag = await storage.updateFeatureFlag(id, req.body);
+      if (!flag) return res.status(404).json({ error: "Feature flag not found" });
+      res.json(flag);
+    } catch (error) {
+      console.error("Error updating feature flag:", error);
+      res.status(500).json({ error: "Failed to update feature flag" });
+    }
+  });
+
+  app.delete("/api/admin/feature-flags/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteFeatureFlag(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting feature flag:", error);
+      res.status(500).json({ error: "Failed to delete feature flag" });
+    }
+  });
+
+  // ============ SUPER ADMIN COUPONS ============
+
+  app.get("/api/admin/coupons", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const coupons = await storage.getAllCoupons();
+      res.json(coupons);
+    } catch (error) {
+      console.error("Error fetching coupons:", error);
+      res.status(500).json({ error: "Failed to fetch coupons" });
+    }
+  });
+
+  app.post("/api/admin/coupons", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const coupon = await storage.createCoupon(req.body);
+      res.status(201).json(coupon);
+    } catch (error) {
+      console.error("Error creating coupon:", error);
+      res.status(500).json({ error: "Failed to create coupon" });
+    }
+  });
+
+  app.patch("/api/admin/coupons/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const coupon = await storage.updateCoupon(id, req.body);
+      if (!coupon) return res.status(404).json({ error: "Coupon not found" });
+      res.json(coupon);
+    } catch (error) {
+      console.error("Error updating coupon:", error);
+      res.status(500).json({ error: "Failed to update coupon" });
+    }
+  });
+
+  app.delete("/api/admin/coupons/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteCoupon(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting coupon:", error);
+      res.status(500).json({ error: "Failed to delete coupon" });
+    }
+  });
+
+  // Validate and redeem coupon (tenant-scoped)
+  app.post("/api/coupons/validate", isAuthenticated, async (req, res) => {
+    try {
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: "Coupon code required" });
+      const result = await storage.validateCoupon(code);
+      res.json(result);
+    } catch (error) {
+      console.error("Error validating coupon:", error);
+      res.status(500).json({ error: "Failed to validate coupon" });
+    }
+  });
+
+  app.post("/api/coupons/redeem", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { code } = req.body;
+      if (!code) return res.status(400).json({ error: "Coupon code required" });
+
+      const validation = await storage.validateCoupon(code);
+      if (!validation.valid) return res.status(400).json({ error: validation.error });
+
+      const redemption = await storage.redeemCoupon(validation.coupon!.id, tenantId);
+      res.json({ success: true, redemption, coupon: validation.coupon });
+    } catch (error) {
+      console.error("Error redeeming coupon:", error);
+      res.status(500).json({ error: "Failed to redeem coupon" });
+    }
+  });
+
+  // ============ SUPER ADMIN ANALYTICS ============
+
+  app.get("/api/admin/analytics/mrr", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const mrrData = await storage.getMrrByMonth();
+      const latestMrr = mrrData.length > 0 ? mrrData[mrrData.length - 1] : { mrr: 0, arr: 0 };
+      res.json({ monthly: mrrData, currentMrr: latestMrr.mrr, currentArr: latestMrr.arr });
+    } catch (error) {
+      console.error("Error fetching MRR analytics:", error);
+      res.status(500).json({ error: "Failed to fetch MRR analytics" });
+    }
+  });
+
+  app.get("/api/admin/analytics/churn", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const churnData = await storage.getChurnRate();
+      res.json(churnData);
+    } catch (error) {
+      console.error("Error fetching churn analytics:", error);
+      res.status(500).json({ error: "Failed to fetch churn analytics" });
+    }
+  });
+
+  app.get("/api/admin/analytics/tenant-health", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const healthScores = await storage.getTenantHealthScores();
+      res.json(healthScores);
+    } catch (error) {
+      console.error("Error fetching tenant health scores:", error);
+      res.status(500).json({ error: "Failed to fetch tenant health scores" });
+    }
+  });
+
+  // ============ SUPER ADMIN IMPERSONATION ============
+
+  app.post("/api/admin/impersonate/:userId", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const adminUserId = getUserId(req);
+      if (!adminUserId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { userId } = req.params;
+      const targetUser = await storage.getUserProfile(userId);
+      if (!targetUser) return res.status(404).json({ error: "User not found" });
+
+      const session = await storage.createImpersonationSession({
+        adminUserId,
+        targetUserId: userId,
+        reason: req.body.reason || "Admin debugging",
+      });
+      res.json({ session, targetUser });
+    } catch (error) {
+      console.error("Error starting impersonation:", error);
+      res.status(500).json({ error: "Failed to start impersonation session" });
+    }
+  });
+
+  app.post("/api/admin/impersonate/end", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const adminUserId = getUserId(req);
+      if (!adminUserId) return res.status(401).json({ error: "Unauthorized" });
+
+      const activeSession = await storage.getActiveImpersonationSession(adminUserId);
+      if (!activeSession) return res.status(404).json({ error: "No active impersonation session" });
+
+      const endedSession = await storage.endImpersonationSession(activeSession.id);
+      res.json({ session: endedSession });
+    } catch (error) {
+      console.error("Error ending impersonation:", error);
+      res.status(500).json({ error: "Failed to end impersonation session" });
+    }
+  });
+
+  // ============ SMS MESSAGING (TENANT-SCOPED) ============
+
+  app.post("/api/sms/send", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { recipientPhone, message, recipientUserId, applicationId } = req.body;
+      if (!recipientPhone || !message) {
+        return res.status(400).json({ error: "Recipient phone and message required" });
+      }
+
+      const smsMessage = await storage.createSmsMessage({
+        tenantId,
+        senderUserId: userId,
+        recipientPhone,
+        message,
+        recipientUserId,
+        applicationId,
+        status: "PENDING",
+      });
+
+      res.status(201).json(smsMessage);
+    } catch (error) {
+      console.error("Error sending SMS:", error);
+      res.status(500).json({ error: "Failed to send SMS" });
+    }
+  });
+
+  app.get("/api/sms/messages", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const messages = await storage.getSmsMessagesByTenant(tenantId);
+      res.json(messages);
+    } catch (error) {
+      console.error("Error fetching SMS messages:", error);
+      res.status(500).json({ error: "Failed to fetch SMS messages" });
+    }
+  });
+
+  // ============ INTERVIEW SCHEDULING (TENANT-SCOPED) ============
+
+  app.get("/api/scheduling/slots", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const slots = await storage.getInterviewSlotsByTenant(tenantId);
+      res.json(slots);
+    } catch (error) {
+      console.error("Error fetching interview slots:", error);
+      res.status(500).json({ error: "Failed to fetch interview slots" });
+    }
+  });
+
+  app.post("/api/scheduling/slots", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const slot = await storage.createInterviewSlot({
+        ...req.body,
+        tenantId,
+        createdByUserId: userId,
+      });
+      res.status(201).json(slot);
+    } catch (error) {
+      console.error("Error creating interview slot:", error);
+      res.status(500).json({ error: "Failed to create interview slot" });
+    }
+  });
+
+  app.patch("/api/scheduling/slots/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const slot = await storage.updateInterviewSlot(id, req.body);
+      if (!slot) return res.status(404).json({ error: "Slot not found" });
+      res.json(slot);
+    } catch (error) {
+      console.error("Error updating interview slot:", error);
+      res.status(500).json({ error: "Failed to update interview slot" });
+    }
+  });
+
+  app.delete("/api/scheduling/slots/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteInterviewSlot(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting interview slot:", error);
+      res.status(500).json({ error: "Failed to delete interview slot" });
+    }
+  });
+
+  app.post("/api/scheduling/book", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { slotId, applicationId } = req.body;
+      if (!slotId) return res.status(400).json({ error: "Slot ID required" });
+
+      const slot = await storage.getInterviewSlot(slotId);
+      if (!slot) return res.status(404).json({ error: "Slot not found" });
+      if ((slot.currentBookings || 0) >= (slot.maxBookings || 1)) {
+        return res.status(400).json({ error: "Slot is fully booked" });
+      }
+
+      const booking = await storage.createInterviewBooking({
+        slotId,
+        applicationId,
+        candidateUserId: userId,
+        status: "CONFIRMED",
+      });
+      res.status(201).json(booking);
+    } catch (error) {
+      console.error("Error booking interview:", error);
+      res.status(500).json({ error: "Failed to book interview" });
+    }
+  });
+
+  // ============ JOB TEMPLATES (TENANT-SCOPED) ============
+
+  app.get("/api/templates/jobs", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const templates = await storage.getJobTemplates(tenantId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching job templates:", error);
+      res.status(500).json({ error: "Failed to fetch job templates" });
+    }
+  });
+
+  app.post("/api/templates/jobs", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const template = await storage.createJobTemplate({
+        ...req.body,
+        tenantId,
+        createdByUserId: userId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating job template:", error);
+      res.status(500).json({ error: "Failed to create job template" });
+    }
+  });
+
+  app.patch("/api/templates/jobs/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updateJobTemplate(id, req.body);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating job template:", error);
+      res.status(500).json({ error: "Failed to update job template" });
+    }
+  });
+
+  app.delete("/api/templates/jobs/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteJobTemplate(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting job template:", error);
+      res.status(500).json({ error: "Failed to delete job template" });
+    }
+  });
+
+  // ============ MESSAGE TEMPLATES (TENANT-SCOPED) ============
+
+  app.get("/api/templates/messages", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const templates = await storage.getMessageTemplates(tenantId);
+      res.json(templates);
+    } catch (error) {
+      console.error("Error fetching message templates:", error);
+      res.status(500).json({ error: "Failed to fetch message templates" });
+    }
+  });
+
+  app.post("/api/templates/messages", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const template = await storage.createMessageTemplate({
+        ...req.body,
+        tenantId,
+        createdByUserId: userId,
+      });
+      res.status(201).json(template);
+    } catch (error) {
+      console.error("Error creating message template:", error);
+      res.status(500).json({ error: "Failed to create message template" });
+    }
+  });
+
+  app.patch("/api/templates/messages/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const template = await storage.updateMessageTemplate(id, req.body);
+      if (!template) return res.status(404).json({ error: "Template not found" });
+      res.json(template);
+    } catch (error) {
+      console.error("Error updating message template:", error);
+      res.status(500).json({ error: "Failed to update message template" });
+    }
+  });
+
+  app.delete("/api/templates/messages/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteMessageTemplate(id);
+      res.status(204).send();
+    } catch (error) {
+      console.error("Error deleting message template:", error);
+      res.status(500).json({ error: "Failed to delete message template" });
+    }
+  });
+
+  // ============ BACKGROUND CHECKS (TENANT-SCOPED) ============
+
+  app.get("/api/background-checks", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const checks = await storage.getBackgroundChecksByTenant(tenantId);
+      res.json(checks);
+    } catch (error) {
+      console.error("Error fetching background checks:", error);
+      res.status(500).json({ error: "Failed to fetch background checks" });
+    }
+  });
+
+  app.post("/api/background-checks", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const check = await storage.createBackgroundCheck({
+        ...req.body,
+        tenantId,
+        requestedByUserId: userId,
+        status: "PENDING",
+      });
+      res.status(201).json(check);
+    } catch (error) {
+      console.error("Error creating background check:", error);
+      res.status(500).json({ error: "Failed to create background check" });
+    }
+  });
+
+  app.patch("/api/background-checks/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const check = await storage.updateBackgroundCheck(id, req.body);
+      if (!check) return res.status(404).json({ error: "Background check not found" });
+      res.json(check);
+    } catch (error) {
+      console.error("Error updating background check:", error);
+      res.status(500).json({ error: "Failed to update background check" });
+    }
+  });
+
+  // ============ ONBOARDING (TENANT-SCOPED) ============
+
+  app.get("/api/onboarding/documents/:applicationId", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const documents = await storage.getOnboardingDocumentsByApplication(applicationId);
+      res.json(documents);
+    } catch (error) {
+      console.error("Error fetching onboarding documents:", error);
+      res.status(500).json({ error: "Failed to fetch onboarding documents" });
+    }
+  });
+
+  app.post("/api/onboarding/documents", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const document = await storage.createOnboardingDocument({
+        ...req.body,
+        tenantId,
+      });
+      res.status(201).json(document);
+    } catch (error) {
+      console.error("Error creating onboarding document:", error);
+      res.status(500).json({ error: "Failed to create onboarding document" });
+    }
+  });
+
+  app.patch("/api/onboarding/documents/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const document = await storage.updateOnboardingDocument(id, req.body);
+      if (!document) return res.status(404).json({ error: "Document not found" });
+      res.json(document);
+    } catch (error) {
+      console.error("Error updating onboarding document:", error);
+      res.status(500).json({ error: "Failed to update onboarding document" });
+    }
+  });
+
+  app.get("/api/onboarding/checklists/:applicationId", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { applicationId } = req.params;
+      const checklists = await storage.getOnboardingChecklistsByApplication(applicationId);
+      res.json(checklists);
+    } catch (error) {
+      console.error("Error fetching onboarding checklists:", error);
+      res.status(500).json({ error: "Failed to fetch onboarding checklists" });
+    }
+  });
+
+  app.post("/api/onboarding/checklists", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const checklist = await storage.createOnboardingChecklist({
+        ...req.body,
+        tenantId,
+      });
+      res.status(201).json(checklist);
+    } catch (error) {
+      console.error("Error creating onboarding checklist:", error);
+      res.status(500).json({ error: "Failed to create onboarding checklist" });
+    }
+  });
+
+  app.patch("/api/onboarding/checklists/:id", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const checklist = await storage.updateOnboardingChecklist(id, req.body);
+      if (!checklist) return res.status(404).json({ error: "Checklist not found" });
+      res.json(checklist);
+    } catch (error) {
+      console.error("Error updating onboarding checklist:", error);
+      res.status(500).json({ error: "Failed to update onboarding checklist" });
+    }
+  });
+
+  // ============ FEATURE FLAG CHECK (TENANT-SCOPED) ============
+
+  app.get("/api/features/:featureName", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { featureName } = req.params;
+      const tenant = await storage.getTenant(tenantId);
+      const enabled = await storage.isFeatureEnabled(featureName, tenantId, tenant?.planType || undefined);
+      res.json({ enabled });
+    } catch (error) {
+      console.error("Error checking feature:", error);
+      res.status(500).json({ error: "Failed to check feature" });
+    }
+  });
+
   return httpServer;
 }

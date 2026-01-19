@@ -212,6 +212,55 @@ npm run build        # Build for production
   - Employers trying to access /seeker/* are redirected to /app
   - Users without profiles are redirected to /onboarding
 
+### Super Admin Portal Enhancement (January 2026)
+- **Business Intelligence Dashboard**: Comprehensive analytics for platform management
+  - MRR/ARR tracking with monthly breakdown and growth trends
+  - Churn rate calculation with trend analysis
+  - Tenant health scores based on usage metrics (at-risk customer identification)
+- **Feature Flags System**: Control feature rollouts across the platform
+  - CRUD operations for feature flags
+  - Enable/disable per subscription plan (FREE/PRO/ENTERPRISE)
+  - Toggle switches for quick enable/disable
+- **Coupon Management**: Promotional code system
+  - Create percentage or fixed amount discounts
+  - Set maximum redemption limits
+  - Track usage statistics
+  - Toggle active/inactive status
+- **New Database Tables**: 13 new tables added
+  - `subscription_events` - MRR/churn tracking
+  - `feature_flags` - Feature toggle management
+  - `coupons`, `coupon_redemptions` - Discount codes
+  - `sms_messages` - SMS communication tracking
+  - `interview_slots`, `interview_bookings` - Self-scheduling
+  - `job_templates`, `message_templates` - Pre-built templates
+  - `background_check_requests` - Background checks
+  - `onboarding_documents`, `onboarding_checklists` - Digital onboarding
+  - `impersonation_sessions` - Admin debugging
+  - `tenant_usage_metrics` - Usage analytics
+
+### New Super Admin API Endpoints
+- `GET /api/admin/analytics/mrr` - MRR/ARR metrics with monthly breakdown
+- `GET /api/admin/analytics/churn` - Churn rate and trends
+- `GET /api/admin/analytics/tenant-health` - Tenant health scores
+- `GET/POST/PATCH/DELETE /api/admin/feature-flags` - Feature flag management
+- `GET/POST/PATCH/DELETE /api/admin/coupons` - Coupon management
+- `POST /api/admin/impersonate/:userId` - Start impersonation session
+- `POST /api/admin/impersonate/end` - End impersonation session
+
+### New Tenant API Endpoints
+- `POST /api/sms/send` - Send SMS to candidate
+- `GET /api/sms/messages` - Get SMS history
+- `GET/POST/PATCH/DELETE /api/scheduling/slots` - Interview slot management
+- `POST /api/scheduling/book` - Book interview slot
+- `GET/POST/PATCH/DELETE /api/templates/jobs` - Job templates
+- `GET/POST/PATCH/DELETE /api/templates/messages` - Message templates
+- `GET/POST/PATCH /api/background-checks` - Background check requests
+- `GET/POST/PATCH /api/onboarding/documents` - Onboarding documents
+- `GET/POST/PATCH /api/onboarding/checklists` - Onboarding checklists
+- `GET /api/features/:featureName` - Check if feature is enabled
+- `POST /api/coupons/validate` - Validate coupon code
+- `POST /api/coupons/redeem` - Redeem coupon
+
 ## User Preferences
 - Dark mode enabled by default (respects system preference)
 - Sidebar collapsible for more workspace

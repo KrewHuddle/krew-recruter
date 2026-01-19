@@ -792,3 +792,334 @@ export const jobImportsRelations = relations(jobImports, ({ one }) => ({
 export const insertJobImportSchema = createInsertSchema(jobImports).omit({ id: true, createdAt: true });
 export type InsertJobImport = z.infer<typeof insertJobImportSchema>;
 export type JobImport = typeof jobImports.$inferSelect;
+
+// ============ SUBSCRIPTION EVENTS (for MRR/churn tracking) ============
+
+export const subscriptionEventTypeEnum = pgEnum("subscription_event_type", ["CREATED", "UPGRADED", "DOWNGRADED", "CANCELED", "REACTIVATED", "TRIAL_STARTED", "TRIAL_ENDED"]);
+
+export const subscriptionEvents = pgTable("subscription_events", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  eventType: subscriptionEventTypeEnum("event_type").notNull(),
+  fromPlan: planTypeEnum("from_plan"),
+  toPlan: planTypeEnum("to_plan"),
+  mrrChangeCents: integer("mrr_change_cents").default(0),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_sub_event_tenant").on(table.tenantId),
+  index("idx_sub_event_created").on(table.createdAt),
+]);
+
+export const insertSubscriptionEventSchema = createInsertSchema(subscriptionEvents).omit({ id: true, createdAt: true });
+export type InsertSubscriptionEvent = z.infer<typeof insertSubscriptionEventSchema>;
+export type SubscriptionEvent = typeof subscriptionEvents.$inferSelect;
+
+// ============ FEATURE FLAGS ============
+
+export const featureFlags = pgTable("feature_flags", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull().unique(),
+  description: text("description"),
+  enabled: boolean("enabled").default(false),
+  enabledForPlans: text("enabled_for_plans").array(),
+  enabledForTenants: text("enabled_for_tenants").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertFeatureFlagSchema = createInsertSchema(featureFlags).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertFeatureFlag = z.infer<typeof insertFeatureFlagSchema>;
+export type FeatureFlag = typeof featureFlags.$inferSelect;
+
+// ============ COUPONS ============
+
+export const couponTypeEnum = pgEnum("coupon_type", ["PERCENT_OFF", "AMOUNT_OFF", "FREE_TRIAL_DAYS"]);
+
+export const coupons = pgTable("coupons", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  code: text("code").notNull().unique(),
+  type: couponTypeEnum("type").notNull(),
+  value: integer("value").notNull(),
+  maxRedemptions: integer("max_redemptions"),
+  currentRedemptions: integer("current_redemptions").default(0),
+  validFrom: timestamp("valid_from"),
+  validUntil: timestamp("valid_until"),
+  applicablePlans: text("applicable_plans").array(),
+  stripeCouponId: text("stripe_coupon_id"),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_coupon_code").on(table.code),
+]);
+
+export const insertCouponSchema = createInsertSchema(coupons).omit({ id: true, createdAt: true, currentRedemptions: true });
+export type InsertCoupon = z.infer<typeof insertCouponSchema>;
+export type Coupon = typeof coupons.$inferSelect;
+
+// ============ COUPON REDEMPTIONS ============
+
+export const couponRedemptions = pgTable("coupon_redemptions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  couponId: varchar("coupon_id").notNull().references(() => coupons.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  redeemedAt: timestamp("redeemed_at").defaultNow(),
+}, (table) => [
+  index("idx_redemption_coupon").on(table.couponId),
+  index("idx_redemption_tenant").on(table.tenantId),
+]);
+
+export const insertCouponRedemptionSchema = createInsertSchema(couponRedemptions).omit({ id: true, redeemedAt: true });
+export type InsertCouponRedemption = z.infer<typeof insertCouponRedemptionSchema>;
+export type CouponRedemption = typeof couponRedemptions.$inferSelect;
+
+// ============ SMS MESSAGES ============
+
+export const smsStatusEnum = pgEnum("sms_status", ["PENDING", "SENT", "DELIVERED", "FAILED"]);
+
+export const smsMessages = pgTable("sms_messages", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  senderUserId: varchar("sender_user_id").notNull(),
+  recipientPhone: text("recipient_phone").notNull(),
+  recipientUserId: varchar("recipient_user_id"),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "set null" }),
+  message: text("message").notNull(),
+  status: smsStatusEnum("status").notNull().default("PENDING"),
+  twilioMessageSid: text("twilio_message_sid"),
+  errorMessage: text("error_message"),
+  sentAt: timestamp("sent_at"),
+  deliveredAt: timestamp("delivered_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_sms_tenant").on(table.tenantId),
+  index("idx_sms_application").on(table.applicationId),
+]);
+
+export const insertSmsMessageSchema = createInsertSchema(smsMessages).omit({ id: true, createdAt: true, sentAt: true, deliveredAt: true });
+export type InsertSmsMessage = z.infer<typeof insertSmsMessageSchema>;
+export type SmsMessage = typeof smsMessages.$inferSelect;
+
+// ============ INTERVIEW SCHEDULING (Self-Scheduling) ============
+
+export const interviewSlots = pgTable("interview_slots", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  createdByUserId: varchar("created_by_user_id").notNull(),
+  title: text("title"),
+  startAt: timestamp("start_at").notNull(),
+  endAt: timestamp("end_at").notNull(),
+  durationMinutes: integer("duration_minutes").default(30),
+  locationId: varchar("location_id").references(() => locations.id, { onDelete: "set null" }),
+  maxBookings: integer("max_bookings").default(1),
+  currentBookings: integer("current_bookings").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_slot_tenant").on(table.tenantId),
+  index("idx_slot_start").on(table.startAt),
+]);
+
+export const insertInterviewSlotSchema = createInsertSchema(interviewSlots).omit({ id: true, createdAt: true, currentBookings: true });
+export type InsertInterviewSlot = z.infer<typeof insertInterviewSlotSchema>;
+export type InterviewSlot = typeof interviewSlots.$inferSelect;
+
+// ============ INTERVIEW BOOKINGS ============
+
+export const interviewBookingStatusEnum = pgEnum("interview_booking_status", ["SCHEDULED", "CONFIRMED", "COMPLETED", "CANCELLED", "NO_SHOW"]);
+
+export const interviewBookings = pgTable("interview_bookings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slotId: varchar("slot_id").notNull().references(() => interviewSlots.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "set null" }),
+  candidateUserId: varchar("candidate_user_id"),
+  candidateName: text("candidate_name"),
+  candidateEmail: text("candidate_email"),
+  candidatePhone: text("candidate_phone"),
+  status: interviewBookingStatusEnum("status").notNull().default("SCHEDULED"),
+  notes: text("notes"),
+  reminderSent: boolean("reminder_sent").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_booking_slot").on(table.slotId),
+  index("idx_booking_application").on(table.applicationId),
+]);
+
+export const insertInterviewBookingSchema = createInsertSchema(interviewBookings).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertInterviewBooking = z.infer<typeof insertInterviewBookingSchema>;
+export type InterviewBooking = typeof interviewBookings.$inferSelect;
+
+// ============ JOB TEMPLATES ============
+
+export const jobTemplates = pgTable("job_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  isSystem: boolean("is_system").default(false),
+  name: text("name").notNull(),
+  role: text("role").notNull(),
+  category: text("category"),
+  title: text("title").notNull(),
+  description: text("description"),
+  requirements: text("requirements").array(),
+  responsibilities: text("responsibilities").array(),
+  benefits: text("benefits").array(),
+  jobType: jobTypeEnum("job_type").default("FULL_TIME"),
+  payRangeMin: integer("pay_range_min"),
+  payRangeMax: integer("pay_range_max"),
+  scheduleTags: text("schedule_tags").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_template_tenant_job").on(table.tenantId),
+  index("idx_template_role").on(table.role),
+]);
+
+export const insertJobTemplateSchema = createInsertSchema(jobTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobTemplate = z.infer<typeof insertJobTemplateSchema>;
+export type JobTemplate = typeof jobTemplates.$inferSelect;
+
+// ============ MESSAGE TEMPLATES ============
+
+export const messageTemplateTypeEnum = pgEnum("message_template_type", ["EMAIL", "SMS", "IN_APP"]);
+
+export const messageTemplates = pgTable("message_templates", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id"),
+  isSystem: boolean("is_system").default(false),
+  name: text("name").notNull(),
+  category: text("category"),
+  type: messageTemplateTypeEnum("type").notNull().default("EMAIL"),
+  subject: text("subject"),
+  body: text("body").notNull(),
+  variables: text("variables").array(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_msg_template_tenant").on(table.tenantId),
+]);
+
+export const insertMessageTemplateSchema = createInsertSchema(messageTemplates).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertMessageTemplate = z.infer<typeof insertMessageTemplateSchema>;
+export type MessageTemplate = typeof messageTemplates.$inferSelect;
+
+// ============ BACKGROUND CHECK REQUESTS ============
+
+export const backgroundCheckStatusEnum = pgEnum("background_check_status", ["PENDING", "IN_PROGRESS", "COMPLETED", "FAILED", "EXPIRED"]);
+
+export const backgroundCheckRequests = pgTable("background_check_requests", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "set null" }),
+  candidateUserId: varchar("candidate_user_id"),
+  candidateName: text("candidate_name").notNull(),
+  candidateEmail: text("candidate_email").notNull(),
+  checkType: text("check_type").default("standard"),
+  status: backgroundCheckStatusEnum("status").notNull().default("PENDING"),
+  providerReferenceId: text("provider_reference_id"),
+  resultJson: jsonb("result_json"),
+  requestedByUserId: varchar("requested_by_user_id").notNull(),
+  completedAt: timestamp("completed_at"),
+  expiresAt: timestamp("expires_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_bgcheck_tenant").on(table.tenantId),
+  index("idx_bgcheck_application").on(table.applicationId),
+]);
+
+export const insertBackgroundCheckRequestSchema = createInsertSchema(backgroundCheckRequests).omit({ id: true, createdAt: true, completedAt: true });
+export type InsertBackgroundCheckRequest = z.infer<typeof insertBackgroundCheckRequestSchema>;
+export type BackgroundCheckRequest = typeof backgroundCheckRequests.$inferSelect;
+
+// ============ ONBOARDING DOCUMENTS ============
+
+export const onboardingDocTypeEnum = pgEnum("onboarding_doc_type", ["OFFER_LETTER", "W4", "I9", "DIRECT_DEPOSIT", "HANDBOOK_ACK", "NDA", "CUSTOM"]);
+export const onboardingDocStatusEnum = pgEnum("onboarding_doc_status", ["PENDING", "SENT", "VIEWED", "SIGNED", "REJECTED"]);
+
+export const onboardingDocuments = pgTable("onboarding_documents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "set null" }),
+  recipientUserId: varchar("recipient_user_id"),
+  recipientEmail: text("recipient_email").notNull(),
+  docType: onboardingDocTypeEnum("doc_type").notNull(),
+  title: text("title").notNull(),
+  templateUrl: text("template_url"),
+  signedUrl: text("signed_url"),
+  status: onboardingDocStatusEnum("status").notNull().default("PENDING"),
+  sentAt: timestamp("sent_at"),
+  viewedAt: timestamp("viewed_at"),
+  signedAt: timestamp("signed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_onboarding_tenant").on(table.tenantId),
+  index("idx_onboarding_application").on(table.applicationId),
+]);
+
+export const insertOnboardingDocumentSchema = createInsertSchema(onboardingDocuments).omit({ id: true, createdAt: true, sentAt: true, viewedAt: true, signedAt: true });
+export type InsertOnboardingDocument = z.infer<typeof insertOnboardingDocumentSchema>;
+export type OnboardingDocument = typeof onboardingDocuments.$inferSelect;
+
+// ============ ONBOARDING CHECKLISTS ============
+
+export const onboardingChecklists = pgTable("onboarding_checklists", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  applicationId: varchar("application_id").references(() => applications.id, { onDelete: "set null" }),
+  recipientUserId: varchar("recipient_user_id"),
+  title: text("title").notNull(),
+  items: jsonb("items").notNull(),
+  completedItems: integer("completed_items").default(0),
+  totalItems: integer("total_items").notNull(),
+  dueDate: timestamp("due_date"),
+  completedAt: timestamp("completed_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_checklist_tenant").on(table.tenantId),
+  index("idx_checklist_application").on(table.applicationId),
+]);
+
+export const insertOnboardingChecklistSchema = createInsertSchema(onboardingChecklists).omit({ id: true, createdAt: true, completedAt: true, completedItems: true });
+export type InsertOnboardingChecklist = z.infer<typeof insertOnboardingChecklistSchema>;
+export type OnboardingChecklist = typeof onboardingChecklists.$inferSelect;
+
+// ============ ADMIN IMPERSONATION SESSIONS ============
+
+export const impersonationSessions = pgTable("impersonation_sessions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  adminUserId: varchar("admin_user_id").notNull(),
+  targetUserId: varchar("target_user_id").notNull(),
+  reason: text("reason"),
+  startedAt: timestamp("started_at").defaultNow(),
+  endedAt: timestamp("ended_at"),
+}, (table) => [
+  index("idx_impersonation_admin").on(table.adminUserId),
+  index("idx_impersonation_target").on(table.targetUserId),
+]);
+
+export const insertImpersonationSessionSchema = createInsertSchema(impersonationSessions).omit({ id: true, startedAt: true, endedAt: true });
+export type InsertImpersonationSession = z.infer<typeof insertImpersonationSessionSchema>;
+export type ImpersonationSession = typeof impersonationSessions.$inferSelect;
+
+// ============ TENANT USAGE METRICS ============
+
+export const tenantUsageMetrics = pgTable("tenant_usage_metrics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  periodStart: timestamp("period_start").notNull(),
+  periodEnd: timestamp("period_end").notNull(),
+  jobsPosted: integer("jobs_posted").default(0),
+  gigsPosted: integer("gigs_posted").default(0),
+  applicationsReceived: integer("applications_received").default(0),
+  hiresMade: integer("hires_made").default(0),
+  interviewsSent: integer("interviews_sent").default(0),
+  gigsCompleted: integer("gigs_completed").default(0),
+  activeUsers: integer("active_users").default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_usage_tenant").on(table.tenantId),
+  index("idx_usage_period").on(table.periodStart),
+]);
+
+export const insertTenantUsageMetricsSchema = createInsertSchema(tenantUsageMetrics).omit({ id: true, createdAt: true });
+export type InsertTenantUsageMetrics = z.infer<typeof insertTenantUsageMetricsSchema>;
+export type TenantUsageMetrics = typeof tenantUsageMetrics.$inferSelect;

@@ -20,6 +20,20 @@ import {
   savedJobs,
   tenantBilling,
   workerPayoutAccounts,
+  subscriptionEvents,
+  featureFlags,
+  coupons,
+  couponRedemptions,
+  smsMessages,
+  interviewSlots,
+  interviewBookings,
+  jobTemplates,
+  messageTemplates,
+  backgroundCheckRequests,
+  onboardingDocuments,
+  onboardingChecklists,
+  impersonationSessions,
+  tenantUsageMetrics,
   type Tenant,
   type InsertTenant,
   type TenantMembership,
@@ -62,9 +76,37 @@ import {
   type InsertWorkerPayoutAccount,
   type InterviewResponse,
   type InsertInterviewResponse,
+  type SubscriptionEvent,
+  type InsertSubscriptionEvent,
+  type FeatureFlag,
+  type InsertFeatureFlag,
+  type Coupon,
+  type InsertCoupon,
+  type CouponRedemption,
+  type InsertCouponRedemption,
+  type SmsMessage,
+  type InsertSmsMessage,
+  type InterviewSlot,
+  type InsertInterviewSlot,
+  type InterviewBooking,
+  type InsertInterviewBooking,
+  type JobTemplate,
+  type InsertJobTemplate,
+  type MessageTemplate,
+  type InsertMessageTemplate,
+  type BackgroundCheckRequest,
+  type InsertBackgroundCheckRequest,
+  type OnboardingDocument,
+  type InsertOnboardingDocument,
+  type OnboardingChecklist,
+  type InsertOnboardingChecklist,
+  type ImpersonationSession,
+  type InsertImpersonationSession,
+  type TenantUsageMetrics,
+  type InsertTenantUsageMetrics,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
 
 export interface IStorage {
   // Tenants
@@ -223,6 +265,98 @@ export interface IStorage {
   getWorkerPayoutAccount(userId: string): Promise<WorkerPayoutAccount | undefined>;
   createWorkerPayoutAccount(data: InsertWorkerPayoutAccount): Promise<WorkerPayoutAccount>;
   updateWorkerPayoutAccount(userId: string, data: Partial<InsertWorkerPayoutAccount>): Promise<WorkerPayoutAccount | undefined>;
+
+  // Subscription Events
+  createSubscriptionEvent(data: InsertSubscriptionEvent): Promise<SubscriptionEvent>;
+  getSubscriptionEventsByTenant(tenantId: string): Promise<SubscriptionEvent[]>;
+  getAllSubscriptionEvents(): Promise<SubscriptionEvent[]>;
+  getMrrByMonth(): Promise<{ month: string; mrr: number; arr: number }[]>;
+  getChurnRate(): Promise<{ rate: number; churned: number; total: number }>;
+
+  // Feature Flags
+  getAllFeatureFlags(): Promise<FeatureFlag[]>;
+  getFeatureFlag(id: string): Promise<FeatureFlag | undefined>;
+  getFeatureFlagByName(name: string): Promise<FeatureFlag | undefined>;
+  createFeatureFlag(data: InsertFeatureFlag): Promise<FeatureFlag>;
+  updateFeatureFlag(id: string, data: Partial<InsertFeatureFlag>): Promise<FeatureFlag | undefined>;
+  deleteFeatureFlag(id: string): Promise<boolean>;
+  isFeatureEnabled(name: string, tenantId?: string, planType?: string): Promise<boolean>;
+
+  // Coupons
+  getAllCoupons(): Promise<Coupon[]>;
+  getCoupon(id: string): Promise<Coupon | undefined>;
+  getCouponByCode(code: string): Promise<Coupon | undefined>;
+  createCoupon(data: InsertCoupon): Promise<Coupon>;
+  updateCoupon(id: string, data: Partial<InsertCoupon>): Promise<Coupon | undefined>;
+  deleteCoupon(id: string): Promise<boolean>;
+  validateCoupon(code: string): Promise<{ valid: boolean; coupon?: Coupon; error?: string }>;
+  redeemCoupon(couponId: string, tenantId: string): Promise<CouponRedemption>;
+  getCouponRedemptionsByTenant(tenantId: string): Promise<CouponRedemption[]>;
+
+  // SMS Messages
+  createSmsMessage(data: InsertSmsMessage): Promise<SmsMessage>;
+  getSmsMessagesByTenant(tenantId: string): Promise<SmsMessage[]>;
+  getSmsMessage(id: string): Promise<SmsMessage | undefined>;
+  updateSmsMessage(id: string, data: Partial<InsertSmsMessage>): Promise<SmsMessage | undefined>;
+
+  // Interview Slots
+  getInterviewSlotsByTenant(tenantId: string): Promise<InterviewSlot[]>;
+  getInterviewSlot(id: string): Promise<InterviewSlot | undefined>;
+  createInterviewSlot(data: InsertInterviewSlot): Promise<InterviewSlot>;
+  updateInterviewSlot(id: string, data: Partial<InsertInterviewSlot>): Promise<InterviewSlot | undefined>;
+  deleteInterviewSlot(id: string): Promise<boolean>;
+
+  // Interview Bookings
+  getInterviewBookingsBySlot(slotId: string): Promise<InterviewBooking[]>;
+  getInterviewBooking(id: string): Promise<InterviewBooking | undefined>;
+  createInterviewBooking(data: InsertInterviewBooking): Promise<InterviewBooking>;
+  updateInterviewBooking(id: string, data: Partial<InsertInterviewBooking>): Promise<InterviewBooking | undefined>;
+
+  // Job Templates
+  getJobTemplates(tenantId?: string): Promise<JobTemplate[]>;
+  getSystemJobTemplates(): Promise<JobTemplate[]>;
+  getJobTemplate(id: string): Promise<JobTemplate | undefined>;
+  createJobTemplate(data: InsertJobTemplate): Promise<JobTemplate>;
+  updateJobTemplate(id: string, data: Partial<InsertJobTemplate>): Promise<JobTemplate | undefined>;
+  deleteJobTemplate(id: string): Promise<boolean>;
+
+  // Message Templates
+  getMessageTemplates(tenantId?: string): Promise<MessageTemplate[]>;
+  getSystemMessageTemplates(): Promise<MessageTemplate[]>;
+  getMessageTemplate(id: string): Promise<MessageTemplate | undefined>;
+  createMessageTemplate(data: InsertMessageTemplate): Promise<MessageTemplate>;
+  updateMessageTemplate(id: string, data: Partial<InsertMessageTemplate>): Promise<MessageTemplate | undefined>;
+  deleteMessageTemplate(id: string): Promise<boolean>;
+
+  // Background Check Requests
+  getBackgroundChecksByTenant(tenantId: string): Promise<BackgroundCheckRequest[]>;
+  getBackgroundCheck(id: string): Promise<BackgroundCheckRequest | undefined>;
+  createBackgroundCheck(data: InsertBackgroundCheckRequest): Promise<BackgroundCheckRequest>;
+  updateBackgroundCheck(id: string, data: Partial<InsertBackgroundCheckRequest>): Promise<BackgroundCheckRequest | undefined>;
+
+  // Onboarding Documents
+  getOnboardingDocumentsByTenant(tenantId: string): Promise<OnboardingDocument[]>;
+  getOnboardingDocumentsByApplication(applicationId: string): Promise<OnboardingDocument[]>;
+  getOnboardingDocument(id: string): Promise<OnboardingDocument | undefined>;
+  createOnboardingDocument(data: InsertOnboardingDocument): Promise<OnboardingDocument>;
+  updateOnboardingDocument(id: string, data: Partial<InsertOnboardingDocument>): Promise<OnboardingDocument | undefined>;
+
+  // Onboarding Checklists
+  getOnboardingChecklistsByTenant(tenantId: string): Promise<OnboardingChecklist[]>;
+  getOnboardingChecklistsByApplication(applicationId: string): Promise<OnboardingChecklist[]>;
+  getOnboardingChecklist(id: string): Promise<OnboardingChecklist | undefined>;
+  createOnboardingChecklist(data: InsertOnboardingChecklist): Promise<OnboardingChecklist>;
+  updateOnboardingChecklist(id: string, data: Partial<InsertOnboardingChecklist>): Promise<OnboardingChecklist | undefined>;
+
+  // Impersonation Sessions
+  createImpersonationSession(data: InsertImpersonationSession): Promise<ImpersonationSession>;
+  getActiveImpersonationSession(adminUserId: string): Promise<ImpersonationSession | undefined>;
+  endImpersonationSession(id: string): Promise<ImpersonationSession | undefined>;
+
+  // Tenant Usage Metrics
+  getTenantUsageMetrics(tenantId: string): Promise<TenantUsageMetrics[]>;
+  upsertTenantUsageMetrics(data: InsertTenantUsageMetrics): Promise<TenantUsageMetrics>;
+  getTenantHealthScores(): Promise<{ tenantId: string; tenantName: string; healthScore: number; metrics: TenantUsageMetrics | null }[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -914,6 +1048,422 @@ export class DatabaseStorage implements IStorage {
       .where(eq(workerPayoutAccounts.userId, userId))
       .returning();
     return account || undefined;
+  }
+
+  // Subscription Events
+  async createSubscriptionEvent(data: InsertSubscriptionEvent): Promise<SubscriptionEvent> {
+    const [event] = await db.insert(subscriptionEvents).values(data).returning();
+    return event;
+  }
+
+  async getSubscriptionEventsByTenant(tenantId: string): Promise<SubscriptionEvent[]> {
+    return db.select().from(subscriptionEvents).where(eq(subscriptionEvents.tenantId, tenantId)).orderBy(desc(subscriptionEvents.createdAt));
+  }
+
+  async getAllSubscriptionEvents(): Promise<SubscriptionEvent[]> {
+    return db.select().from(subscriptionEvents).orderBy(desc(subscriptionEvents.createdAt));
+  }
+
+  async getMrrByMonth(): Promise<{ month: string; mrr: number; arr: number }[]> {
+    const events = await db.select().from(subscriptionEvents).orderBy(subscriptionEvents.createdAt);
+    const monthlyMrr: Map<string, number> = new Map();
+    let runningMrr = 0;
+
+    for (const event of events) {
+      runningMrr += event.mrrChangeCents || 0;
+      const month = event.createdAt ? new Date(event.createdAt).toISOString().slice(0, 7) : '';
+      if (month) {
+        monthlyMrr.set(month, runningMrr);
+      }
+    }
+
+    return Array.from(monthlyMrr.entries()).map(([month, mrr]) => ({
+      month,
+      mrr: mrr / 100,
+      arr: (mrr * 12) / 100,
+    }));
+  }
+
+  async getChurnRate(): Promise<{ rate: number; churned: number; total: number }> {
+    const threeMonthsAgo = new Date();
+    threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - 3);
+
+    const [totalResult] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(subscriptionEvents)
+      .where(eq(subscriptionEvents.eventType, "CREATED"));
+
+    const [churnedResult] = await db.select({ count: sql<number>`count(*)::int` })
+      .from(subscriptionEvents)
+      .where(and(
+        eq(subscriptionEvents.eventType, "CANCELED"),
+        gte(subscriptionEvents.createdAt, threeMonthsAgo)
+      ));
+
+    const total = totalResult?.count || 0;
+    const churned = churnedResult?.count || 0;
+    const rate = total > 0 ? (churned / total) * 100 : 0;
+
+    return { rate, churned, total };
+  }
+
+  // Feature Flags
+  async getAllFeatureFlags(): Promise<FeatureFlag[]> {
+    return db.select().from(featureFlags).orderBy(featureFlags.name);
+  }
+
+  async getFeatureFlag(id: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.id, id));
+    return flag || undefined;
+  }
+
+  async getFeatureFlagByName(name: string): Promise<FeatureFlag | undefined> {
+    const [flag] = await db.select().from(featureFlags).where(eq(featureFlags.name, name));
+    return flag || undefined;
+  }
+
+  async createFeatureFlag(data: InsertFeatureFlag): Promise<FeatureFlag> {
+    const [flag] = await db.insert(featureFlags).values(data).returning();
+    return flag;
+  }
+
+  async updateFeatureFlag(id: string, data: Partial<InsertFeatureFlag>): Promise<FeatureFlag | undefined> {
+    const [flag] = await db
+      .update(featureFlags)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(featureFlags.id, id))
+      .returning();
+    return flag || undefined;
+  }
+
+  async deleteFeatureFlag(id: string): Promise<boolean> {
+    await db.delete(featureFlags).where(eq(featureFlags.id, id));
+    return true;
+  }
+
+  async isFeatureEnabled(name: string, tenantId?: string, planType?: string): Promise<boolean> {
+    const flag = await this.getFeatureFlagByName(name);
+    if (!flag) return false;
+    if (!flag.enabled) return false;
+    if (tenantId && flag.enabledForTenants?.includes(tenantId)) return true;
+    if (planType && flag.enabledForPlans?.includes(planType)) return true;
+    if (!flag.enabledForTenants?.length && !flag.enabledForPlans?.length) return true;
+    return false;
+  }
+
+  // Coupons
+  async getAllCoupons(): Promise<Coupon[]> {
+    return db.select().from(coupons).orderBy(desc(coupons.createdAt));
+  }
+
+  async getCoupon(id: string): Promise<Coupon | undefined> {
+    const [coupon] = await db.select().from(coupons).where(eq(coupons.id, id));
+    return coupon || undefined;
+  }
+
+  async getCouponByCode(code: string): Promise<Coupon | undefined> {
+    const [coupon] = await db.select().from(coupons).where(eq(coupons.code, code.toUpperCase()));
+    return coupon || undefined;
+  }
+
+  async createCoupon(data: InsertCoupon): Promise<Coupon> {
+    const [coupon] = await db.insert(coupons).values({ ...data, code: data.code.toUpperCase() }).returning();
+    return coupon;
+  }
+
+  async updateCoupon(id: string, data: Partial<InsertCoupon>): Promise<Coupon | undefined> {
+    const updateData = { ...data };
+    if (updateData.code) updateData.code = updateData.code.toUpperCase();
+    const [coupon] = await db.update(coupons).set(updateData).where(eq(coupons.id, id)).returning();
+    return coupon || undefined;
+  }
+
+  async deleteCoupon(id: string): Promise<boolean> {
+    await db.delete(coupons).where(eq(coupons.id, id));
+    return true;
+  }
+
+  async validateCoupon(code: string): Promise<{ valid: boolean; coupon?: Coupon; error?: string }> {
+    const coupon = await this.getCouponByCode(code);
+    if (!coupon) return { valid: false, error: "Coupon not found" };
+    if (!coupon.active) return { valid: false, error: "Coupon is inactive" };
+    if (coupon.validFrom && new Date(coupon.validFrom) > new Date()) return { valid: false, error: "Coupon not yet valid" };
+    if (coupon.validUntil && new Date(coupon.validUntil) < new Date()) return { valid: false, error: "Coupon has expired" };
+    if (coupon.maxRedemptions && (coupon.currentRedemptions || 0) >= coupon.maxRedemptions) return { valid: false, error: "Coupon redemption limit reached" };
+    return { valid: true, coupon };
+  }
+
+  async redeemCoupon(couponId: string, tenantId: string): Promise<CouponRedemption> {
+    await db.update(coupons).set({ currentRedemptions: sql`${coupons.currentRedemptions} + 1` }).where(eq(coupons.id, couponId));
+    const [redemption] = await db.insert(couponRedemptions).values({ couponId, tenantId }).returning();
+    return redemption;
+  }
+
+  async getCouponRedemptionsByTenant(tenantId: string): Promise<CouponRedemption[]> {
+    return db.select().from(couponRedemptions).where(eq(couponRedemptions.tenantId, tenantId));
+  }
+
+  // SMS Messages
+  async createSmsMessage(data: InsertSmsMessage): Promise<SmsMessage> {
+    const [msg] = await db.insert(smsMessages).values(data).returning();
+    return msg;
+  }
+
+  async getSmsMessagesByTenant(tenantId: string): Promise<SmsMessage[]> {
+    return db.select().from(smsMessages).where(eq(smsMessages.tenantId, tenantId)).orderBy(desc(smsMessages.createdAt));
+  }
+
+  async getSmsMessage(id: string): Promise<SmsMessage | undefined> {
+    const [msg] = await db.select().from(smsMessages).where(eq(smsMessages.id, id));
+    return msg || undefined;
+  }
+
+  async updateSmsMessage(id: string, data: Partial<InsertSmsMessage>): Promise<SmsMessage | undefined> {
+    const [msg] = await db.update(smsMessages).set(data).where(eq(smsMessages.id, id)).returning();
+    return msg || undefined;
+  }
+
+  // Interview Slots
+  async getInterviewSlotsByTenant(tenantId: string): Promise<InterviewSlot[]> {
+    return db.select().from(interviewSlots).where(eq(interviewSlots.tenantId, tenantId)).orderBy(interviewSlots.startAt);
+  }
+
+  async getInterviewSlot(id: string): Promise<InterviewSlot | undefined> {
+    const [slot] = await db.select().from(interviewSlots).where(eq(interviewSlots.id, id));
+    return slot || undefined;
+  }
+
+  async createInterviewSlot(data: InsertInterviewSlot): Promise<InterviewSlot> {
+    const [slot] = await db.insert(interviewSlots).values(data).returning();
+    return slot;
+  }
+
+  async updateInterviewSlot(id: string, data: Partial<InsertInterviewSlot>): Promise<InterviewSlot | undefined> {
+    const [slot] = await db.update(interviewSlots).set(data).where(eq(interviewSlots.id, id)).returning();
+    return slot || undefined;
+  }
+
+  async deleteInterviewSlot(id: string): Promise<boolean> {
+    await db.delete(interviewSlots).where(eq(interviewSlots.id, id));
+    return true;
+  }
+
+  // Interview Bookings
+  async getInterviewBookingsBySlot(slotId: string): Promise<InterviewBooking[]> {
+    return db.select().from(interviewBookings).where(eq(interviewBookings.slotId, slotId));
+  }
+
+  async getInterviewBooking(id: string): Promise<InterviewBooking | undefined> {
+    const [booking] = await db.select().from(interviewBookings).where(eq(interviewBookings.id, id));
+    return booking || undefined;
+  }
+
+  async createInterviewBooking(data: InsertInterviewBooking): Promise<InterviewBooking> {
+    const [booking] = await db.insert(interviewBookings).values(data).returning();
+    await db.update(interviewSlots).set({ currentBookings: sql`${interviewSlots.currentBookings} + 1` }).where(eq(interviewSlots.id, data.slotId));
+    return booking;
+  }
+
+  async updateInterviewBooking(id: string, data: Partial<InsertInterviewBooking>): Promise<InterviewBooking | undefined> {
+    const [booking] = await db.update(interviewBookings).set({ ...data, updatedAt: new Date() }).where(eq(interviewBookings.id, id)).returning();
+    return booking || undefined;
+  }
+
+  // Job Templates
+  async getJobTemplates(tenantId?: string): Promise<JobTemplate[]> {
+    if (tenantId) {
+      return db.select().from(jobTemplates).where(
+        sql`${jobTemplates.tenantId} = ${tenantId} OR ${jobTemplates.isSystem} = true`
+      ).orderBy(jobTemplates.name);
+    }
+    return db.select().from(jobTemplates).orderBy(jobTemplates.name);
+  }
+
+  async getSystemJobTemplates(): Promise<JobTemplate[]> {
+    return db.select().from(jobTemplates).where(eq(jobTemplates.isSystem, true)).orderBy(jobTemplates.name);
+  }
+
+  async getJobTemplate(id: string): Promise<JobTemplate | undefined> {
+    const [template] = await db.select().from(jobTemplates).where(eq(jobTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createJobTemplate(data: InsertJobTemplate): Promise<JobTemplate> {
+    const [template] = await db.insert(jobTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateJobTemplate(id: string, data: Partial<InsertJobTemplate>): Promise<JobTemplate | undefined> {
+    const [template] = await db.update(jobTemplates).set({ ...data, updatedAt: new Date() }).where(eq(jobTemplates.id, id)).returning();
+    return template || undefined;
+  }
+
+  async deleteJobTemplate(id: string): Promise<boolean> {
+    await db.delete(jobTemplates).where(eq(jobTemplates.id, id));
+    return true;
+  }
+
+  // Message Templates
+  async getMessageTemplates(tenantId?: string): Promise<MessageTemplate[]> {
+    if (tenantId) {
+      return db.select().from(messageTemplates).where(
+        sql`${messageTemplates.tenantId} = ${tenantId} OR ${messageTemplates.isSystem} = true`
+      ).orderBy(messageTemplates.name);
+    }
+    return db.select().from(messageTemplates).orderBy(messageTemplates.name);
+  }
+
+  async getSystemMessageTemplates(): Promise<MessageTemplate[]> {
+    return db.select().from(messageTemplates).where(eq(messageTemplates.isSystem, true)).orderBy(messageTemplates.name);
+  }
+
+  async getMessageTemplate(id: string): Promise<MessageTemplate | undefined> {
+    const [template] = await db.select().from(messageTemplates).where(eq(messageTemplates.id, id));
+    return template || undefined;
+  }
+
+  async createMessageTemplate(data: InsertMessageTemplate): Promise<MessageTemplate> {
+    const [template] = await db.insert(messageTemplates).values(data).returning();
+    return template;
+  }
+
+  async updateMessageTemplate(id: string, data: Partial<InsertMessageTemplate>): Promise<MessageTemplate | undefined> {
+    const [template] = await db.update(messageTemplates).set({ ...data, updatedAt: new Date() }).where(eq(messageTemplates.id, id)).returning();
+    return template || undefined;
+  }
+
+  async deleteMessageTemplate(id: string): Promise<boolean> {
+    await db.delete(messageTemplates).where(eq(messageTemplates.id, id));
+    return true;
+  }
+
+  // Background Check Requests
+  async getBackgroundChecksByTenant(tenantId: string): Promise<BackgroundCheckRequest[]> {
+    return db.select().from(backgroundCheckRequests).where(eq(backgroundCheckRequests.tenantId, tenantId)).orderBy(desc(backgroundCheckRequests.createdAt));
+  }
+
+  async getBackgroundCheck(id: string): Promise<BackgroundCheckRequest | undefined> {
+    const [check] = await db.select().from(backgroundCheckRequests).where(eq(backgroundCheckRequests.id, id));
+    return check || undefined;
+  }
+
+  async createBackgroundCheck(data: InsertBackgroundCheckRequest): Promise<BackgroundCheckRequest> {
+    const [check] = await db.insert(backgroundCheckRequests).values(data).returning();
+    return check;
+  }
+
+  async updateBackgroundCheck(id: string, data: Partial<InsertBackgroundCheckRequest>): Promise<BackgroundCheckRequest | undefined> {
+    const [check] = await db.update(backgroundCheckRequests).set(data).where(eq(backgroundCheckRequests.id, id)).returning();
+    return check || undefined;
+  }
+
+  // Onboarding Documents
+  async getOnboardingDocumentsByTenant(tenantId: string): Promise<OnboardingDocument[]> {
+    return db.select().from(onboardingDocuments).where(eq(onboardingDocuments.tenantId, tenantId)).orderBy(desc(onboardingDocuments.createdAt));
+  }
+
+  async getOnboardingDocumentsByApplication(applicationId: string): Promise<OnboardingDocument[]> {
+    return db.select().from(onboardingDocuments).where(eq(onboardingDocuments.applicationId, applicationId));
+  }
+
+  async getOnboardingDocument(id: string): Promise<OnboardingDocument | undefined> {
+    const [doc] = await db.select().from(onboardingDocuments).where(eq(onboardingDocuments.id, id));
+    return doc || undefined;
+  }
+
+  async createOnboardingDocument(data: InsertOnboardingDocument): Promise<OnboardingDocument> {
+    const [doc] = await db.insert(onboardingDocuments).values(data).returning();
+    return doc;
+  }
+
+  async updateOnboardingDocument(id: string, data: Partial<InsertOnboardingDocument>): Promise<OnboardingDocument | undefined> {
+    const [doc] = await db.update(onboardingDocuments).set(data).where(eq(onboardingDocuments.id, id)).returning();
+    return doc || undefined;
+  }
+
+  // Onboarding Checklists
+  async getOnboardingChecklistsByTenant(tenantId: string): Promise<OnboardingChecklist[]> {
+    return db.select().from(onboardingChecklists).where(eq(onboardingChecklists.tenantId, tenantId)).orderBy(desc(onboardingChecklists.createdAt));
+  }
+
+  async getOnboardingChecklistsByApplication(applicationId: string): Promise<OnboardingChecklist[]> {
+    return db.select().from(onboardingChecklists).where(eq(onboardingChecklists.applicationId, applicationId));
+  }
+
+  async getOnboardingChecklist(id: string): Promise<OnboardingChecklist | undefined> {
+    const [checklist] = await db.select().from(onboardingChecklists).where(eq(onboardingChecklists.id, id));
+    return checklist || undefined;
+  }
+
+  async createOnboardingChecklist(data: InsertOnboardingChecklist): Promise<OnboardingChecklist> {
+    const [checklist] = await db.insert(onboardingChecklists).values(data).returning();
+    return checklist;
+  }
+
+  async updateOnboardingChecklist(id: string, data: Partial<InsertOnboardingChecklist>): Promise<OnboardingChecklist | undefined> {
+    const [checklist] = await db.update(onboardingChecklists).set(data).where(eq(onboardingChecklists.id, id)).returning();
+    return checklist || undefined;
+  }
+
+  // Impersonation Sessions
+  async createImpersonationSession(data: InsertImpersonationSession): Promise<ImpersonationSession> {
+    const [session] = await db.insert(impersonationSessions).values(data).returning();
+    return session;
+  }
+
+  async getActiveImpersonationSession(adminUserId: string): Promise<ImpersonationSession | undefined> {
+    const [session] = await db.select().from(impersonationSessions)
+      .where(and(eq(impersonationSessions.adminUserId, adminUserId), isNull(impersonationSessions.endedAt)))
+      .orderBy(desc(impersonationSessions.startedAt));
+    return session || undefined;
+  }
+
+  async endImpersonationSession(id: string): Promise<ImpersonationSession | undefined> {
+    const [session] = await db.update(impersonationSessions).set({ endedAt: new Date() }).where(eq(impersonationSessions.id, id)).returning();
+    return session || undefined;
+  }
+
+  // Tenant Usage Metrics
+  async getTenantUsageMetrics(tenantId: string): Promise<TenantUsageMetrics[]> {
+    return db.select().from(tenantUsageMetrics).where(eq(tenantUsageMetrics.tenantId, tenantId)).orderBy(desc(tenantUsageMetrics.periodStart));
+  }
+
+  async upsertTenantUsageMetrics(data: InsertTenantUsageMetrics): Promise<TenantUsageMetrics> {
+    const [existing] = await db.select().from(tenantUsageMetrics)
+      .where(and(
+        eq(tenantUsageMetrics.tenantId, data.tenantId),
+        eq(tenantUsageMetrics.periodStart, data.periodStart)
+      ));
+    
+    if (existing) {
+      const [updated] = await db.update(tenantUsageMetrics).set(data).where(eq(tenantUsageMetrics.id, existing.id)).returning();
+      return updated;
+    }
+    const [created] = await db.insert(tenantUsageMetrics).values(data).returning();
+    return created;
+  }
+
+  async getTenantHealthScores(): Promise<{ tenantId: string; tenantName: string; healthScore: number; metrics: TenantUsageMetrics | null }[]> {
+    const allTenants = await this.getAllTenants();
+    const results = [];
+
+    for (const tenant of allTenants) {
+      const metrics = await this.getTenantUsageMetrics(tenant.id);
+      const latestMetrics = metrics[0] || null;
+      
+      let healthScore = 50;
+      if (latestMetrics) {
+        if ((latestMetrics.jobsPosted || 0) > 0) healthScore += 10;
+        if ((latestMetrics.applicationsReceived || 0) > 0) healthScore += 10;
+        if ((latestMetrics.hiresMade || 0) > 0) healthScore += 15;
+        if ((latestMetrics.activeUsers || 0) > 1) healthScore += 10;
+        if ((latestMetrics.interviewsSent || 0) > 0) healthScore += 5;
+      }
+      healthScore = Math.min(100, healthScore);
+
+      results.push({ tenantId: tenant.id, tenantName: tenant.name, healthScore, metrics: latestMetrics });
+    }
+
+    return results.sort((a, b) => b.healthScore - a.healthScore);
   }
 }
 

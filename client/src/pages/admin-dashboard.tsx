@@ -1,9 +1,23 @@
+import { useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { Progress } from "@/components/ui/progress";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from "@/components/ui/dialog";
 import {
   Table,
   TableBody,
@@ -36,6 +50,7 @@ import {
   ShieldOff,
   DollarSign,
   TrendingUp,
+  TrendingDown,
   CreditCard,
   Map,
   ExternalLink,
@@ -50,10 +65,21 @@ import {
   User,
   Heart,
   CreditCard as CreditCardIcon,
+  BarChart3,
+  Activity,
+  Flag,
+  Ticket,
+  Plus,
+  Trash2,
+  Edit,
+  AlertTriangle,
+  CheckCircle2,
+  UserCog,
+  Eye,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import type { Tenant, UserProfile, GigPayout, GigPost } from "@shared/schema";
+import type { Tenant, UserProfile, GigPayout, GigPost, FeatureFlag, Coupon } from "@shared/schema";
 
 interface AdminStats {
   totalTenants: number;
@@ -75,6 +101,34 @@ interface AdminPayout extends GigPayout {
   gig?: GigPost | null;
   workerProfile?: UserProfile | null;
   tenant?: Tenant | null;
+}
+
+interface MrrMetrics {
+  currentMrr: number;
+  previousMrr: number;
+  mrrGrowth: number;
+  arr: number;
+  monthlyBreakdown: { month: string; mrr: number; newMrr: number; churnedMrr: number }[];
+}
+
+interface ChurnMetrics {
+  currentChurnRate: number;
+  previousChurnRate: number;
+  churnTrend: number;
+  totalCanceled: number;
+  monthlyChurn: { month: string; rate: number; count: number }[];
+}
+
+interface TenantHealth {
+  tenantId: string;
+  tenantName: string;
+  planType: string;
+  healthScore: number;
+  jobsPosted: number;
+  gigsPosted: number;
+  hiresMade: number;
+  lastActiveAt: string | null;
+  isAtRisk: boolean;
 }
 
 const planColors: Record<string, string> = {
@@ -138,6 +192,144 @@ export default function AdminDashboard() {
 
   const toggleSuperAdmin = (userId: string, currentStatus: boolean) => {
     updateUserMutation.mutate({ userId, data: { isSuperAdmin: !currentStatus } });
+  };
+
+  const { data: mrrMetrics, isLoading: mrrLoading } = useQuery<MrrMetrics>({
+    queryKey: ["/api/admin/analytics/mrr"],
+  });
+
+  const { data: churnMetrics, isLoading: churnLoading } = useQuery<ChurnMetrics>({
+    queryKey: ["/api/admin/analytics/churn"],
+  });
+
+  const { data: tenantHealth, isLoading: healthLoading } = useQuery<TenantHealth[]>({
+    queryKey: ["/api/admin/analytics/tenant-health"],
+  });
+
+  const { data: featureFlags, isLoading: flagsLoading } = useQuery<FeatureFlag[]>({
+    queryKey: ["/api/admin/feature-flags"],
+  });
+
+  const { data: coupons, isLoading: couponsLoading } = useQuery<Coupon[]>({
+    queryKey: ["/api/admin/coupons"],
+  });
+
+  const [newFlagName, setNewFlagName] = useState("");
+  const [newFlagDescription, setNewFlagDescription] = useState("");
+  const [newFlagEnabled, setNewFlagEnabled] = useState(false);
+  const [newFlagPlans, setNewFlagPlans] = useState("all");
+  const [flagDialogOpen, setFlagDialogOpen] = useState(false);
+
+  const [newCouponCode, setNewCouponCode] = useState("");
+  const [newCouponDiscount, setNewCouponDiscount] = useState("");
+  const [newCouponType, setNewCouponType] = useState<"percentage" | "fixed">("percentage");
+  const [newCouponMaxUses, setNewCouponMaxUses] = useState("");
+  const [couponDialogOpen, setCouponDialogOpen] = useState(false);
+
+  const createFlagMutation = useMutation({
+    mutationFn: async (data: { name: string; description: string; enabled: boolean; enabledForPlans: string[] }) => {
+      return apiRequest("POST", "/api/admin/feature-flags", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feature-flags"] });
+      toast({ title: "Feature flag created successfully" });
+      setFlagDialogOpen(false);
+      setNewFlagName("");
+      setNewFlagDescription("");
+      setNewFlagEnabled(false);
+      setNewFlagPlans("all");
+    },
+    onError: () => {
+      toast({ title: "Failed to create feature flag", variant: "destructive" });
+    },
+  });
+
+  const toggleFlagMutation = useMutation({
+    mutationFn: async ({ id, enabled }: { id: string; enabled: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/feature-flags/${id}`, { enabled });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feature-flags"] });
+      toast({ title: "Feature flag updated" });
+    },
+  });
+
+  const deleteFlagMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/admin/feature-flags/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/feature-flags"] });
+      toast({ title: "Feature flag deleted" });
+    },
+  });
+
+  const createCouponMutation = useMutation({
+    mutationFn: async (data: { code: string; discountType: string; discountValue: number; maxRedemptions?: number }) => {
+      return apiRequest("POST", "/api/admin/coupons", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coupons"] });
+      toast({ title: "Coupon created successfully" });
+      setCouponDialogOpen(false);
+      setNewCouponCode("");
+      setNewCouponDiscount("");
+      setNewCouponMaxUses("");
+    },
+    onError: () => {
+      toast({ title: "Failed to create coupon", variant: "destructive" });
+    },
+  });
+
+  const toggleCouponMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/coupons/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coupons"] });
+      toast({ title: "Coupon updated" });
+    },
+  });
+
+  const deleteCouponMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/admin/coupons/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/coupons"] });
+      toast({ title: "Coupon deleted" });
+    },
+  });
+
+  const impersonateMutation = useMutation({
+    mutationFn: async (userId: string) => {
+      return apiRequest("POST", `/api/admin/impersonate/${userId}`, {});
+    },
+    onSuccess: () => {
+      toast({ title: "Impersonation session started", description: "You are now viewing as this user" });
+    },
+    onError: () => {
+      toast({ title: "Failed to start impersonation", variant: "destructive" });
+    },
+  });
+
+  const handleCreateFlag = () => {
+    const plans = newFlagPlans === "all" ? ["FREE", "PRO", "ENTERPRISE"] : [newFlagPlans];
+    createFlagMutation.mutate({
+      name: newFlagName,
+      description: newFlagDescription,
+      enabled: newFlagEnabled,
+      enabledForPlans: plans,
+    });
+  };
+
+  const handleCreateCoupon = () => {
+    createCouponMutation.mutate({
+      code: newCouponCode.toUpperCase(),
+      discountType: newCouponType,
+      discountValue: parseFloat(newCouponDiscount),
+      maxRedemptions: newCouponMaxUses ? parseInt(newCouponMaxUses) : undefined,
+    });
   };
 
   return (
@@ -227,7 +419,7 @@ export default function AdminDashboard() {
       </div>
 
       <Tabs defaultValue="tenants" className="space-y-4">
-        <TabsList>
+        <TabsList className="flex-wrap">
           <TabsTrigger value="tenants" data-testid="tab-tenants">
             <Building2 className="h-4 w-4 mr-2" />
             Organizations
@@ -235,6 +427,22 @@ export default function AdminDashboard() {
           <TabsTrigger value="users" data-testid="tab-users">
             <Users className="h-4 w-4 mr-2" />
             Users
+          </TabsTrigger>
+          <TabsTrigger value="analytics" data-testid="tab-analytics">
+            <BarChart3 className="h-4 w-4 mr-2" />
+            Analytics
+          </TabsTrigger>
+          <TabsTrigger value="health" data-testid="tab-health">
+            <Activity className="h-4 w-4 mr-2" />
+            Tenant Health
+          </TabsTrigger>
+          <TabsTrigger value="flags" data-testid="tab-flags">
+            <Flag className="h-4 w-4 mr-2" />
+            Feature Flags
+          </TabsTrigger>
+          <TabsTrigger value="coupons" data-testid="tab-coupons">
+            <Ticket className="h-4 w-4 mr-2" />
+            Coupons
           </TabsTrigger>
           <TabsTrigger value="revenue" data-testid="tab-revenue">
             <DollarSign className="h-4 w-4 mr-2" />
@@ -693,6 +901,502 @@ export default function AdminDashboard() {
                   </div>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <div className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-4">
+              <Card data-testid="card-mrr">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Monthly Recurring Revenue</CardTitle>
+                  <DollarSign className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {mrrLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold">
+                        ${(mrrMetrics?.currentMrr || 0).toLocaleString()}
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        {(mrrMetrics?.mrrGrowth || 0) >= 0 ? (
+                          <TrendingUp className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <TrendingDown className="h-3 w-3 text-red-500" />
+                        )}
+                        {(mrrMetrics?.mrrGrowth || 0).toFixed(1)}% from last month
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-arr">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Annual Recurring Revenue</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {mrrLoading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      ${(mrrMetrics?.arr || 0).toLocaleString()}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-churn">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Churn Rate</CardTitle>
+                  <TrendingDown className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {churnLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <>
+                      <div className="text-2xl font-bold">
+                        {(churnMetrics?.currentChurnRate || 0).toFixed(1)}%
+                      </div>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1">
+                        {(churnMetrics?.churnTrend || 0) <= 0 ? (
+                          <CheckCircle2 className="h-3 w-3 text-green-500" />
+                        ) : (
+                          <AlertTriangle className="h-3 w-3 text-yellow-500" />
+                        )}
+                        {Math.abs(churnMetrics?.churnTrend || 0).toFixed(1)}% {(churnMetrics?.churnTrend || 0) <= 0 ? 'better' : 'worse'}
+                      </p>
+                    </>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card data-testid="card-canceled">
+                <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Canceled</CardTitle>
+                  <AlertTriangle className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  {churnLoading ? (
+                    <Skeleton className="h-8 w-16" />
+                  ) : (
+                    <div className="text-2xl font-bold">
+                      {churnMetrics?.totalCanceled || 0}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Monthly Revenue Breakdown</CardTitle>
+                <CardDescription>MRR trends over the past 12 months</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {mrrLoading ? (
+                  <Skeleton className="h-40 w-full" />
+                ) : mrrMetrics?.monthlyBreakdown && mrrMetrics.monthlyBreakdown.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Month</TableHead>
+                        <TableHead className="text-right">MRR</TableHead>
+                        <TableHead className="text-right">New MRR</TableHead>
+                        <TableHead className="text-right">Churned MRR</TableHead>
+                        <TableHead className="text-right">Net Change</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {mrrMetrics.monthlyBreakdown.map((row) => (
+                        <TableRow key={row.month} data-testid={`mrr-row-${row.month}`}>
+                          <TableCell className="font-medium">{row.month}</TableCell>
+                          <TableCell className="text-right">${row.mrr.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-green-600">+${row.newMrr.toLocaleString()}</TableCell>
+                          <TableCell className="text-right text-red-600">-${row.churnedMrr.toLocaleString()}</TableCell>
+                          <TableCell className="text-right">
+                            <Badge variant={row.newMrr - row.churnedMrr >= 0 ? "default" : "destructive"}>
+                              {row.newMrr - row.churnedMrr >= 0 ? '+' : ''}{(row.newMrr - row.churnedMrr).toLocaleString()}
+                            </Badge>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No revenue data available yet. Revenue tracking starts when tenants subscribe.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="health">
+          <Card>
+            <CardHeader>
+              <CardTitle>Tenant Health Scores</CardTitle>
+              <CardDescription>
+                Monitor tenant engagement and identify at-risk customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {healthLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : tenantHealth && tenantHealth.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Organization</TableHead>
+                      <TableHead>Plan</TableHead>
+                      <TableHead>Health Score</TableHead>
+                      <TableHead className="text-center">Jobs</TableHead>
+                      <TableHead className="text-center">Gigs</TableHead>
+                      <TableHead className="text-center">Hires</TableHead>
+                      <TableHead>Last Active</TableHead>
+                      <TableHead>Status</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {tenantHealth.map((tenant) => (
+                      <TableRow key={tenant.tenantId} data-testid={`health-row-${tenant.tenantId}`}>
+                        <TableCell className="font-medium">{tenant.tenantName}</TableCell>
+                        <TableCell>
+                          <Badge className={planColors[tenant.planType] || planColors.FREE}>
+                            {tenant.planType}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-2">
+                            <Progress value={tenant.healthScore} className="w-20" />
+                            <span className="text-sm">{tenant.healthScore}%</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-center">{tenant.jobsPosted}</TableCell>
+                        <TableCell className="text-center">{tenant.gigsPosted}</TableCell>
+                        <TableCell className="text-center">{tenant.hiresMade}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {tenant.lastActiveAt ? new Date(tenant.lastActiveAt).toLocaleDateString() : 'Never'}
+                        </TableCell>
+                        <TableCell>
+                          {tenant.isAtRisk ? (
+                            <Badge variant="destructive" className="flex items-center gap-1 w-fit">
+                              <AlertTriangle className="h-3 w-3" />
+                              At Risk
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="flex items-center gap-1 w-fit">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Healthy
+                            </Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No tenant health data available. Health scores are calculated based on tenant activity.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="flags">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Feature Flags</CardTitle>
+                <CardDescription>
+                  Control feature rollouts across the platform
+                </CardDescription>
+              </div>
+              <Dialog open={flagDialogOpen} onOpenChange={setFlagDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-flag">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Flag
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Feature Flag</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="flag-name">Flag Name</Label>
+                      <Input
+                        id="flag-name"
+                        placeholder="e.g., enable_video_interviews"
+                        value={newFlagName}
+                        onChange={(e) => setNewFlagName(e.target.value)}
+                        data-testid="input-flag-name"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="flag-description">Description</Label>
+                      <Textarea
+                        id="flag-description"
+                        placeholder="What does this feature flag control?"
+                        value={newFlagDescription}
+                        onChange={(e) => setNewFlagDescription(e.target.value)}
+                        data-testid="input-flag-description"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="flag-plans">Enabled For Plans</Label>
+                      <Select value={newFlagPlans} onValueChange={setNewFlagPlans}>
+                        <SelectTrigger data-testid="select-flag-plans">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Plans</SelectItem>
+                          <SelectItem value="FREE">Free Only</SelectItem>
+                          <SelectItem value="PRO">Pro Only</SelectItem>
+                          <SelectItem value="ENTERPRISE">Enterprise Only</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="flag-enabled">Enabled</Label>
+                      <Switch
+                        id="flag-enabled"
+                        checked={newFlagEnabled}
+                        onCheckedChange={setNewFlagEnabled}
+                        data-testid="switch-flag-enabled"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={handleCreateFlag}
+                      disabled={!newFlagName || createFlagMutation.isPending}
+                      data-testid="button-submit-flag"
+                    >
+                      {createFlagMutation.isPending ? "Creating..." : "Create Flag"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {flagsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : featureFlags && featureFlags.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Name</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Plans</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {featureFlags.map((flag) => (
+                      <TableRow key={flag.id} data-testid={`flag-row-${flag.id}`}>
+                        <TableCell className="font-medium font-mono">{flag.name}</TableCell>
+                        <TableCell className="text-muted-foreground max-w-xs truncate">
+                          {flag.description || '-'}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1 flex-wrap">
+                            {(flag.enabledForPlans || []).map((plan) => (
+                              <Badge key={plan} variant="outline" className="text-xs">
+                                {plan}
+                              </Badge>
+                            ))}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={flag.enabled}
+                            onCheckedChange={(checked) => toggleFlagMutation.mutate({ id: flag.id, enabled: checked })}
+                            data-testid={`switch-flag-${flag.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteFlagMutation.mutate(flag.id)}
+                            data-testid={`button-delete-flag-${flag.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No feature flags created yet. Create one to control feature rollouts.
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="coupons">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle>Discount Coupons</CardTitle>
+                <CardDescription>
+                  Manage promotional codes and discounts
+                </CardDescription>
+              </div>
+              <Dialog open={couponDialogOpen} onOpenChange={setCouponDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button data-testid="button-create-coupon">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create Coupon
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Coupon</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4 py-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="coupon-code">Coupon Code</Label>
+                      <Input
+                        id="coupon-code"
+                        placeholder="e.g., SUMMER25"
+                        value={newCouponCode}
+                        onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                        data-testid="input-coupon-code"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="coupon-type">Discount Type</Label>
+                      <Select value={newCouponType} onValueChange={(v) => setNewCouponType(v as "percentage" | "fixed")}>
+                        <SelectTrigger data-testid="select-coupon-type">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="percentage">Percentage (%)</SelectItem>
+                          <SelectItem value="fixed">Fixed Amount ($)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="coupon-discount">
+                        Discount Value {newCouponType === 'percentage' ? '(%)' : '($)'}
+                      </Label>
+                      <Input
+                        id="coupon-discount"
+                        type="number"
+                        placeholder={newCouponType === 'percentage' ? '25' : '10'}
+                        value={newCouponDiscount}
+                        onChange={(e) => setNewCouponDiscount(e.target.value)}
+                        data-testid="input-coupon-discount"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="coupon-max-uses">Max Redemptions (optional)</Label>
+                      <Input
+                        id="coupon-max-uses"
+                        type="number"
+                        placeholder="Leave empty for unlimited"
+                        value={newCouponMaxUses}
+                        onChange={(e) => setNewCouponMaxUses(e.target.value)}
+                        data-testid="input-coupon-max-uses"
+                      />
+                    </div>
+                  </div>
+                  <DialogFooter>
+                    <Button
+                      onClick={handleCreateCoupon}
+                      disabled={!newCouponCode || !newCouponDiscount || createCouponMutation.isPending}
+                      data-testid="button-submit-coupon"
+                    >
+                      {createCouponMutation.isPending ? "Creating..." : "Create Coupon"}
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
+            </CardHeader>
+            <CardContent>
+              {couponsLoading ? (
+                <div className="space-y-2">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-12 w-full" />
+                  ))}
+                </div>
+              ) : coupons && coupons.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Code</TableHead>
+                      <TableHead>Discount</TableHead>
+                      <TableHead className="text-center">Used</TableHead>
+                      <TableHead className="text-center">Max Uses</TableHead>
+                      <TableHead>Expires</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {coupons.map((coupon) => (
+                      <TableRow key={coupon.id} data-testid={`coupon-row-${coupon.id}`}>
+                        <TableCell className="font-medium font-mono">{coupon.code}</TableCell>
+                        <TableCell>
+                          {coupon.discountType === 'percentage' 
+                            ? `${coupon.discountValue}%` 
+                            : `$${coupon.discountValue}`}
+                        </TableCell>
+                        <TableCell className="text-center">{coupon.currentRedemptions || 0}</TableCell>
+                        <TableCell className="text-center">
+                          {coupon.maxRedemptions || '∞'}
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString() : 'Never'}
+                        </TableCell>
+                        <TableCell>
+                          <Switch
+                            checked={coupon.isActive}
+                            onCheckedChange={(checked) => toggleCouponMutation.mutate({ id: coupon.id, isActive: checked })}
+                            data-testid={`switch-coupon-${coupon.id}`}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => deleteCouponMutation.mutate(coupon.id)}
+                            data-testid={`button-delete-coupon-${coupon.id}`}
+                          >
+                            <Trash2 className="h-4 w-4 text-destructive" />
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">
+                  No coupons created yet. Create one to offer promotional discounts.
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
