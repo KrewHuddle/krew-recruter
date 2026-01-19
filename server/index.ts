@@ -57,7 +57,10 @@ async function initStripe() {
   }
 }
 
-await initStripe();
+// Initialize Stripe (wrapped to avoid top-level await for CommonJS compatibility)
+(async () => {
+  await initStripe();
+})();
 
 app.use(cookieParser());
 
