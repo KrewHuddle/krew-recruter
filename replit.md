@@ -139,8 +139,9 @@ All routes prefixed with `/api`
 
 ## Design System
 Professional hospitality theme with:
-- **Primary**: Teal (173 58% 39%)
+- **Primary**: Purple/Magenta (280 70% 52% light / 280 70% 60% dark)
 - **Secondary**: Warm Amber (35 90% 55%)
+- **Logo**: Purple/magenta gradient logo used throughout (attached_assets/3_1768835575859.png)
 - Dark mode support with carefully tuned colors
 - Custom elevation utilities (hover-elevate, active-elevate-2)
 
@@ -164,7 +165,12 @@ npm run build        # Build for production
 - Interview templates with question management
 - Settings with org/team/billing/integrations tabs
 
-### Dual Experience Architecture (Latest)
+### Branding Update
+- Updated color scheme from teal to purple/magenta to match company logo
+- Logo integrated across all sidebars (employer and seeker) and public pages
+- Consistent branding in both light and dark modes
+
+### Dual Experience Architecture
 - **Onboarding Flow**: New users at /onboarding choose between "Job Seeker" or "Employer"
 - **Job Seeker Experience**: 
   - Profile builder at /seeker/profile (skills, experience, availability)
