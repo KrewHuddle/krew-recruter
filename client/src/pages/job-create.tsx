@@ -20,7 +20,9 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -222,22 +224,22 @@ export default function JobCreate() {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="" disabled>
-                              -- Front of House --
-                            </SelectItem>
-                            {FOH_ROLES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
-                              </SelectItem>
-                            ))}
-                            <SelectItem value="" disabled>
-                              -- Back of House --
-                            </SelectItem>
-                            {BOH_ROLES.map((role) => (
-                              <SelectItem key={role} value={role}>
-                                {role}
-                              </SelectItem>
-                            ))}
+                            <SelectGroup>
+                              <SelectLabel>Front of House</SelectLabel>
+                              {FOH_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {role}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                            <SelectGroup>
+                              <SelectLabel>Back of House</SelectLabel>
+                              {BOH_ROLES.map((role) => (
+                                <SelectItem key={role} value={role}>
+                                  {role}
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
                           </SelectContent>
                         </Select>
                         <FormMessage />
