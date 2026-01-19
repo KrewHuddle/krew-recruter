@@ -1,11 +1,87 @@
+import { useState } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { Link } from "wouter";
-import { Mail, Chrome, Github, Apple, ArrowRight, Shield, Zap, Users } from "lucide-react";
+import { Link, useLocation } from "wouter";
+import { Mail, Eye, EyeOff, Zap, Users, Shield, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 import logoImage from "@assets/3_1768835575859.png";
 
+type AuthMode = "login" | "register";
+
 export default function Login() {
+  const [, setLocation] = useLocation();
+  const [mode, setMode] = useState<AuthMode>("login");
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [firstName, setFirstName] = useState("");
+  const [lastName, setLastName] = useState("");
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const loginMutation = useMutation({
+    mutationFn: async (data: { email: string; password: string }) => {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Login failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Welcome back!", description: "You've successfully signed in." });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Login failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const registerMutation = useMutation({
+    mutationFn: async (data: { email: string; password: string; firstName?: string; lastName?: string }) => {
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(data),
+      });
+      if (!res.ok) {
+        const error = await res.json();
+        throw new Error(error.error || "Registration failed");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      toast({ title: "Account created!", description: "Welcome to Krew Recruiter." });
+      setLocation("/");
+    },
+    onError: (error: Error) => {
+      toast({ title: "Registration failed", description: error.message, variant: "destructive" });
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode === "login") {
+      loginMutation.mutate({ email, password });
+    } else {
+      registerMutation.mutate({ email, password, firstName, lastName });
+    }
+  };
+
+  const isLoading = loginMutation.isPending || registerMutation.isPending;
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
@@ -76,58 +152,129 @@ export default function Login() {
 
             <Card className="border-0 shadow-lg">
               <CardHeader className="text-center pb-4">
-                <CardTitle className="text-2xl">Welcome back</CardTitle>
+                <CardTitle className="text-2xl">
+                  {mode === "login" ? "Welcome back" : "Create your account"}
+                </CardTitle>
                 <CardDescription>
-                  Sign in to your account to continue
+                  {mode === "login" 
+                    ? "Sign in to your account to continue" 
+                    : "Get started with Krew Recruiter"}
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <a href="/api/login" className="block">
-                  <Button className="w-full gap-2" size="lg" data-testid="button-continue-signin">
-                    Continue to Sign In
-                    <ArrowRight className="h-4 w-4" />
+              <CardContent>
+                <form onSubmit={handleSubmit} className="space-y-4">
+                  {mode === "register" && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-2">
+                        <Label htmlFor="firstName">First name</Label>
+                        <Input
+                          id="firstName"
+                          placeholder="John"
+                          value={firstName}
+                          onChange={(e) => setFirstName(e.target.value)}
+                          data-testid="input-first-name"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="lastName">Last name</Label>
+                        <Input
+                          id="lastName"
+                          placeholder="Doe"
+                          value={lastName}
+                          onChange={(e) => setLastName(e.target.value)}
+                          data-testid="input-last-name"
+                        />
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="space-y-2">
+                    <Label htmlFor="email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="email"
+                        type="email"
+                        placeholder="you@example.com"
+                        className="pl-9"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        required
+                        data-testid="input-email"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder={mode === "register" ? "At least 8 characters" : "Enter your password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        minLength={mode === "register" ? 8 : undefined}
+                        data-testid="input-password"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        data-testid="button-toggle-password"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {mode === "login" && (
+                    <div className="text-right">
+                      <Link href="/forgot-password">
+                        <span className="text-sm text-primary hover:underline cursor-pointer" data-testid="link-forgot-password">
+                          Forgot password?
+                        </span>
+                      </Link>
+                    </div>
+                  )}
+
+                  <Button type="submit" className="w-full" disabled={isLoading} data-testid="button-submit">
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {mode === "login" ? "Sign in" : "Create account"}
                   </Button>
-                </a>
+                </form>
 
-                <div className="relative">
-                  <div className="absolute inset-0 flex items-center">
-                    <span className="w-full border-t border-border" />
-                  </div>
-                  <div className="relative flex justify-center text-xs uppercase">
-                    <span className="bg-card px-2 text-muted-foreground">Available sign-in options</span>
-                  </div>
+                <div className="mt-6 text-center text-sm">
+                  {mode === "login" ? (
+                    <p className="text-muted-foreground">
+                      Don't have an account?{" "}
+                      <button 
+                        onClick={() => setMode("register")}
+                        className="text-primary hover:underline font-medium"
+                        data-testid="link-switch-register"
+                      >
+                        Sign up
+                      </button>
+                    </p>
+                  ) : (
+                    <p className="text-muted-foreground">
+                      Already have an account?{" "}
+                      <button 
+                        onClick={() => setMode("login")}
+                        className="text-primary hover:underline font-medium"
+                        data-testid="link-switch-login"
+                      >
+                        Sign in
+                      </button>
+                    </p>
+                  )}
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                    <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Email</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                    <Chrome className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Google</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                    <Github className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">GitHub</span>
-                  </div>
-                  <div className="flex items-center gap-2 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                    <Apple className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm">Apple</span>
-                  </div>
-                </div>
-
-                <p className="text-center text-xs text-muted-foreground pt-2">
-                  By signing in, you agree to our Terms of Service and Privacy Policy
-                </p>
               </CardContent>
             </Card>
 
-            <p className="text-center text-sm text-muted-foreground mt-6">
-              Don't have an account?{" "}
-              <a href="/api/login" className="text-primary hover:underline" data-testid="link-signup">
-                Sign up for free
-              </a>
+            <p className="text-center text-xs text-muted-foreground mt-6">
+              By signing in, you agree to our Terms of Service and Privacy Policy
             </p>
           </div>
         </div>

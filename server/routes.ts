@@ -1,23 +1,21 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
+import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUserClaims as getCustomUserClaims } from "./customAuth";
 import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
 
-// Helper to safely get user ID from claims
+// Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
-  const user = req.user as any;
-  return user?.claims?.sub as string | undefined;
+  return getCustomUserId(req);
 }
 
-// Helper to safely get user claims
+// Helper to safely get user claims from session
 function getUserClaims(req: Request): { sub?: string; email?: string; first_name?: string; last_name?: string } {
-  const user = req.user as any;
-  return user?.claims || {};
+  return getCustomUserClaims(req);
 }
 
 // Utility to get tenant ID from cookie
@@ -77,9 +75,8 @@ export async function registerRoutes(
   httpServer: Server,
   app: Express
 ): Promise<Server> {
-  // Setup auth first
-  await setupAuth(app);
-  registerAuthRoutes(app);
+  // Setup custom auth
+  await setupCustomAuth(app);
   
   // Setup object storage
   registerObjectStorageRoutes(app);
