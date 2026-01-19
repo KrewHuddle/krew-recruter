@@ -13,7 +13,7 @@ Krew Recruiter is a comprehensive multi-tenant SaaS hospitality hiring platform 
 - **Frontend**: React + Vite + Tailwind CSS + shadcn/ui
 - **Backend**: Express.js + TypeScript
 - **Database**: PostgreSQL with Drizzle ORM
-- **Auth**: Replit Auth (OpenID Connect)
+- **Auth**: Custom email/password authentication with bcrypt + express-session
 - **Routing**: Wouter (client-side)
 
 ## Project Structure
@@ -93,10 +93,13 @@ Pre-configured roles for hospitality:
 ## API Endpoints
 All routes prefixed with `/api`
 
-### Auth
-- `GET /api/auth/user` - Current user info
-- `GET /api/login` - Initiate OAuth flow
-- `GET /api/logout` - End session
+### Auth (Custom Email/Password)
+- `GET /api/auth/user` - Current user info (session-based)
+- `POST /api/auth/register` - Register new user with email/password
+- `POST /api/auth/login` - Login with email/password
+- `POST /api/auth/logout` - End session
+- `POST /api/auth/forgot-password` - Request password reset
+- `POST /api/auth/reset-password` - Reset password with token
 
 ### Tenants
 - `GET /api/tenants/memberships` - User's organizations
