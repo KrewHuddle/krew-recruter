@@ -5,11 +5,15 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "@/components/app-sidebar";
+import { SeekerSidebar } from "@/components/seeker-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TenantProvider } from "@/lib/tenant-context";
 import { useAuth } from "@/hooks/use-auth";
 import NotFound from "@/pages/not-found";
+import Home from "@/pages/home";
 import Landing from "@/pages/landing";
+import Employers from "@/pages/employers";
+import JobSearch from "@/pages/job-search";
 import Dashboard from "@/pages/dashboard";
 import Locations from "@/pages/locations";
 import Jobs from "@/pages/jobs";
@@ -20,9 +24,11 @@ import GigCreate from "@/pages/gig-create";
 import GigBoard from "@/pages/gig-board";
 import Interviews from "@/pages/interviews";
 import Settings from "@/pages/settings";
+import SeekerDashboard from "@/pages/seeker-dashboard";
+import SeekerProfile from "@/pages/seeker-profile";
 import { Loader2 } from "lucide-react";
 
-function ProtectedLayout({ children }: { children: React.ReactNode }) {
+function EmployerLayout({ children }: { children: React.ReactNode }) {
   const sidebarStyle = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3.5rem",
@@ -46,9 +52,30 @@ function ProtectedLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function SeekerLayout({ children }: { children: React.ReactNode }) {
+  const sidebarStyle = {
+    "--sidebar-width": "16rem",
+    "--sidebar-width-icon": "3.5rem",
+  };
+
+  return (
+    <SidebarProvider style={sidebarStyle as React.CSSProperties}>
+      <div className="flex h-screen w-full">
+        <SeekerSidebar />
+        <div className="flex flex-1 flex-col min-w-0">
+          <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-4">
+            <SidebarTrigger data-testid="button-sidebar-toggle" />
+            <ThemeToggle />
+          </header>
+          <main className="flex-1 overflow-auto">{children}</main>
+        </div>
+      </div>
+    </SidebarProvider>
+  );
+}
+
+function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading } = useAuth();
-  const [, setLocation] = useLocation();
 
   if (isLoading) {
     return (
@@ -63,87 +90,117 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return null;
   }
 
-  return <ProtectedLayout>{children}</ProtectedLayout>;
+  return <EmployerLayout>{children}</EmployerLayout>;
+}
+
+function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
+  const { isAuthenticated, isLoading } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  return <SeekerLayout>{children}</SeekerLayout>;
 }
 
 function AppRouter() {
-  const { isAuthenticated, isLoading } = useAuth();
-
   return (
     <Switch>
-      {/* Public routes */}
-      <Route path="/">
-        {isLoading ? (
-          <div className="flex h-screen items-center justify-center">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : isAuthenticated ? (
-          <ProtectedRoute>
-            <Dashboard />
-          </ProtectedRoute>
-        ) : (
-          <Landing />
-        )}
-      </Route>
+      <Route path="/" component={Home} />
+      
+      <Route path="/employers" component={Employers} />
+      
+      <Route path="/jobs" component={JobSearch} />
       
       <Route path="/gigs" component={GigBoard} />
       
-      {/* Protected routes */}
+      <Route path="/seeker">
+        <ProtectedSeekerRoute>
+          <SeekerDashboard />
+        </ProtectedSeekerRoute>
+      </Route>
+      
+      <Route path="/seeker/profile">
+        <ProtectedSeekerRoute>
+          <SeekerProfile />
+        </ProtectedSeekerRoute>
+      </Route>
+      
+      <Route path="/seeker/applications">
+        <ProtectedSeekerRoute>
+          <SeekerDashboard />
+        </ProtectedSeekerRoute>
+      </Route>
+      
+      <Route path="/seeker/saved">
+        <ProtectedSeekerRoute>
+          <SeekerDashboard />
+        </ProtectedSeekerRoute>
+      </Route>
+      
       <Route path="/app">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Dashboard />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/locations">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Locations />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/jobs">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Jobs />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/jobs/new">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <JobCreate />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/applicants">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Applicants />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/gigs">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Gigs />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/gigs/new">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <GigCreate />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/interviews">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Interviews />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
       <Route path="/app/settings">
-        <ProtectedRoute>
+        <ProtectedEmployerRoute>
           <Settings />
-        </ProtectedRoute>
+        </ProtectedEmployerRoute>
       </Route>
       
-      {/* Fallback to 404 */}
       <Route component={NotFound} />
     </Switch>
   );

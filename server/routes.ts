@@ -5,6 +5,18 @@ import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integra
 import { z } from "zod";
 import { randomBytes } from "crypto";
 
+// Helper to safely get user ID from claims
+function getUserId(req: Request): string | undefined {
+  const user = req.user as any;
+  return user?.claims?.sub as string | undefined;
+}
+
+// Helper to safely get user claims
+function getUserClaims(req: Request): { sub?: string; email?: string; first_name?: string; last_name?: string } {
+  const user = req.user as any;
+  return user?.claims || {};
+}
+
 // Utility to get tenant ID from cookie
 function getTenantIdFromCookie(req: Request): string | undefined {
   return req.cookies?.tenantId;
@@ -17,7 +29,7 @@ async function requireTenant(req: Request, res: Response, next: NextFunction) {
     return res.status(400).json({ error: "Tenant context required" });
   }
 
-  const userId = req.user?.claims?.sub;
+  const userId = getUserId(req);
   if (!userId) {
     return res.status(401).json({ error: "Unauthorized" });
   }
@@ -71,7 +83,7 @@ export async function registerRoutes(
   // Get user's tenant memberships
   app.get("/api/tenants/memberships", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const memberships = await storage.getMembershipsByUser(userId);
@@ -85,7 +97,7 @@ export async function registerRoutes(
   // Create tenant
   app.post("/api/tenants", isAuthenticated, async (req, res) => {
     try {
-      const userId = req.user?.claims?.sub;
+      const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const { name } = req.body;
@@ -559,6 +571,258 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching invites:", error);
       res.status(500).json({ error: "Failed to fetch invites" });
+    }
+  });
+
+  // ============ PUBLIC JOB ROUTES (Job Seeker) ============
+
+  // Get all published jobs (public - no auth required)
+  app.get("/api/jobs/public", async (req, res) => {
+    try {
+      const jobsList = await storage.getPublishedJobs();
+      
+      // Get location and tenant info for each job
+      const jobsWithInfo = await Promise.all(
+        jobsList.map(async (job) => {
+          const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+          const tenant = await storage.getTenant(job.tenantId);
+          return { ...job, location, tenant };
+        })
+      );
+      
+      res.json(jobsWithInfo);
+    } catch (error) {
+      console.error("Error fetching public jobs:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+  });
+
+  // Get single public job details
+  app.get("/api/jobs/public/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const job = await storage.getJob(id);
+      
+      if (!job || job.status !== "PUBLISHED") {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+      const tenant = await storage.getTenant(job.tenantId);
+      
+      res.json({ ...job, location, tenant });
+    } catch (error) {
+      console.error("Error fetching job:", error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
+  // ============ JOB SEEKER PROFILE ROUTES ============
+
+  // Get current user's profile
+  app.get("/api/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const profile = await storage.getWorkerProfile(userId);
+      res.json(profile || null);
+    } catch (error) {
+      console.error("Error fetching profile:", error);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  // Create worker profile
+  app.post("/api/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const profile = await storage.createWorkerProfile({ ...req.body, userId });
+      res.json(profile);
+    } catch (error) {
+      console.error("Error creating profile:", error);
+      res.status(500).json({ error: "Failed to create profile" });
+    }
+  });
+
+  // Update worker profile
+  app.patch("/api/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const profile = await storage.updateWorkerProfile(userId, req.body);
+      res.json(profile);
+    } catch (error) {
+      console.error("Error updating profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // ============ JOB SEEKER APPLICATION ROUTES ============
+
+  // Get current user's applications
+  app.get("/api/applications/mine", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const apps = await storage.getApplicationsByWorker(userId);
+      
+      // Get job and tenant info
+      const appsWithJobs = await Promise.all(
+        apps.map(async (app) => {
+          const job = await storage.getJob(app.jobId);
+          const tenant = job ? await storage.getTenant(job.tenantId) : null;
+          return { ...app, job: job ? { ...job, tenant } : null };
+        })
+      );
+      
+      res.json(appsWithJobs);
+    } catch (error) {
+      console.error("Error fetching applications:", error);
+      res.status(500).json({ error: "Failed to fetch applications" });
+    }
+  });
+
+  // Apply to a job
+  app.post("/api/applications/apply", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { jobId, coverLetter, resumeUrl } = req.body;
+      if (!jobId) return res.status(400).json({ error: "Job ID required" });
+
+      // Get the job to find tenant
+      const job = await storage.getJob(jobId);
+      if (!job || job.status !== "PUBLISHED") {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Check if already applied
+      const existingApps = await storage.getApplicationsByWorker(userId);
+      if (existingApps.some(app => app.jobId === jobId)) {
+        return res.status(400).json({ error: "Already applied to this job" });
+      }
+
+      const application = await storage.createApplication({
+        tenantId: job.tenantId,
+        jobId,
+        workerUserId: userId,
+        coverLetter,
+        resumeUrl,
+        stage: "APPLIED",
+      });
+
+      res.json(application);
+    } catch (error) {
+      console.error("Error creating application:", error);
+      res.status(500).json({ error: "Failed to apply" });
+    }
+  });
+
+  // ============ SAVED JOBS ROUTES ============
+
+  // Get user's saved jobs
+  app.get("/api/saved-jobs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const savedJobs = await storage.getSavedJobsByUser(userId);
+      
+      // Get job details
+      const jobsWithDetails = await Promise.all(
+        savedJobs.map(async (saved) => {
+          const job = await storage.getJob(saved.jobId);
+          if (!job) return null;
+          const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+          const tenant = await storage.getTenant(job.tenantId);
+          return { ...saved, job: { ...job, location, tenant } };
+        })
+      );
+      
+      res.json(jobsWithDetails.filter(Boolean));
+    } catch (error) {
+      console.error("Error fetching saved jobs:", error);
+      res.status(500).json({ error: "Failed to fetch saved jobs" });
+    }
+  });
+
+  // Save a job
+  app.post("/api/saved-jobs", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { jobId } = req.body;
+      if (!jobId) return res.status(400).json({ error: "Job ID required" });
+
+      const saved = await storage.saveJob({ userId, jobId });
+      res.json(saved);
+    } catch (error) {
+      console.error("Error saving job:", error);
+      res.status(500).json({ error: "Failed to save job" });
+    }
+  });
+
+  // Remove saved job
+  app.delete("/api/saved-jobs/:jobId", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { jobId } = req.params;
+      await storage.unsaveJob(userId, jobId);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing saved job:", error);
+      res.status(500).json({ error: "Failed to remove saved job" });
+    }
+  });
+
+  // ============ USER TYPE / ONBOARDING ROUTES ============
+
+  // Get user profile (type: employer or job seeker)
+  app.get("/api/user/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const userProfile = await storage.getUserProfile(userId);
+      res.json(userProfile || null);
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      res.status(500).json({ error: "Failed to fetch user profile" });
+    }
+  });
+
+  // Set user type (employer or job seeker)
+  app.post("/api/user/profile", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const claims = getUserClaims(req);
+      const email = claims.email;
+      const firstName = claims.first_name;
+      const lastName = claims.last_name;
+
+      const userProfile = await storage.createUserProfile({
+        userId,
+        email,
+        firstName,
+        lastName,
+        ...req.body,
+      });
+
+      res.json(userProfile);
+    } catch (error) {
+      console.error("Error creating user profile:", error);
+      res.status(500).json({ error: "Failed to create user profile" });
     }
   });
 

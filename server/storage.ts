@@ -12,6 +12,9 @@ import {
   interviewResponses,
   jobDistributionChannels,
   sponsoredCampaigns,
+  workerProfiles,
+  userProfiles,
+  savedJobs,
   type Tenant,
   type InsertTenant,
   type TenantMembership,
@@ -36,6 +39,12 @@ import {
   type InsertJobDistributionChannel,
   type SponsoredCampaign,
   type InsertSponsoredCampaign,
+  type WorkerProfile,
+  type InsertWorkerProfile,
+  type UserProfile,
+  type InsertUserProfile,
+  type SavedJob,
+  type InsertSavedJob,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -114,6 +123,26 @@ export interface IStorage {
     openGigs: number;
     pendingAssignments: number;
   }>;
+
+  // Public Jobs
+  getPublishedJobs(): Promise<Job[]>;
+
+  // Worker Profiles
+  getWorkerProfile(userId: string): Promise<WorkerProfile | undefined>;
+  createWorkerProfile(data: InsertWorkerProfile): Promise<WorkerProfile>;
+  updateWorkerProfile(userId: string, data: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined>;
+
+  // User Profiles
+  getUserProfile(userId: string): Promise<UserProfile | undefined>;
+  createUserProfile(data: InsertUserProfile): Promise<UserProfile>;
+
+  // Applications for workers
+  getApplicationsByWorker(userId: string): Promise<Application[]>;
+
+  // Saved Jobs
+  getSavedJobsByUser(userId: string): Promise<SavedJob[]>;
+  saveJob(data: InsertSavedJob): Promise<SavedJob>;
+  unsaveJob(userId: string, jobId: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -455,6 +484,62 @@ export class DatabaseStorage implements IStorage {
       openGigs: openGigsResult?.count || 0,
       pendingAssignments: pendingAssignmentsResult?.count || 0,
     };
+  }
+
+  // Public Jobs
+  async getPublishedJobs(): Promise<Job[]> {
+    return db.select().from(jobs).where(eq(jobs.status, "PUBLISHED")).orderBy(desc(jobs.createdAt));
+  }
+
+  // Worker Profiles
+  async getWorkerProfile(userId: string): Promise<WorkerProfile | undefined> {
+    const [profile] = await db.select().from(workerProfiles).where(eq(workerProfiles.userId, userId));
+    return profile || undefined;
+  }
+
+  async createWorkerProfile(data: InsertWorkerProfile): Promise<WorkerProfile> {
+    const [profile] = await db.insert(workerProfiles).values(data).returning();
+    return profile;
+  }
+
+  async updateWorkerProfile(userId: string, data: Partial<InsertWorkerProfile>): Promise<WorkerProfile | undefined> {
+    const [profile] = await db
+      .update(workerProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workerProfiles.userId, userId))
+      .returning();
+    return profile || undefined;
+  }
+
+  // User Profiles
+  async getUserProfile(userId: string): Promise<UserProfile | undefined> {
+    const [profile] = await db.select().from(userProfiles).where(eq(userProfiles.userId, userId));
+    return profile || undefined;
+  }
+
+  async createUserProfile(data: InsertUserProfile): Promise<UserProfile> {
+    const [profile] = await db.insert(userProfiles).values(data).returning();
+    return profile;
+  }
+
+  // Applications for workers
+  async getApplicationsByWorker(userId: string): Promise<Application[]> {
+    return db.select().from(applications).where(eq(applications.workerUserId, userId)).orderBy(desc(applications.appliedAt));
+  }
+
+  // Saved Jobs
+  async getSavedJobsByUser(userId: string): Promise<SavedJob[]> {
+    return db.select().from(savedJobs).where(eq(savedJobs.userId, userId)).orderBy(desc(savedJobs.savedAt));
+  }
+
+  async saveJob(data: InsertSavedJob): Promise<SavedJob> {
+    const [saved] = await db.insert(savedJobs).values(data).returning();
+    return saved;
+  }
+
+  async unsaveJob(userId: string, jobId: string): Promise<boolean> {
+    await db.delete(savedJobs).where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)));
+    return true;
   }
 }
 

@@ -156,18 +156,50 @@ export const insertJobSchema = createInsertSchema(jobs).omit({ id: true, created
 export type InsertJob = z.infer<typeof insertJobSchema>;
 export type Job = typeof jobs.$inferSelect;
 
+// ============ USER TYPE ENUM ============
+
+export const userTypeEnum = pgEnum("user_type", ["EMPLOYER", "JOB_SEEKER"]);
+
+// ============ USER PROFILES (Global user preferences) ============
+
+export const userProfiles = pgTable("user_profiles", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  userType: userTypeEnum("user_type").notNull().default("JOB_SEEKER"),
+  email: text("email"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  phone: text("phone"),
+  avatarUrl: text("avatar_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertUserProfileSchema = createInsertSchema(userProfiles).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertUserProfile = z.infer<typeof insertUserProfileSchema>;
+export type UserProfile = typeof userProfiles.$inferSelect;
+
 // ============ WORKER PROFILES (Global, not tenant-scoped) ============
 
 export const workerProfiles = pgTable("worker_profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   userId: varchar("user_id").notNull().unique(),
   name: text("name"),
+  headline: text("headline"),
   city: text("city"),
+  state: text("state"),
   summary: text("summary"),
+  experienceYears: integer("experience_years"),
   fohRoles: text("foh_roles").array(),
   bohRoles: text("boh_roles").array(),
   availabilityJson: jsonb("availability_json"),
   certificationsJson: jsonb("certifications_json"),
+  resumeUrl: text("resume_url"),
+  desiredPayMin: integer("desired_pay_min"),
+  desiredPayMax: integer("desired_pay_max"),
+  openToGigs: boolean("open_to_gigs").default(true),
+  openToFullTime: boolean("open_to_full_time").default(true),
+  openToPartTime: boolean("open_to_part_time").default(true),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -175,6 +207,26 @@ export const workerProfiles = pgTable("worker_profiles", {
 export const insertWorkerProfileSchema = createInsertSchema(workerProfiles).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertWorkerProfile = z.infer<typeof insertWorkerProfileSchema>;
 export type WorkerProfile = typeof workerProfiles.$inferSelect;
+
+// ============ SAVED JOBS ============
+
+export const savedJobs = pgTable("saved_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  savedAt: timestamp("saved_at").defaultNow(),
+}, (table) => [
+  index("idx_saved_jobs_user").on(table.userId),
+  index("idx_saved_jobs_job").on(table.jobId),
+]);
+
+export const savedJobsRelations = relations(savedJobs, ({ one }) => ({
+  job: one(jobs, { fields: [savedJobs.jobId], references: [jobs.id] }),
+}));
+
+export const insertSavedJobSchema = createInsertSchema(savedJobs).omit({ id: true, savedAt: true });
+export type InsertSavedJob = z.infer<typeof insertSavedJobSchema>;
+export type SavedJob = typeof savedJobs.$inferSelect;
 
 // ============ APPLICATIONS ============
 
