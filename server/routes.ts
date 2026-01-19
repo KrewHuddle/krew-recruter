@@ -264,16 +264,17 @@ export async function registerRoutes(
       const tenantId = (req as any).tenantId;
       const jobList = await storage.getJobsByTenant(tenantId);
       
-      // Get location info for each job
-      const jobsWithLocations = await Promise.all(
+      // Get location info and distribution channels for each job
+      const jobsWithDetails = await Promise.all(
         jobList.map(async (job) => {
           const location = job.locationId ? await storage.getLocation(job.locationId) : undefined;
           const apps = await storage.getApplicationsByJob(job.id);
-          return { ...job, location, _count: { applications: apps.length } };
+          const distributionChannels = await storage.getDistributionChannelsByJob(job.id);
+          return { ...job, location, _count: { applications: apps.length }, distributionChannels };
         })
       );
       
-      res.json(jobsWithLocations);
+      res.json(jobsWithDetails);
     } catch (error) {
       console.error("Error fetching jobs:", error);
       res.status(500).json({ error: "Failed to fetch jobs" });
@@ -781,6 +782,226 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error removing saved job:", error);
       res.status(500).json({ error: "Failed to remove saved job" });
+    }
+  });
+
+  // ============ INTEGRATION CONNECTIONS ROUTES ============
+
+  // Get integration connections for tenant
+  app.get("/api/integrations", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const connections = await storage.getIntegrationConnectionsByTenant(tenantId);
+      // Mask credentials before sending
+      const masked = connections.map(conn => ({
+        ...conn,
+        credentialsEncryptedJson: conn.credentialsEncryptedJson ? "********" : null,
+      }));
+      res.json(masked);
+    } catch (error) {
+      console.error("Error fetching integrations:", error);
+      res.status(500).json({ error: "Failed to fetch integrations" });
+    }
+  });
+
+  // Create integration connection
+  app.post("/api/integrations", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN"), async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { provider, credentials } = req.body;
+
+      if (!provider) {
+        return res.status(400).json({ error: "Provider required" });
+      }
+
+      // Store credentials as JSON (in production would encrypt)
+      const connection = await storage.createIntegrationConnection({
+        tenantId,
+        provider,
+        credentialsEncryptedJson: credentials ? JSON.stringify(credentials) : null,
+        status: "active",
+      });
+
+      res.json({
+        ...connection,
+        credentialsEncryptedJson: "********",
+      });
+    } catch (error) {
+      console.error("Error creating integration:", error);
+      res.status(500).json({ error: "Failed to create integration" });
+    }
+  });
+
+  // Update integration connection
+  app.patch("/api/integrations/:id", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { credentials, status } = req.body;
+
+      const updateData: any = {};
+      if (credentials !== undefined) {
+        updateData.credentialsEncryptedJson = credentials ? JSON.stringify(credentials) : null;
+      }
+      if (status !== undefined) {
+        updateData.status = status;
+      }
+
+      const connection = await storage.updateIntegrationConnection(id, updateData);
+      if (!connection) {
+        return res.status(404).json({ error: "Integration not found" });
+      }
+
+      res.json({
+        ...connection,
+        credentialsEncryptedJson: connection.credentialsEncryptedJson ? "********" : null,
+      });
+    } catch (error) {
+      console.error("Error updating integration:", error);
+      res.status(500).json({ error: "Failed to update integration" });
+    }
+  });
+
+  // Delete integration connection
+  app.delete("/api/integrations/:id", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN"), async (req, res) => {
+    try {
+      const { id } = req.params;
+      await storage.deleteIntegrationConnection(id);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error deleting integration:", error);
+      res.status(500).json({ error: "Failed to delete integration" });
+    }
+  });
+
+  // ============ JOB DISTRIBUTION ROUTES ============
+
+  // Get distribution channels for a job
+  app.get("/api/jobs/:jobId/distribution", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { jobId } = req.params;
+      
+      // Verify job belongs to tenant
+      const job = await storage.getJob(jobId as string);
+      if (!job || job.tenantId !== tenantId) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      
+      const channels = await storage.getDistributionChannelsByJob(jobId as string);
+      res.json(channels);
+    } catch (error) {
+      console.error("Error fetching distribution channels:", error);
+      res.status(500).json({ error: "Failed to fetch distribution channels" });
+    }
+  });
+
+  // Create or update distribution for a job (post to job board)
+  app.post("/api/jobs/:jobId/distribute", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { jobId } = req.params;
+      const { provider } = req.body;
+
+      if (!provider) {
+        return res.status(400).json({ error: "Provider required" });
+      }
+
+      // Check if integration exists
+      const connections = await storage.getIntegrationConnectionsByTenant(tenantId);
+      const connection = connections.find(c => c.provider === provider && c.status === "active");
+
+      if (!connection) {
+        return res.status(400).json({ error: `No active ${provider} integration found. Configure it in Settings first.` });
+      }
+
+      // Get job details and verify tenant ownership
+      const job = await storage.getJob(jobId as string);
+      if (!job || job.tenantId !== tenantId) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // Check if already distributed to this provider
+      const existingChannels = await storage.getDistributionChannelsByJob(jobId);
+      const existingChannel = existingChannels.find(c => c.provider === provider);
+
+      if (existingChannel) {
+        // Update existing channel
+        const updated = await storage.updateDistributionChannel(existingChannel.id, {
+          status: "ACTIVE",
+          postedAt: new Date(),
+          lastError: null,
+        });
+        return res.json(updated);
+      }
+
+      // Create new distribution channel
+      // In production, this would call the actual job board API
+      // For now, we simulate a successful post
+      const externalJobId = `${provider.toLowerCase()}-${job.id}-${Date.now()}`;
+
+      const channel = await storage.createDistributionChannel({
+        tenantId,
+        jobId,
+        provider,
+        externalJobId,
+        status: "ACTIVE",
+        postedAt: new Date(),
+      });
+
+      res.json(channel);
+    } catch (error) {
+      console.error("Error distributing job:", error);
+      res.status(500).json({ error: "Failed to distribute job" });
+    }
+  });
+
+  // Pause/unpause distribution
+  app.patch("/api/jobs/:jobId/distribution/:channelId", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { jobId, channelId } = req.params;
+      const { status } = req.body;
+
+      // Verify job belongs to tenant
+      const job = await storage.getJob(jobId as string);
+      if (!job || job.tenantId !== tenantId) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      if (!["ACTIVE", "PAUSED", "CLOSED"].includes(status)) {
+        return res.status(400).json({ error: "Invalid status" });
+      }
+
+      const channel = await storage.updateDistributionChannel(channelId as string, { status });
+      if (!channel) {
+        return res.status(404).json({ error: "Distribution channel not found" });
+      }
+
+      res.json(channel);
+    } catch (error) {
+      console.error("Error updating distribution:", error);
+      res.status(500).json({ error: "Failed to update distribution" });
+    }
+  });
+
+  // Remove distribution (take down from job board)
+  app.delete("/api/jobs/:jobId/distribution/:channelId", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { jobId, channelId } = req.params;
+
+      // Verify job belongs to tenant
+      const job = await storage.getJob(jobId as string);
+      if (!job || job.tenantId !== tenantId) {
+        return res.status(404).json({ error: "Job not found" });
+      }
+
+      // In production, would call job board API to remove the posting
+      await storage.deleteDistributionChannel(channelId as string);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error removing distribution:", error);
+      res.status(500).json({ error: "Failed to remove distribution" });
     }
   });
 

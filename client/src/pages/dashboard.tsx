@@ -30,26 +30,26 @@ export default function Dashboard() {
   const { currentTenant } = useTenant();
 
   const { data: stats, isLoading: statsLoading } = useQuery<DashboardStats>({
-    queryKey: ["/api/dashboard/stats", currentTenant?.id],
+    queryKey: ["/api/dashboard/stats"],
     enabled: !!currentTenant,
   });
 
   const { data: recentJobs, isLoading: jobsLoading } = useQuery<Job[]>({
-    queryKey: ["/api/jobs", currentTenant?.id, { limit: 5 }],
+    queryKey: ["/api/jobs"],
     enabled: !!currentTenant,
   });
 
   const { data: recentApplicants, isLoading: applicantsLoading } = useQuery<
     (Application & { job?: Job })[]
   >({
-    queryKey: ["/api/applications", currentTenant?.id, { limit: 5 }],
+    queryKey: ["/api/applications"],
     enabled: !!currentTenant,
   });
 
   const { data: upcomingGigs, isLoading: gigsLoading } = useQuery<
     (GigPost & { location?: Location })[]
   >({
-    queryKey: ["/api/gigs", currentTenant?.id, { status: "OPEN", limit: 5 }],
+    queryKey: ["/api/gigs"],
     enabled: !!currentTenant,
   });
 
@@ -249,7 +249,7 @@ export default function Dashboard() {
                 <Briefcase className="h-10 w-10 text-muted-foreground/50 mb-3" />
                 <p className="text-sm text-muted-foreground">No jobs yet</p>
                 <Link href="/app/jobs/new">
-                  <Button variant="link" size="sm" className="mt-2">
+                  <Button variant="ghost" size="sm" className="mt-2 text-primary">
                     Create your first job
                   </Button>
                 </Link>
@@ -383,7 +383,7 @@ export default function Dashboard() {
                   No upcoming gigs
                 </p>
                 <Link href="/app/gigs/new">
-                  <Button variant="link" size="sm" className="mt-2">
+                  <Button variant="ghost" size="sm" className="mt-2 text-primary">
                     Post your first gig
                   </Button>
                 </Link>

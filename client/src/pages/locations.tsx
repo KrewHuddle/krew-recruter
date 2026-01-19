@@ -64,7 +64,7 @@ export default function Locations() {
   const [editingLocation, setEditingLocation] = useState<Location | null>(null);
 
   const { data: locations, isLoading } = useQuery<Location[]>({
-    queryKey: ["/api/locations", currentTenant?.id],
+    queryKey: ["/api/locations"],
     enabled: !!currentTenant,
   });
 
@@ -88,7 +88,7 @@ export default function Locations() {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations", currentTenant?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       toast({ title: "Location created successfully" });
       setIsDialogOpen(false);
       form.reset();
@@ -103,7 +103,7 @@ export default function Locations() {
       return apiRequest("PATCH", `/api/locations/${data.id}`, data);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations", currentTenant?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       toast({ title: "Location updated successfully" });
       setEditingLocation(null);
       setIsDialogOpen(false);
@@ -119,7 +119,7 @@ export default function Locations() {
       return apiRequest("DELETE", `/api/locations/${id}`, undefined);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/locations", currentTenant?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/locations"] });
       toast({ title: "Location deleted successfully" });
     },
     onError: () => {

@@ -74,8 +74,9 @@ export default function JobCreate() {
   const [step, setStep] = useState(1);
 
   const { data: locations } = useQuery<Location[]>({
-    queryKey: ["/api/locations", currentTenant?.id],
+    queryKey: ["/api/locations"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const form = useForm<JobFormValues>({
@@ -102,7 +103,7 @@ export default function JobCreate() {
     },
     onSuccess: async (response) => {
       const job = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/jobs", currentTenant?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/jobs"] });
       toast({ title: "Job created successfully" });
       navigate(`/app/jobs/${job.id}`);
     },
@@ -273,26 +274,33 @@ export default function JobCreate() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Location</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger data-testid="select-job-location">
-                              <SelectValue placeholder="Select a location" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {locations?.map((loc) => (
-                              <SelectItem key={loc.id} value={loc.id}>
-                                {loc.name}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormDescription>
-                          {!locations?.length && (
-                            <Link href="/app/locations" className="text-primary">
+                        {locations && locations.length > 0 ? (
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-job-location">
+                                <SelectValue placeholder="Select a location" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {locations.map((loc) => (
+                                <SelectItem key={loc.id} value={loc.id}>
+                                  {loc.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        ) : (
+                          <div className="flex flex-col gap-2">
+                            <div className="flex h-9 items-center rounded-md border border-input bg-muted px-3 text-sm text-muted-foreground">
+                              No locations available
+                            </div>
+                            <Link href="/app/locations" className="text-sm text-primary hover:underline">
                               Add a location first
                             </Link>
-                          )}
+                          </div>
+                        )}
+                        <FormDescription className="sr-only">
+                          Select the work location for this position
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

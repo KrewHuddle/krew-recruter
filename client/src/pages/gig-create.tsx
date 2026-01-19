@@ -53,8 +53,9 @@ export default function GigCreate() {
   const { toast } = useToast();
 
   const { data: locations } = useQuery<Location[]>({
-    queryKey: ["/api/locations", currentTenant?.id],
+    queryKey: ["/api/locations"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const form = useForm<GigFormValues>({
@@ -94,7 +95,7 @@ export default function GigCreate() {
     },
     onSuccess: async (response) => {
       const gig = await response.json();
-      queryClient.invalidateQueries({ queryKey: ["/api/gigs", currentTenant?.id] });
+      queryClient.invalidateQueries({ queryKey: ["/api/gigs"] });
       toast({ title: "Gig posted successfully" });
       navigate(`/app/gigs/${gig.id}`);
     },

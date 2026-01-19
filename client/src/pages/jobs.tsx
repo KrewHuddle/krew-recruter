@@ -22,14 +22,17 @@ import {
   Users,
   Star,
   ExternalLink,
+  Globe,
+  CheckCircle2,
 } from "lucide-react";
 import { useState } from "react";
-import type { Job, Location, SponsoredCampaign } from "@shared/schema";
+import type { Job, Location, SponsoredCampaign, JobDistributionChannel } from "@shared/schema";
 
 type JobWithRelations = Job & {
   location?: Location;
   _count?: { applications: number };
   sponsoredCampaign?: SponsoredCampaign | null;
+  distributionChannels?: JobDistributionChannel[];
 };
 
 export default function Jobs() {
@@ -38,8 +41,9 @@ export default function Jobs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: jobs, isLoading } = useQuery<JobWithRelations[]>({
-    queryKey: ["/api/jobs", currentTenant?.id],
+    queryKey: ["/api/jobs"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const filteredJobs = jobs?.filter((job) => {
@@ -184,6 +188,12 @@ export default function Jobs() {
                             {tag}
                           </Badge>
                         ))}
+                        {job.distributionChannels && job.distributionChannels.filter(c => c.status === "ACTIVE").length > 0 && (
+                          <Badge variant="outline" className="gap-1 text-xs border-green-500/50 text-green-600 dark:text-green-400">
+                            <Globe className="h-3 w-3" />
+                            {job.distributionChannels.filter(c => c.status === "ACTIVE").length} board{job.distributionChannels.filter(c => c.status === "ACTIVE").length > 1 ? "s" : ""}
+                          </Badge>
+                        )}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

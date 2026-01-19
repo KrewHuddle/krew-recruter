@@ -70,13 +70,15 @@ export default function Interviews() {
   const [isQuestionDialogOpen, setIsQuestionDialogOpen] = useState(false);
 
   const { data: templates, isLoading } = useQuery<TemplateWithQuestions[]>({
-    queryKey: ["/api/interviews/templates", currentTenant?.id],
+    queryKey: ["/api/interviews/templates"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const { data: invites } = useQuery<(InterviewInvite & { template?: InterviewTemplate })[]>({
-    queryKey: ["/api/interviews/invites", currentTenant?.id],
+    queryKey: ["/api/interviews/invites"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const templateForm = useForm<TemplateFormValues>({
@@ -98,7 +100,7 @@ export default function Interviews() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["/api/interviews/templates", currentTenant?.id],
+        queryKey: ["/api/interviews/templates"],
       });
       toast({ title: "Template created successfully" });
       setIsTemplateDialogOpen(false);
@@ -120,7 +122,7 @@ export default function Interviews() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["/api/interviews/templates", currentTenant?.id],
+        queryKey: ["/api/interviews/templates"],
       });
       toast({ title: "Question added successfully" });
       setIsQuestionDialogOpen(false);
@@ -137,7 +139,7 @@ export default function Interviews() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
-        queryKey: ["/api/interviews/templates", currentTenant?.id],
+        queryKey: ["/api/interviews/templates"],
       });
       toast({ title: "Template deleted successfully" });
       setSelectedTemplate(null);

@@ -50,8 +50,11 @@ import {
   Crown,
   Shield,
   Eye,
+  Loader2,
+  Unlink,
+  ExternalLink,
 } from "lucide-react";
-import type { Tenant, TenantMembership } from "@shared/schema";
+import type { Tenant, TenantMembership, IntegrationConnection } from "@shared/schema";
 
 type MemberWithUser = TenantMembership & {
   user?: { email: string; firstName?: string; lastName?: string };
@@ -676,41 +679,290 @@ export default function Settings() {
 
         {/* Integrations Tab */}
         <TabsContent value="integrations" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Job Board Integrations</CardTitle>
-              <CardDescription>
-                Connect your job board accounts for automatic distribution
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {["Indeed", "ZipRecruiter", "Aggregator"].map((provider) => (
-                  <div
-                    key={provider}
-                    className="flex items-center justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted text-muted-foreground font-bold">
-                        {provider[0]}
-                      </div>
-                      <div>
-                        <div className="font-medium">{provider}</div>
-                        <div className="text-sm text-muted-foreground">
-                          Not connected
-                        </div>
-                      </div>
-                    </div>
-                    <Button variant="outline" size="sm" data-testid={`button-connect-${provider.toLowerCase()}`}>
-                      Connect
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          <IntegrationsPanel tenantId={currentTenant?.id} isOwnerOrAdmin={isOwnerOrAdmin} />
         </TabsContent>
       </Tabs>
     </div>
+  );
+}
+
+type ProviderField = {
+  key: string;
+  label: string;
+  placeholder: string;
+  secret?: boolean;
+};
+
+type ProviderConfig = {
+  id: string;
+  name: string;
+  description: string;
+  docsUrl: string | null;
+  fields: ProviderField[];
+};
+
+const JOB_BOARD_PROVIDERS: ProviderConfig[] = [
+  {
+    id: "INDEED",
+    name: "Indeed",
+    description: "Post jobs to the world's largest job site",
+    docsUrl: "https://docs.indeed.com/job-sync-api",
+    fields: [
+      { key: "employerId", label: "Employer ID", placeholder: "Your Indeed Employer ID" },
+      { key: "apiKey", label: "API Key", placeholder: "Your Indeed API Key", secret: true },
+    ],
+  },
+  {
+    id: "ZIPRECRUITER",
+    name: "ZipRecruiter",
+    description: "Reach millions of job seekers on ZipRecruiter",
+    docsUrl: "https://www.ziprecruiter.com/partner/documentation/",
+    fields: [
+      { key: "partnerId", label: "Partner ID", placeholder: "Your ZipRecruiter Partner ID" },
+      { key: "apiKey", label: "API Key", placeholder: "Your ZipRecruiter API Key", secret: true },
+    ],
+  },
+  {
+    id: "AGGREGATOR",
+    name: "Aggregator Feed",
+    description: "XML/JSON feed for aggregator sites",
+    docsUrl: null,
+    fields: [
+      { key: "feedUrl", label: "Feed URL", placeholder: "https://your-site.com/jobs.xml" },
+    ],
+  },
+];
+
+function IntegrationsPanel({ tenantId, isOwnerOrAdmin }: { tenantId?: string; isOwnerOrAdmin: boolean }) {
+  const { toast } = useToast();
+  const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [credentials, setCredentials] = useState<Record<string, string>>({});
+
+  const { data: integrations, isLoading } = useQuery<IntegrationConnection[]>({
+    queryKey: ["/api/integrations"],
+    enabled: !!tenantId,
+  });
+
+  const connectMutation = useMutation({
+    mutationFn: async ({ provider, creds }: { provider: string; creds: Record<string, string> }) => {
+      return apiRequest("POST", "/api/integrations", {
+        provider,
+        credentials: creds,
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations"] });
+      toast({ title: "Integration connected successfully" });
+      setConnectingProvider(null);
+      setCredentials({});
+    },
+    onError: () => {
+      toast({ title: "Failed to connect integration", variant: "destructive" });
+    },
+  });
+
+  const disconnectMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/integrations/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/integrations"] });
+      toast({ title: "Integration disconnected" });
+    },
+    onError: () => {
+      toast({ title: "Failed to disconnect integration", variant: "destructive" });
+    },
+  });
+
+  const getConnectionForProvider = (providerId: string) => {
+    return integrations?.find(i => i.provider === providerId);
+  };
+
+  const handleConnect = (providerId: string) => {
+    const providerConfig = JOB_BOARD_PROVIDERS.find(p => p.id === providerId);
+    if (!providerConfig) return;
+
+    const missingFields = providerConfig.fields.filter(f => !credentials[f.key]);
+    if (missingFields.length > 0) {
+      toast({ title: `Please fill in all fields`, variant: "destructive" });
+      return;
+    }
+
+    connectMutation.mutate({ provider: providerId, creds: credentials });
+  };
+
+  if (!tenantId) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <LinkIcon className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No organization selected</h3>
+          <p className="text-muted-foreground text-center max-w-sm">
+            Select or create an organization to manage integrations
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Job Board Integrations</CardTitle>
+        <CardDescription>
+          Connect your job board accounts to automatically distribute job postings
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {isLoading ? (
+          <div className="space-y-4">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="flex items-center gap-4 rounded-lg border border-border p-4">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-4 w-32" />
+                  <Skeleton className="h-3 w-48" />
+                </div>
+                <Skeleton className="h-8 w-24" />
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {JOB_BOARD_PROVIDERS.map((provider) => {
+              const connection = getConnectionForProvider(provider.id);
+              const isConnected = !!connection && connection.status === "active";
+              const isExpanded = connectingProvider === provider.id;
+
+              return (
+                <div
+                  key={provider.id}
+                  className="rounded-lg border border-border overflow-hidden"
+                  data-testid={`integration-card-${provider.id.toLowerCase()}`}
+                >
+                  <div className="flex items-center justify-between p-4">
+                    <div className="flex items-center gap-3">
+                      <div className={`flex h-10 w-10 items-center justify-center rounded-lg font-bold ${
+                        isConnected ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400" : "bg-muted text-muted-foreground"
+                      }`}>
+                        {provider.name[0]}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-medium">{provider.name}</span>
+                          {isConnected && (
+                            <Badge variant="default" className="text-xs">
+                              <CheckCircle2 className="h-3 w-3 mr-1" />
+                              Connected
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-muted-foreground">
+                          {provider.description}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {provider.docsUrl && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          asChild
+                        >
+                          <a href={provider.docsUrl} target="_blank" rel="noopener noreferrer" title="View API documentation">
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        </Button>
+                      )}
+                      {isConnected ? (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => disconnectMutation.mutate(connection.id)}
+                          disabled={disconnectMutation.isPending || !isOwnerOrAdmin}
+                          data-testid={`button-disconnect-${provider.id.toLowerCase()}`}
+                        >
+                          {disconnectMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <>
+                              <Unlink className="h-4 w-4 mr-1" />
+                              Disconnect
+                            </>
+                          )}
+                        </Button>
+                      ) : (
+                        <Button
+                          variant={isExpanded ? "secondary" : "outline"}
+                          size="sm"
+                          onClick={() => {
+                            setConnectingProvider(isExpanded ? null : provider.id);
+                            setCredentials({});
+                          }}
+                          disabled={!isOwnerOrAdmin}
+                          data-testid={`button-connect-${provider.id.toLowerCase()}`}
+                        >
+                          {isExpanded ? "Cancel" : "Connect"}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isExpanded && !isConnected && (
+                    <div className="border-t border-border bg-muted/30 p-4 space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Enter your {provider.name} API credentials to enable automatic job posting.
+                      </p>
+                      <div className="grid gap-3">
+                        {provider.fields.map((field) => (
+                          <div key={field.key} className="grid gap-1.5">
+                            <label className="text-sm font-medium">{field.label}</label>
+                            <Input
+                              type={field.secret ? "password" : "text"}
+                              placeholder={field.placeholder}
+                              value={credentials[field.key] || ""}
+                              onChange={(e) =>
+                                setCredentials({ ...credentials, [field.key]: e.target.value })
+                              }
+                              data-testid={`input-${provider.id.toLowerCase()}-${field.key.toLowerCase()}`}
+                            />
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex justify-end">
+                        <Button
+                          onClick={() => handleConnect(provider.id)}
+                          disabled={connectMutation.isPending}
+                          data-testid={`button-save-${provider.id.toLowerCase()}`}
+                        >
+                          {connectMutation.isPending ? (
+                            <>
+                              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                              Connecting...
+                            </>
+                          ) : (
+                            "Save & Connect"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="mt-6 p-4 rounded-lg bg-muted/50 border border-border">
+          <h4 className="font-medium mb-2">How Job Board Integration Works</h4>
+          <ol className="text-sm text-muted-foreground space-y-1 list-decimal list-inside">
+            <li>Connect your job board accounts above with your API credentials</li>
+            <li>When you create or publish a job, select which boards to post to</li>
+            <li>Jobs are automatically synced to the selected boards</li>
+            <li>Track posting status and manage distributions from the Jobs page</li>
+          </ol>
+        </div>
+      </CardContent>
+    </Card>
   );
 }

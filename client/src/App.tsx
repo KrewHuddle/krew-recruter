@@ -17,6 +17,7 @@ import JobSearch from "@/pages/job-search";
 import Dashboard from "@/pages/dashboard";
 import Locations from "@/pages/locations";
 import Jobs from "@/pages/jobs";
+import JobDetail from "@/pages/job-detail";
 import JobCreate from "@/pages/job-create";
 import Applicants from "@/pages/applicants";
 import Gigs from "@/pages/gigs";
@@ -228,6 +229,12 @@ function AppRouter() {
       <Route path="/app/jobs/new">
         <ProtectedEmployerRoute>
           <JobCreate />
+        </ProtectedEmployerRoute>
+      </Route>
+      
+      <Route path="/app/jobs/:id">
+        <ProtectedEmployerRoute>
+          <JobDetail />
         </ProtectedEmployerRoute>
       </Route>
       

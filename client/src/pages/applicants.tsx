@@ -35,8 +35,9 @@ export default function Applicants() {
   const [stageFilter, setStageFilter] = useState<string>("all");
 
   const { data: applications, isLoading } = useQuery<ApplicationWithJob[]>({
-    queryKey: ["/api/applications", currentTenant?.id],
+    queryKey: ["/api/applications"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const filteredApplications = applications?.filter((app) => {

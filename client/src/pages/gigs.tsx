@@ -37,8 +37,9 @@ export default function Gigs() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
 
   const { data: gigs, isLoading } = useQuery<GigPostWithRelations[]>({
-    queryKey: ["/api/gigs", currentTenant?.id],
+    queryKey: ["/api/gigs"],
     enabled: !!currentTenant,
+    refetchOnMount: "always",
   });
 
   const filteredGigs = gigs?.filter((gig) => {

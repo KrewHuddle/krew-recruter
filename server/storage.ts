@@ -10,6 +10,7 @@ import {
   interviewQuestions,
   interviewInvites,
   interviewResponses,
+  integrationConnections,
   jobDistributionChannels,
   sponsoredCampaigns,
   workerProfiles,
@@ -35,6 +36,8 @@ import {
   type InsertInterviewQuestion,
   type InterviewInvite,
   type InsertInterviewInvite,
+  type IntegrationConnection,
+  type InsertIntegrationConnection,
   type JobDistributionChannel,
   type InsertJobDistributionChannel,
   type SponsoredCampaign,
@@ -143,6 +146,20 @@ export interface IStorage {
   getSavedJobsByUser(userId: string): Promise<SavedJob[]>;
   saveJob(data: InsertSavedJob): Promise<SavedJob>;
   unsaveJob(userId: string, jobId: string): Promise<boolean>;
+
+  // Integration Connections
+  getIntegrationConnectionsByTenant(tenantId: string): Promise<IntegrationConnection[]>;
+  getIntegrationConnection(id: string): Promise<IntegrationConnection | undefined>;
+  createIntegrationConnection(data: InsertIntegrationConnection): Promise<IntegrationConnection>;
+  updateIntegrationConnection(id: string, data: Partial<InsertIntegrationConnection>): Promise<IntegrationConnection | undefined>;
+  deleteIntegrationConnection(id: string): Promise<boolean>;
+
+  // Job Distribution Channels
+  getDistributionChannelsByJob(jobId: string): Promise<JobDistributionChannel[]>;
+  getDistributionChannelsByTenant(tenantId: string): Promise<JobDistributionChannel[]>;
+  createDistributionChannel(data: InsertJobDistributionChannel): Promise<JobDistributionChannel>;
+  updateDistributionChannel(id: string, data: Partial<InsertJobDistributionChannel>): Promise<JobDistributionChannel | undefined>;
+  deleteDistributionChannel(id: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -539,6 +556,63 @@ export class DatabaseStorage implements IStorage {
 
   async unsaveJob(userId: string, jobId: string): Promise<boolean> {
     await db.delete(savedJobs).where(and(eq(savedJobs.userId, userId), eq(savedJobs.jobId, jobId)));
+    return true;
+  }
+
+  // Integration Connections
+  async getIntegrationConnectionsByTenant(tenantId: string): Promise<IntegrationConnection[]> {
+    return db.select().from(integrationConnections).where(eq(integrationConnections.tenantId, tenantId));
+  }
+
+  async getIntegrationConnection(id: string): Promise<IntegrationConnection | undefined> {
+    const [conn] = await db.select().from(integrationConnections).where(eq(integrationConnections.id, id));
+    return conn || undefined;
+  }
+
+  async createIntegrationConnection(data: InsertIntegrationConnection): Promise<IntegrationConnection> {
+    const [conn] = await db.insert(integrationConnections).values(data).returning();
+    return conn;
+  }
+
+  async updateIntegrationConnection(id: string, data: Partial<InsertIntegrationConnection>): Promise<IntegrationConnection | undefined> {
+    const [conn] = await db
+      .update(integrationConnections)
+      .set(data)
+      .where(eq(integrationConnections.id, id))
+      .returning();
+    return conn || undefined;
+  }
+
+  async deleteIntegrationConnection(id: string): Promise<boolean> {
+    await db.delete(integrationConnections).where(eq(integrationConnections.id, id));
+    return true;
+  }
+
+  // Job Distribution Channels
+  async getDistributionChannelsByJob(jobId: string): Promise<JobDistributionChannel[]> {
+    return db.select().from(jobDistributionChannels).where(eq(jobDistributionChannels.jobId, jobId));
+  }
+
+  async getDistributionChannelsByTenant(tenantId: string): Promise<JobDistributionChannel[]> {
+    return db.select().from(jobDistributionChannels).where(eq(jobDistributionChannels.tenantId, tenantId));
+  }
+
+  async createDistributionChannel(data: InsertJobDistributionChannel): Promise<JobDistributionChannel> {
+    const [channel] = await db.insert(jobDistributionChannels).values(data).returning();
+    return channel;
+  }
+
+  async updateDistributionChannel(id: string, data: Partial<InsertJobDistributionChannel>): Promise<JobDistributionChannel | undefined> {
+    const [channel] = await db
+      .update(jobDistributionChannels)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(jobDistributionChannels.id, id))
+      .returning();
+    return channel || undefined;
+  }
+
+  async deleteDistributionChannel(id: string): Promise<boolean> {
+    await db.delete(jobDistributionChannels).where(eq(jobDistributionChannels.id, id));
     return true;
   }
 }
