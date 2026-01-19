@@ -40,6 +40,8 @@ export default function GigBoard() {
   const { user, isAuthenticated } = useAuth();
   const [search, setSearch] = useState("");
   const [roleFilter, setRoleFilter] = useState<string>("all");
+  const [dateFilter, setDateFilter] = useState<string>("all");
+  const [payFilter, setPayFilter] = useState<string>("all");
 
   const { data: gigs, isLoading } = useQuery<PublicGig[]>({
     queryKey: ["/api/gigs/public"],
@@ -51,7 +53,39 @@ export default function GigBoard() {
       gig.location?.name?.toLowerCase().includes(search.toLowerCase()) ||
       gig.tenant?.name?.toLowerCase().includes(search.toLowerCase());
     const matchesRole = roleFilter === "all" || gig.role === roleFilter;
-    return matchesSearch && matchesRole;
+    
+    // Date filter
+    let matchesDate = true;
+    if (dateFilter !== "all" && gig.startAt) {
+      const gigDate = new Date(gig.startAt);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+      const thisWeekEnd = new Date(today);
+      thisWeekEnd.setDate(thisWeekEnd.getDate() + 7);
+      
+      if (dateFilter === "today") {
+        matchesDate = gigDate >= today && gigDate < tomorrow;
+      } else if (dateFilter === "tomorrow") {
+        const dayAfterTomorrow = new Date(tomorrow);
+        dayAfterTomorrow.setDate(dayAfterTomorrow.getDate() + 1);
+        matchesDate = gigDate >= tomorrow && gigDate < dayAfterTomorrow;
+      } else if (dateFilter === "this_week") {
+        matchesDate = gigDate >= today && gigDate < thisWeekEnd;
+      }
+    }
+    
+    // Pay filter
+    let matchesPay = true;
+    if (payFilter !== "all" && gig.payRate) {
+      const rate = typeof gig.payRate === 'string' ? parseFloat(gig.payRate) : Number(gig.payRate);
+      if (payFilter === "under_20") matchesPay = rate < 20;
+      else if (payFilter === "20_30") matchesPay = rate >= 20 && rate < 30;
+      else if (payFilter === "30_plus") matchesPay = rate >= 30;
+    }
+    
+    return matchesSearch && matchesRole && matchesDate && matchesPay;
   });
 
   // Sort: urgent first, then by date
@@ -110,31 +144,60 @@ export default function GigBoard() {
           </div>
 
           {/* Search & Filters */}
-          <div className="mt-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center">
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by role, location, or company..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9"
-                data-testid="input-search-public-gigs"
-              />
+          <div className="mt-8 flex flex-col gap-4">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-center">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search by role, location, or company..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9"
+                  data-testid="input-search-public-gigs"
+                />
+              </div>
             </div>
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full sm:w-48" data-testid="select-role-filter">
-                <Filter className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Filter by role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                {allRoles.map((role) => (
-                  <SelectItem key={role} value={role}>
-                    {role}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap gap-3 justify-center">
+              <Select value={roleFilter} onValueChange={setRoleFilter}>
+                <SelectTrigger className="w-40" data-testid="select-role-filter">
+                  <SelectValue placeholder="Role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Roles</SelectItem>
+                  {allRoles.map((role) => (
+                    <SelectItem key={role} value={role}>
+                      {role}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={dateFilter} onValueChange={setDateFilter}>
+                <SelectTrigger className="w-40" data-testid="select-date-filter">
+                  <Calendar className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Date" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Date</SelectItem>
+                  <SelectItem value="today">Today</SelectItem>
+                  <SelectItem value="tomorrow">Tomorrow</SelectItem>
+                  <SelectItem value="this_week">This Week</SelectItem>
+                </SelectContent>
+              </Select>
+              
+              <Select value={payFilter} onValueChange={setPayFilter}>
+                <SelectTrigger className="w-40" data-testid="select-pay-filter">
+                  <DollarSign className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Pay Rate" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Any Pay</SelectItem>
+                  <SelectItem value="under_20">Under $20/hr</SelectItem>
+                  <SelectItem value="20_30">$20-30/hr</SelectItem>
+                  <SelectItem value="30_plus">$30+/hr</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </div>
       </section>
@@ -240,12 +303,12 @@ export default function GigBoard() {
               <CardContent className="flex flex-col items-center justify-center py-16">
                 <Clock className="h-12 w-12 text-muted-foreground/50 mb-4" />
                 <h3 className="text-lg font-semibold mb-2">
-                  {search || roleFilter !== "all"
+                  {search || roleFilter !== "all" || dateFilter !== "all" || payFilter !== "all"
                     ? "No gigs found"
                     : "No gigs available right now"}
                 </h3>
                 <p className="text-muted-foreground text-center max-w-sm mb-4">
-                  {search || roleFilter !== "all"
+                  {search || roleFilter !== "all" || dateFilter !== "all" || payFilter !== "all"
                     ? "Try adjusting your search or filters"
                     : "Check back soon for new opportunities"}
                 </p>
