@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
-  Zap,
   Users,
   Clock,
   Video,
@@ -17,6 +16,7 @@ import {
   Layers,
   Shield,
 } from "lucide-react";
+import logoImage from "@assets/3_1768835575859.png";
 
 const features = [
   {
@@ -137,9 +137,7 @@ export default function Employers() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Zap className="h-5 w-5" />
-              </div>
+              <img src={logoImage} alt="Krew Recruiter" className="h-9 w-9 rounded-lg object-contain" data-testid="img-logo-nav" />
               <span className="text-xl font-semibold">Krew</span>
             </div>
           </Link>
@@ -423,9 +421,7 @@ export default function Employers() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Zap className="h-4 w-4" />
-              </div>
+              <img src={logoImage} alt="Krew Recruiter" className="h-8 w-8 rounded-lg object-contain" data-testid="img-logo-footer" />
               <span className="font-semibold">Krew</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">

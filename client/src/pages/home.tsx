@@ -9,7 +9,6 @@ import { useQuery } from "@tanstack/react-query";
 import {
   Search,
   MapPin,
-  Zap,
   Briefcase,
   Clock,
   DollarSign,
@@ -21,6 +20,7 @@ import {
   TrendingUp,
 } from "lucide-react";
 import type { Job, Location as LocationType, Tenant } from "@shared/schema";
+import logoImage from "@assets/3_1768835575859.png";
 
 type JobWithDetails = Job & {
   location: LocationType | null;
@@ -66,9 +66,12 @@ export default function Home() {
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <Link href="/">
             <div className="flex items-center gap-2 cursor-pointer">
-              <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                <Zap className="h-5 w-5" />
-              </div>
+              <img 
+                src={logoImage} 
+                alt="Krew Recruiter" 
+                className="h-9 w-9 rounded-lg object-contain"
+                data-testid="img-logo-nav"
+              />
               <span className="text-xl font-semibold">Krew</span>
             </div>
           </Link>
@@ -367,9 +370,12 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-4">
             <div>
               <div className="flex items-center gap-2 mb-4">
-                <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-                  <Zap className="h-4 w-4" />
-                </div>
+                <img 
+                  src={logoImage} 
+                  alt="Krew Recruiter" 
+                  className="h-8 w-8 rounded-lg object-contain"
+                  data-testid="img-logo-footer"
+                />
                 <span className="font-semibold">Krew</span>
               </div>
               <p className="text-sm text-muted-foreground">

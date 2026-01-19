@@ -30,10 +30,10 @@ import {
   Settings,
   LogOut,
   ChevronUp,
-  Zap,
   User,
   Bell,
 } from "lucide-react";
+import logoImage from "@assets/3_1768835575859.png";
 
 const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/seeker" },
@@ -62,9 +62,12 @@ export function SeekerSidebar() {
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <Link href="/">
           <div className="flex items-center gap-2 cursor-pointer">
-            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-              <Zap className="h-4 w-4" />
-            </div>
+            <img 
+              src={logoImage} 
+              alt="Krew Recruiter" 
+              className="h-8 w-8 rounded-lg object-contain"
+              data-testid="img-logo"
+            />
             <span className="font-semibold text-lg">Krew</span>
           </div>
         </Link>

@@ -32,10 +32,10 @@ import {
   Building2,
   ChevronDown,
   LogOut,
-  Zap,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/lib/tenant-context";
+import logoImage from "@assets/3_1768835575859.png";
 
 const mainNavItems = [
   { title: "Dashboard", url: "/app", icon: LayoutDashboard },
@@ -70,9 +70,12 @@ export function AppSidebar() {
     <Sidebar>
       <SidebarHeader className="border-b border-sidebar-border p-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary text-primary-foreground">
-            <Zap className="h-5 w-5" />
-          </div>
+          <img 
+            src={logoImage} 
+            alt="Krew Recruiter" 
+            className="h-10 w-10 rounded-lg object-contain"
+            data-testid="img-logo"
+          />
           <div className="flex flex-col">
             <span className="font-semibold text-sidebar-foreground">Krew Recruiter</span>
             <span className="text-xs text-muted-foreground">Hospitality Hiring</span>
