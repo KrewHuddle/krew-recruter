@@ -158,11 +158,28 @@ npm run build        # Build for production
 - Professional landing page with hospitality theme
 - Dashboard with stats and recent activity
 - Location CRUD with timezone support
-- Job creation wizard with 3 steps
+- Job creation wizard with 3 steps (fixed SelectGroup/SelectLabel for role categories)
 - Applicant pipeline view (Kanban-style)
 - Gig marketplace (public board + employer management)
 - Interview templates with question management
 - Settings with org/team/billing/integrations tabs
+
+### Dual Experience Architecture (Latest)
+- **Onboarding Flow**: New users at /onboarding choose between "Job Seeker" or "Employer"
+- **Job Seeker Experience**: 
+  - Profile builder at /seeker/profile (skills, experience, availability)
+  - Dashboard at /seeker with application tracking
+  - Saved jobs at /seeker/saved (API-backed with POST/DELETE /api/saved-jobs)
+  - Job search at /jobs with filters and save functionality
+- **Employer Experience**:
+  - Dashboard at /app with hiring stats
+  - Job posting at /app/jobs/new (multi-step wizard)
+  - Applicant management at /app/applicants (pipeline view)
+  - Gig management at /app/gigs
+- **Role-based Routing**: Protected routes check userType and redirect to correct dashboard
+  - Job seekers trying to access /app/* are redirected to /seeker
+  - Employers trying to access /seeker/* are redirected to /app
+  - Users without profiles are redirected to /onboarding
 
 ## User Preferences
 - Dark mode enabled by default (respects system preference)
