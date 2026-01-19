@@ -1,0 +1,302 @@
+```text
+You are Replit’s AI Agent. Build a production-ready MVP for a multi-tenant SaaS hospitality hiring platform called **Krew Recruiter**. It includes: ATS-style hiring (FT/PT), a gig marketplace for short-term hospitality shifts, async video interviews (Hireflix-style), job board distribution (Indeed, ZipRecruiter, and “other boards” via an aggregator adapter), and sponsored job promotion inside Krew.
+
+PRIMARY GOAL
+Ship a working MVP (web app + API + DB) that runs in Replit with seed data, RBAC, tenant isolation, job posting, applicants pipeline, gig signup/vetting, gig shifts, async interviews, and job board distribution tracking + internal sponsored listings.
+
+TECH STACK (use exactly)
+- Web: Next.js 14 App Router, TypeScript, TailwindCSS, shadcn/ui
+- Forms/Validation: React Hook Form + Zod
+- Auth: NextAuth (Credentials email+password). Add optional Google OAuth stub.
+- DB: PostgreSQL + Prisma ORM
+- Storage (MVP): Local filesystem for uploads (video), behind a storage interface to swap to S3 later
+- Jobs/Background processing (MVP): simple in-process queue + cron-like endpoint (design to swap to BullMQ later)
+- Tests: Vitest (or Jest) + supertest-like helpers for route handler testing
+
+MONOREPO LAYOUT
+- /apps/web  (Next.js app)
+- /packages/db (Prisma schema, client, migrations, seed)
+- /packages/ui (shared UI components optional)
+If you prefer simpler: keep everything in a single Next.js app with /prisma and /lib, but still keep clean separation.
+
+MULTI-TENANCY (REQUIRED)
+- Tenants represent hospitality companies/restaurant groups.
+- Users can belong to multiple tenants via TenantMembership.
+- All tenant-scoped tables MUST include tenant_id.
+- All server operations MUST enforce:
+  1) authenticated user
+  2) membership in tenant
+  3) RBAC role authorization
+- RBAC roles per tenant: OWNER, ADMIN, HIRING_MANAGER, LOCATION_MANAGER, REVIEWER, VIEWER
+- Implement utilities:
+  - requireAuth()
+  - requireTenant(tenantId)
+  - requireRole(tenantId, allowedRoles)
+- Tenant selector in UI to switch active tenant (store in cookie or session).
+
+CORE MODULES (MVP REQUIRED)
+
+1) AUTH + ONBOARDING
+- Sign up / sign in
+- Create first tenant during onboarding (“Company/Group name”)
+- Invite members via email invitation token (no real email needed; show invite link in UI)
+- Tenant settings: members list + role management
+- Plan: FREE/PRO/ENTERPRISE (seed Demo tenant as PRO)
+
+2) LOCATIONS
+- CRUD locations (tenant-scoped): name, address, timezone
+
+3) JOBS + ATS PIPELINE
+- Create job postings (FT/PT) per location:
+  - title, role, description, pay range, schedule tags, status (DRAFT/PUBLISHED/CLOSED)
+- Applicants pipeline stages:
+  - APPLIED, SCREENING, INTERVIEW, OFFER, HIRED, REJECTED
+- Applications:
+  - worker applies to job, employer moves stages
+- Messaging:
+  - thread per application, store messages (simple, in-app)
+
+4) WORKER PROFILE (MVP-lite)
+- WorkerProfile (global, not tenant-scoped):
+  - name, city, summary, FOH roles, BOH roles, availability (simple weekly), certifications metadata
+- Workers can apply to jobs across tenants.
+
+5) KREW GIGS MARKETPLACE (REQUIRED)
+Worker side:
+- “Join Krew Gigs” flow at /gigs/join:
+  Step A: select FOH/BOH roles (multi-select)
+  Step B: set travel distance, min hourly rate, availability
+  Step C: vetting checklist + attestations (BASIC / VERIFIED / PRO)
+  Step D: enable “Gig-Ready” toggle (requires BASIC complete)
+- Public gig board at /gigs:
+  - list OPEN gigs, filter by role, distance, pay, date
+
+Employer side (tenant-protected):
+- Post gig shifts:
+  - location, role, startAt, endAt, payRate, requirements (json), acceptanceMode (INSTANT_BOOK / APPROVAL_REQUIRED), emergency flag, status
+- Worker acceptance:
+  - If INSTANT_BOOK and worker vetted >= VERIFIED (configurable), auto-confirm
+  - Else create PENDING request for employer approval
+- Gig assignment lifecycle:
+  - PENDING, CONFIRMED, CHECKED_IN, COMPLETED, NO_SHOW, CANCELLED
+- Reliability score MVP (0–100), starting 100:
+  - COMPLETED +2
+  - CANCEL within 24h -10
+  - NO_SHOW -25
+  clamp 0–100
+
+FOH ROLES (must be present in UI + enums)
+- Server
+- Cocktail Server
+- Banquet Server
+- Fine Dining Server
+- Food Runner
+- Busser / Server Assistant
+- Host / Hostess
+- Expo / Expeditor
+- Bartender
+- Barback
+- Sommelier / Wine Steward
+- Beverage Server
+- Event Captain
+- Banquet Captain
+- Coat Check Attendant
+- Concierge
+- Cashier / Counter Staff
+- Shift Lead
+- Floor Manager
+- Assistant Manager
+- FOH Supervisor
+
+BOH ROLES (must be present in UI + enums)
+- Line Cook
+- Prep Cook
+- Grill Cook
+- Fry Cook
+- Saute Cook
+- Pantry / Garde Manger
+- Pizza Cook
+- Sushi Cook
+- Breakfast Cook
+- Short Order Cook
+- Broiler Cook
+- Pastry Cook
+- Baker
+- Dishwasher / Steward
+- Kitchen Porter
+- Butcher
+- Catering Prep / Production Cook
+- Sous Chef
+- Kitchen Manager
+- Lead Line Cook
+
+6) ASYNC VIDEO INTERVIEWS (MVP)
+Employer:
+- Interview templates per tenant:
+  - name, role, questions (start with TEXT prompts only; include time limit fields for future)
+- Invite candidate to interview from an Application
+Candidate:
+- Candidate responds per question with:
+  - Video upload (mp4/webm) OR text fallback
+Employer review:
+- Review page: play videos, overall score (1–5), decision (YES/MAYBE/NO), notes
+Permissions:
+- REVIEWER+ can view/review interviews
+
+7) JOB BOARD DISTRIBUTION (REQUIRED: tracking + adapter architecture; real posting is stubbed unless keys provided)
+Objective:
+- Enable employers to select where to distribute jobs:
+  - Krew Recruiter (always)
+  - Indeed (adapter)
+  - ZipRecruiter (adapter)
+  - “Other boards” via Aggregator adapter
+MVP behavior:
+- Implement provider adapter interface and tracking tables.
+- By default, adapters run in “stub mode” and simulate posting + return an external_job_id.
+- Provide a settings screen to store provider credentials per tenant (encrypted at rest via env secret).
+- Add a cron sync endpoint to refresh statuses.
+
+Provider adapter interface (implement)
+- createPosting(job, connection) -> { externalJobId, status }
+- updatePosting(job, externalJobId, connection)
+- closePosting(externalJobId, connection)
+- syncPosting(externalJobId, connection) -> { status, lastError? }
+
+UI:
+- Job create/edit flow includes “Distribution” step with checkboxes.
+- A “Distribution” panel on Job detail shows channel statuses and errors.
+
+8) SPONSORED JOBS INSIDE KREW (REQUIRED)
+Objective:
+- Allow employers to sponsor their job inside Krew search results.
+- Sponsored placement boosts ranking within Krew job search + gig board (if applicable).
+MVP:
+- SponsoredCampaign table with: start/end, model (FLAT or PPC), budget, spend
+- SponsoredEvent table tracks impressions + clicks
+- Search ranking boosts sponsored jobs deterministically.
+- UI: “Sponsor this job” button with duration + budget. Gate behind PRO.
+
+BILLING (MVP STUB)
+- Plan per tenant: FREE/PRO/ENTERPRISE
+- Feature gating:
+  - Gigs + Interviews + Sponsored + Job Distribution require PRO (but seed demo PRO tenant)
+- No Stripe in MVP; just structure.
+
+PAGES (WEB APP)
+Public:
+- / (landing)
+- /auth/signin, /auth/signup
+- /gigs (public gig board)
+- /gigs/join (worker gig signup + vetting)
+
+Protected (tenant-aware):
+- /app (dashboard)
+- /app/locations
+- /app/jobs
+- /app/jobs/new
+- /app/jobs/[id]
+- /app/applicants (applications list)
+- /app/applications/[id] (pipeline + messages + invite to interview)
+- /app/gigs (employer gig posts list)
+- /app/gigs/new
+- /app/interviews (templates + invites)
+- /app/settings (tenant, plan, members, integrations)
+
+DATA MODEL (PRISMA) — MINIMUM TABLES
+- User
+- Tenant
+- TenantMembership (userId, tenantId, role)
+- Plan (tenantId, planType)
+- Location (tenantId)
+- Job (tenantId, locationId, status)
+- WorkerProfile (userId) [global]
+- Application (tenantId, jobId, workerUserId, stage)
+- MessageThread (tenantId, applicationId)
+- Message (threadId, senderUserId, body)
+- GigWorkerProfile (userId, gigReady, vettingStatus, rolesFOH, rolesBOH, minRate, distance, reliabilityScore)
+- GigPost (tenantId, locationId, role, startAt, endAt, payRate, acceptanceMode, emergency, status, requirementsJson)
+- GigAssignment (tenantId, gigPostId, workerUserId, status)
+- InterviewTemplate (tenantId)
+- InterviewQuestion (tenantId, templateId, promptText, responseType, timeLimitSeconds, maxRetakes)
+- InterviewInvite (tenantId, templateId, applicationId, workerUserId, status, deadlineAt)
+- InterviewResponse (tenantId, inviteId, questionId, type, videoPath, text)
+- InterviewReview (tenantId, inviteId, reviewerUserId, score, decision, notes)
+- IntegrationConnection (tenantId, provider, credentialsEncryptedJson, status, lastSyncAt)
+- JobDistributionChannel (tenantId, jobId, provider, externalJobId, status, lastError, postedAt, updatedAt)
+- SponsoredCampaign (tenantId, jobId, model, budgetCents, spendCents, startAt, endAt, status)
+- SponsoredEvent (tenantId, campaignId, type, metadataJson, createdAt)
+- Notification (tenantId, userId, type, dataJson, readAt)
+
+API ROUTES (Next.js route handlers under /api)
+Use Zod validation + consistent JSON error format.
+- /api/tenants (create/list)
+- /api/tenants/[tenantId]/members (invite, update role)
+- /api/locations (CRUD)
+- /api/jobs (CRUD + publish/close)
+- /api/jobs/[id]/distribution (set channels, view statuses)
+- /api/applications (apply, list)
+- /api/applications/[id]/stage (move stage)
+- /api/messages (create thread/message)
+- /api/gigs/public (list open gigs)
+- /api/app/gigs (tenant gig CRUD)
+- /api/gig-assignments (accept/request/approve/check-in/complete)
+- /api/interviews/templates (CRUD)
+- /api/interviews/invites (create, list)
+- /api/interviews/responses (upload/save)
+- /api/interviews/reviews (submit review)
+- /api/integrations/connections (CRUD)
+- /api/sponsored/campaigns (create/list)
+- /api/cron/sync (process expirations, reminders, distribution sync)
+
+SECURITY REQUIREMENTS
+- Auth required for all /app pages and tenant APIs.
+- Verify tenant membership and RBAC on server for every tenant-scoped operation.
+- Upload security:
+  - Limit size (<= 50MB) and types (mp4/webm)
+  - Store outside public folder; serve via authenticated route that checks tenant membership
+- Add basic audit events for:
+  - role changes
+  - gig assignment status changes
+  - interview review submission
+  - job distribution actions
+
+SEARCH + SPONSORED RANKING (MVP SIMPLE)
+- Job search sorting:
+  - Sponsored jobs first (if active campaign)
+  - Then newest published
+- Track SponsoredEvent:
+  - impression when job card renders server-side list response
+  - click when user opens job detail
+
+SEED DATA (REQUIRED)
+Seed a PRO tenant “Demo Hospitality Group” with:
+- 2 locations
+- 3 published jobs + distribution channels (stubbed)
+- 5 open gigs
+- 2 workers (one VERIFIED gig-ready)
+- 2 applications
+- 1 interview template with 3 questions
+- 1 sponsored campaign active on one job
+
+DELIVERABLES
+- Running app with README (setup, env, migrate, seed, run)
+- .env.example
+- Prisma migrations + seed script
+- At least 8 API tests (tenant isolation, RBAC, gigs accept flow, distribution channel stub)
+- Replit deploy/run notes
+
+IMPLEMENTATION ORDER (FOLLOW)
+1) DB + Prisma + seed
+2) Auth + tenant membership + RBAC utilities
+3) Locations + Jobs + Applications + messaging
+4) Gig worker join/vetting + gig posts + assignments + reliability
+5) Interviews templates + invites + responses + reviews (video upload)
+6) Job distribution tracking + adapters (stub mode) + integrations UI
+7) Sponsored campaigns + boosted search + events
+8) Tests + polish + README
+
+IMPORTANT
+- Keep everything compiling and runnable at each step.
+- Choose the simplest working approach consistent with requirements.
+- If any external API keys are missing, keep adapters in stub mode but fully implement tracking tables, UI, and sync flows.
+```
