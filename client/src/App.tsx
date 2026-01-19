@@ -1,6 +1,6 @@
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
-import { QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider, useQuery } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
@@ -29,6 +29,7 @@ import SeekerProfile from "@/pages/seeker-profile";
 import SeekerSaved from "@/pages/seeker-saved";
 import Onboarding from "@/pages/onboarding";
 import { Loader2 } from "lucide-react";
+import type { UserProfile } from "@shared/schema";
 
 function EmployerLayout({ children }: { children: React.ReactNode }) {
   const sidebarStyle = {
@@ -77,9 +78,15 @@ function SeekerLayout({ children }: { children: React.ReactNode }) {
 }
 
 function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
+  
+  const { data: profile, isLoading: profileLoading } = useQuery<UserProfile | null>({
+    queryKey: ["/api/user/profile"],
+    enabled: isAuthenticated,
+  });
 
-  if (isLoading) {
+  if (isLoading || profileLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -92,13 +99,29 @@ function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
     return null;
   }
 
+  if (!profile) {
+    setLocation("/onboarding");
+    return null;
+  }
+
+  if (profile.userType === "JOB_SEEKER") {
+    setLocation("/seeker");
+    return null;
+  }
+
   return <EmployerLayout>{children}</EmployerLayout>;
 }
 
 function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
+  
+  const { data: profile, isLoading: profileLoading } = useQuery<UserProfile | null>({
+    queryKey: ["/api/user/profile"],
+    enabled: isAuthenticated,
+  });
 
-  if (isLoading) {
+  if (isLoading || profileLoading) {
     return (
       <div className="flex h-screen items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -108,6 +131,16 @@ function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
 
   if (!isAuthenticated) {
     window.location.href = "/api/login";
+    return null;
+  }
+
+  if (!profile) {
+    setLocation("/onboarding");
+    return null;
+  }
+
+  if (profile.userType === "EMPLOYER") {
+    setLocation("/app");
     return null;
   }
 
