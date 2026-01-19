@@ -395,7 +395,7 @@ export default function Home() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/employers"><span className="hover:text-foreground cursor-pointer">Post a Job</span></Link></li>
                 <li><Link href="/employers"><span className="hover:text-foreground cursor-pointer">Pricing</span></Link></li>
-                <li><a href="/api/login" className="hover:text-foreground">Employer Login</a></li>
+                <li><a href="/api/login" className="hover:text-foreground">Employer Sign In</a></li>
               </ul>
             </div>
             <div>

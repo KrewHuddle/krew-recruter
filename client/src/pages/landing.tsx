@@ -110,7 +110,7 @@ export default function Landing() {
             <ThemeToggle />
             <a href="/api/login">
               <Button variant="ghost" data-testid="button-login">
-                Log in
+                Sign in
               </Button>
             </a>
             <a href="/api/login">
@@ -158,7 +158,7 @@ export default function Landing() {
                 </Button>
               </Link>
             </div>
-            <div className="mt-8 flex items-center justify-center gap-6 text-sm text-muted-foreground">
+            <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
                 Free forever plan
@@ -166,6 +166,10 @@ export default function Landing() {
               <div className="flex items-center gap-1.5">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
                 No credit card required
+              </div>
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="h-4 w-4 text-primary" />
+                Sign up with email or Google
               </div>
             </div>
           </div>
