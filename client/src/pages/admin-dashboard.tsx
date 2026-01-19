@@ -1,4 +1,5 @@
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +37,19 @@ import {
   DollarSign,
   TrendingUp,
   CreditCard,
+  Map,
+  ExternalLink,
+  Home,
+  LogIn,
+  UserPlus,
+  LayoutDashboard,
+  MapPin,
+  CalendarDays,
+  MessageSquare,
+  Settings,
+  User,
+  Heart,
+  CreditCard as CreditCardIcon,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -225,6 +239,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="revenue" data-testid="tab-revenue">
             <DollarSign className="h-4 w-4 mr-2" />
             Revenue
+          </TabsTrigger>
+          <TabsTrigger value="pages" data-testid="tab-pages">
+            <Map className="h-4 w-4 mr-2" />
+            Pages
           </TabsTrigger>
         </TabsList>
 
@@ -501,6 +519,180 @@ export default function AdminDashboard() {
                   No payouts yet
                 </div>
               )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="pages">
+          <Card>
+            <CardHeader>
+              <CardTitle>Page Directory</CardTitle>
+              <CardDescription>
+                All application routes and pages organized by section
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+                {/* Public Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Home className="h-5 w-5 text-muted-foreground" />
+                    Public Pages
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-landing">
+                      <Home className="h-4 w-4" />
+                      Landing Page
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/gigs" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-gigs">
+                      <CalendarDays className="h-4 w-4" />
+                      Gig Board
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/jobs" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-jobs">
+                      <Briefcase className="h-4 w-4" />
+                      Job Board
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Auth Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <LogIn className="h-5 w-5 text-muted-foreground" />
+                    Authentication
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/login" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-login">
+                      <LogIn className="h-4 w-4" />
+                      Login
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/register" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-register">
+                      <UserPlus className="h-4 w-4" />
+                      Register
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/onboarding" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-onboarding">
+                      <User className="h-4 w-4" />
+                      Onboarding
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Employer Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                    Employer Dashboard
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/app" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-employer-dashboard">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/locations" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-locations">
+                      <MapPin className="h-4 w-4" />
+                      Locations
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/jobs" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-employer-jobs">
+                      <Briefcase className="h-4 w-4" />
+                      Jobs
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/applicants" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-applicants">
+                      <Users className="h-4 w-4" />
+                      Applicants
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/gigs" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-employer-gigs">
+                      <CalendarDays className="h-4 w-4" />
+                      Gigs
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/interviews" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-interviews">
+                      <MessageSquare className="h-4 w-4" />
+                      Interviews
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/app/settings" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-employer-settings">
+                      <Settings className="h-4 w-4" />
+                      Settings
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Job Seeker Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                    Job Seeker Dashboard
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/seeker" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-seeker-dashboard">
+                      <LayoutDashboard className="h-4 w-4" />
+                      Dashboard
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/seeker/profile" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-seeker-profile">
+                      <User className="h-4 w-4" />
+                      Profile
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/seeker/saved" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-saved-jobs">
+                      <Heart className="h-4 w-4" />
+                      Saved Jobs
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/seeker/gigs" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-seeker-gigs">
+                      <CalendarDays className="h-4 w-4" />
+                      My Gigs
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Admin Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <Shield className="h-5 w-5 text-muted-foreground" />
+                    Super Admin
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/admin" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-admin">
+                      <Shield className="h-4 w-4" />
+                      Admin Dashboard
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+
+                {/* Billing Pages */}
+                <div className="space-y-3">
+                  <h3 className="font-semibold text-lg flex items-center gap-2">
+                    <CreditCardIcon className="h-5 w-5 text-muted-foreground" />
+                    Billing & Payments
+                  </h3>
+                  <div className="space-y-2 pl-7">
+                    <Link href="/billing/success" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-billing-success">
+                      <CreditCardIcon className="h-4 w-4" />
+                      Billing Success
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                    <Link href="/payout/return" className="flex items-center gap-2 text-sm hover-elevate p-2 rounded-md" data-testid="page-link-payout-return">
+                      <DollarSign className="h-4 w-4" />
+                      Payout Return
+                      <ExternalLink className="h-3 w-3 ml-auto text-muted-foreground" />
+                    </Link>
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>
