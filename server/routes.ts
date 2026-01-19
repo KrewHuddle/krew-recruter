@@ -1047,5 +1047,99 @@ export async function registerRoutes(
     }
   });
 
+  // ============ SUPER ADMIN ROUTES ============
+
+  // Middleware to require super admin
+  async function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ error: "Unauthorized" });
+    }
+
+    const userProfile = await storage.getUserProfile(userId);
+    if (!userProfile?.isSuperAdmin) {
+      return res.status(403).json({ error: "Super admin access required" });
+    }
+
+    next();
+  }
+
+  // Check if current user is super admin
+  app.get("/api/admin/check", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const userProfile = await storage.getUserProfile(userId);
+      res.json({ isSuperAdmin: userProfile?.isSuperAdmin || false });
+    } catch (error) {
+      console.error("Error checking admin status:", error);
+      res.status(500).json({ error: "Failed to check admin status" });
+    }
+  });
+
+  // Get admin dashboard stats
+  app.get("/api/admin/stats", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const stats = await storage.getAdminStats();
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching admin stats:", error);
+      res.status(500).json({ error: "Failed to fetch admin stats" });
+    }
+  });
+
+  // Get all tenants (organizations)
+  app.get("/api/admin/tenants", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const allTenants = await storage.getAllTenants();
+      res.json(allTenants);
+    } catch (error) {
+      console.error("Error fetching tenants:", error);
+      res.status(500).json({ error: "Failed to fetch tenants" });
+    }
+  });
+
+  // Update tenant (e.g., plan type, suspend)
+  app.patch("/api/admin/tenants/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const tenant = await storage.updateTenant(id, req.body);
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+      res.json(tenant);
+    } catch (error) {
+      console.error("Error updating tenant:", error);
+      res.status(500).json({ error: "Failed to update tenant" });
+    }
+  });
+
+  // Get all users
+  app.get("/api/admin/users", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const users = await storage.getAllUserProfiles();
+      res.json(users);
+    } catch (error) {
+      console.error("Error fetching users:", error);
+      res.status(500).json({ error: "Failed to fetch users" });
+    }
+  });
+
+  // Update user (e.g., grant/revoke super admin)
+  app.patch("/api/admin/users/:userId", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const userProfile = await storage.updateUserProfile(userId, req.body);
+      if (!userProfile) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(userProfile);
+    } catch (error) {
+      console.error("Error updating user:", error);
+      res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
   return httpServer;
 }

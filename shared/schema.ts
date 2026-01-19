@@ -171,6 +171,7 @@ export const userProfiles = pgTable("user_profiles", {
   lastName: text("last_name"),
   phone: text("phone"),
   avatarUrl: text("avatar_url"),
+  isSuperAdmin: boolean("is_super_admin").default(false),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 });
@@ -625,3 +626,140 @@ export const auditEvents = pgTable("audit_events", {
 export const insertAuditEventSchema = createInsertSchema(auditEvents).omit({ id: true, createdAt: true });
 export type InsertAuditEvent = z.infer<typeof insertAuditEventSchema>;
 export type AuditEvent = typeof auditEvents.$inferSelect;
+
+// ============ BILLING ENUMS ============
+
+export const subscriptionStatusEnum = pgEnum("subscription_status", ["ACTIVE", "PAST_DUE", "CANCELED", "TRIALING", "UNPAID"]);
+export const paymentStatusEnum = pgEnum("payment_status", ["PENDING", "SUCCEEDED", "FAILED", "REFUNDED"]);
+export const payoutStatusEnum = pgEnum("payout_status", ["PENDING", "PROCESSING", "COMPLETED", "FAILED"]);
+export const jobImportStatusEnum = pgEnum("job_import_status", ["PENDING", "PROCESSING", "COMPLETED", "FAILED"]);
+
+// ============ TENANT BILLING ============
+
+export const tenantBilling = pgTable("tenant_billing", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().unique().references(() => tenants.id, { onDelete: "cascade" }),
+  stripeCustomerId: text("stripe_customer_id"),
+  stripeSubscriptionId: text("stripe_subscription_id"),
+  subscriptionStatus: subscriptionStatusEnum("subscription_status"),
+  currentPeriodStart: timestamp("current_period_start"),
+  currentPeriodEnd: timestamp("current_period_end"),
+  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_billing_tenant").on(table.tenantId),
+  index("idx_billing_stripe_customer").on(table.stripeCustomerId),
+]);
+
+export const tenantBillingRelations = relations(tenantBilling, ({ one }) => ({
+  tenant: one(tenants, { fields: [tenantBilling.tenantId], references: [tenants.id] }),
+}));
+
+export const insertTenantBillingSchema = createInsertSchema(tenantBilling).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertTenantBilling = z.infer<typeof insertTenantBillingSchema>;
+export type TenantBilling = typeof tenantBilling.$inferSelect;
+
+// ============ PAYMENT HISTORY ============
+
+export const paymentHistory = pgTable("payment_history", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  stripePaymentIntentId: text("stripe_payment_intent_id"),
+  stripeInvoiceId: text("stripe_invoice_id"),
+  amountCents: integer("amount_cents").notNull(),
+  currency: text("currency").default("usd"),
+  status: paymentStatusEnum("status").notNull().default("PENDING"),
+  description: text("description"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_payment_tenant").on(table.tenantId),
+]);
+
+export const paymentHistoryRelations = relations(paymentHistory, ({ one }) => ({
+  tenant: one(tenants, { fields: [paymentHistory.tenantId], references: [tenants.id] }),
+}));
+
+export const insertPaymentHistorySchema = createInsertSchema(paymentHistory).omit({ id: true, createdAt: true });
+export type InsertPaymentHistory = z.infer<typeof insertPaymentHistorySchema>;
+export type PaymentHistory = typeof paymentHistory.$inferSelect;
+
+// ============ WORKER PAYOUT ACCOUNTS (Stripe Connect) ============
+
+export const workerPayoutAccounts = pgTable("worker_payout_accounts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().unique(),
+  stripeAccountId: text("stripe_account_id"),
+  stripeAccountStatus: text("stripe_account_status"),
+  payoutsEnabled: boolean("payouts_enabled").default(false),
+  chargesEnabled: boolean("charges_enabled").default(false),
+  detailsSubmitted: boolean("details_submitted").default(false),
+  email: text("email"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_payout_account_user").on(table.userId),
+  index("idx_payout_account_stripe").on(table.stripeAccountId),
+]);
+
+export const insertWorkerPayoutAccountSchema = createInsertSchema(workerPayoutAccounts).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertWorkerPayoutAccount = z.infer<typeof insertWorkerPayoutAccountSchema>;
+export type WorkerPayoutAccount = typeof workerPayoutAccounts.$inferSelect;
+
+// ============ GIG PAYOUTS ============
+
+export const gigPayouts = pgTable("gig_payouts", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  gigAssignmentId: varchar("gig_assignment_id").notNull().references(() => gigAssignments.id, { onDelete: "cascade" }),
+  workerUserId: varchar("worker_user_id").notNull(),
+  amountCents: integer("amount_cents").notNull(),
+  platformFeeCents: integer("platform_fee_cents").default(0),
+  netAmountCents: integer("net_amount_cents").notNull(),
+  stripeTransferId: text("stripe_transfer_id"),
+  status: payoutStatusEnum("status").notNull().default("PENDING"),
+  approvedByUserId: varchar("approved_by_user_id"),
+  approvedAt: timestamp("approved_at"),
+  paidAt: timestamp("paid_at"),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_payout_tenant").on(table.tenantId),
+  index("idx_payout_assignment").on(table.gigAssignmentId),
+  index("idx_payout_worker").on(table.workerUserId),
+]);
+
+export const gigPayoutsRelations = relations(gigPayouts, ({ one }) => ({
+  tenant: one(tenants, { fields: [gigPayouts.tenantId], references: [tenants.id] }),
+  gigAssignment: one(gigAssignments, { fields: [gigPayouts.gigAssignmentId], references: [gigAssignments.id] }),
+}));
+
+export const insertGigPayoutSchema = createInsertSchema(gigPayouts).omit({ id: true, createdAt: true });
+export type InsertGigPayout = z.infer<typeof insertGigPayoutSchema>;
+export type GigPayout = typeof gigPayouts.$inferSelect;
+
+// ============ JOB IMPORTS ============
+
+export const jobImports = pgTable("job_imports", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  fileName: text("file_name"),
+  source: text("source").default("CSV"),
+  totalRows: integer("total_rows").default(0),
+  successCount: integer("success_count").default(0),
+  failureCount: integer("failure_count").default(0),
+  status: jobImportStatusEnum("status").notNull().default("PENDING"),
+  errorLog: jsonb("error_log"),
+  importedByUserId: varchar("imported_by_user_id").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  completedAt: timestamp("completed_at"),
+}, (table) => [
+  index("idx_import_tenant").on(table.tenantId),
+]);
+
+export const jobImportsRelations = relations(jobImports, ({ one }) => ({
+  tenant: one(tenants, { fields: [jobImports.tenantId], references: [tenants.id] }),
+}));
+
+export const insertJobImportSchema = createInsertSchema(jobImports).omit({ id: true, createdAt: true });
+export type InsertJobImport = z.infer<typeof insertJobImportSchema>;
+export type JobImport = typeof jobImports.$inferSelect;

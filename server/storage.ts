@@ -160,6 +160,18 @@ export interface IStorage {
   createDistributionChannel(data: InsertJobDistributionChannel): Promise<JobDistributionChannel>;
   updateDistributionChannel(id: string, data: Partial<InsertJobDistributionChannel>): Promise<JobDistributionChannel | undefined>;
   deleteDistributionChannel(id: string): Promise<boolean>;
+
+  // Admin - Platform-wide operations
+  getAllTenants(): Promise<Tenant[]>;
+  getAllUserProfiles(): Promise<UserProfile[]>;
+  updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined>;
+  getAdminStats(): Promise<{
+    totalTenants: number;
+    totalUsers: number;
+    totalJobs: number;
+    totalApplications: number;
+    totalGigs: number;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -614,6 +626,46 @@ export class DatabaseStorage implements IStorage {
   async deleteDistributionChannel(id: string): Promise<boolean> {
     await db.delete(jobDistributionChannels).where(eq(jobDistributionChannels.id, id));
     return true;
+  }
+
+  // Admin - Platform-wide operations
+  async getAllTenants(): Promise<Tenant[]> {
+    return db.select().from(tenants).orderBy(desc(tenants.createdAt));
+  }
+
+  async getAllUserProfiles(): Promise<UserProfile[]> {
+    return db.select().from(userProfiles).orderBy(desc(userProfiles.createdAt));
+  }
+
+  async updateUserProfile(userId: string, data: Partial<InsertUserProfile>): Promise<UserProfile | undefined> {
+    const [profile] = await db
+      .update(userProfiles)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(userProfiles.userId, userId))
+      .returning();
+    return profile || undefined;
+  }
+
+  async getAdminStats(): Promise<{
+    totalTenants: number;
+    totalUsers: number;
+    totalJobs: number;
+    totalApplications: number;
+    totalGigs: number;
+  }> {
+    const [tenantCount] = await db.select({ count: sql<number>`count(*)::int` }).from(tenants);
+    const [userCount] = await db.select({ count: sql<number>`count(*)::int` }).from(userProfiles);
+    const [jobCount] = await db.select({ count: sql<number>`count(*)::int` }).from(jobs);
+    const [appCount] = await db.select({ count: sql<number>`count(*)::int` }).from(applications);
+    const [gigCount] = await db.select({ count: sql<number>`count(*)::int` }).from(gigPosts);
+
+    return {
+      totalTenants: tenantCount?.count || 0,
+      totalUsers: userCount?.count || 0,
+      totalJobs: jobCount?.count || 0,
+      totalApplications: appCount?.count || 0,
+      totalGigs: gigCount?.count || 0,
+    };
   }
 }
 

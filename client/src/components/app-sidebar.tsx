@@ -32,9 +32,11 @@ import {
   Building2,
   ChevronDown,
   LogOut,
+  Shield,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/lib/tenant-context";
+import { useQuery } from "@tanstack/react-query";
 import logoImage from "@assets/3_1768835575859.png";
 
 const mainNavItems = [
@@ -60,6 +62,10 @@ export function AppSidebar() {
   const [location] = useLocation();
   const { user, logout } = useAuth();
   const { currentTenant, memberships, setCurrentTenant } = useTenant();
+
+  const { data: adminCheck } = useQuery<{ isSuperAdmin: boolean }>({
+    queryKey: ["/api/admin/check"],
+  });
 
   const isActive = (path: string) => {
     if (path === "/app") return location === "/app";
@@ -226,6 +232,29 @@ export function AppSidebar() {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
+
+        {/* Super Admin */}
+        {adminCheck?.isSuperAdmin && (
+          <SidebarGroup>
+            <SidebarGroupLabel>Platform Admin</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location === "/admin"}
+                    data-testid="nav-super-admin"
+                  >
+                    <Link href="/admin">
+                      <Shield className="h-4 w-4" />
+                      <span>Super Admin</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       <SidebarFooter className="border-t border-sidebar-border p-4">

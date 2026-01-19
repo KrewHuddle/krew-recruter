@@ -29,7 +29,8 @@ import SeekerDashboard from "@/pages/seeker-dashboard";
 import SeekerProfile from "@/pages/seeker-profile";
 import SeekerSaved from "@/pages/seeker-saved";
 import Onboarding from "@/pages/onboarding";
-import { Loader2 } from "lucide-react";
+import AdminDashboard from "@/pages/admin-dashboard";
+import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
 
 function EmployerLayout({ children }: { children: React.ReactNode }) {
@@ -167,6 +168,56 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-6">
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <span className="font-semibold">Super Admin</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <a href="/app" className="text-sm text-muted-foreground hover:text-foreground">
+            Back to App
+          </a>
+          <ThemeToggle />
+        </div>
+      </header>
+      <main>{children}</main>
+    </div>
+  );
+}
+
+function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const { isAuthenticated, isLoading } = useAuth();
+
+  const { data: adminCheck, isLoading: adminLoading } = useQuery<{ isSuperAdmin: boolean }>({
+    queryKey: ["/api/admin/check"],
+    enabled: isAuthenticated,
+  });
+
+  if (isLoading || adminLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    window.location.href = "/api/login";
+    return null;
+  }
+
+  if (!adminCheck?.isSuperAdmin) {
+    setLocation("/app");
+    return null;
+  }
+
+  return <AdminLayout>{children}</AdminLayout>;
+}
+
 function AppRouter() {
   return (
     <Switch>
@@ -266,6 +317,12 @@ function AppRouter() {
         <ProtectedEmployerRoute>
           <Settings />
         </ProtectedEmployerRoute>
+      </Route>
+      
+      <Route path="/admin">
+        <ProtectedAdminRoute>
+          <AdminDashboard />
+        </ProtectedAdminRoute>
       </Route>
       
       <Route component={NotFound} />
