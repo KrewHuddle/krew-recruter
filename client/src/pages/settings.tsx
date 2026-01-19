@@ -634,47 +634,7 @@ export default function Settings() {
 
         {/* Billing Tab */}
         <TabsContent value="billing" className="space-y-4">
-          <Card>
-            <CardHeader>
-              <CardTitle>Current Plan</CardTitle>
-              <CardDescription>
-                Manage your subscription and billing
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-center justify-between rounded-lg border border-border p-6">
-                <div>
-                  <div className="flex items-center gap-3">
-                    <Badge
-                      variant={
-                        currentTenant?.planType === "PRO"
-                          ? "default"
-                          : currentTenant?.planType === "ENTERPRISE"
-                          ? "secondary"
-                          : "outline"
-                      }
-                      className="text-base px-3 py-1"
-                    >
-                      {currentTenant?.planType || "FREE"}
-                    </Badge>
-                    {currentTenant?.planType === "FREE" && (
-                      <span className="text-muted-foreground">plan</span>
-                    )}
-                  </div>
-                  <p className="mt-2 text-sm text-muted-foreground">
-                    {currentTenant?.planType === "FREE"
-                      ? "Upgrade to PRO to unlock gigs, interviews, and job distribution"
-                      : currentTenant?.planType === "PRO"
-                      ? "Full access to all features"
-                      : "Enterprise features with dedicated support"}
-                  </p>
-                </div>
-                {currentTenant?.planType === "FREE" && (
-                  <Button data-testid="button-upgrade">Upgrade to PRO</Button>
-                )}
-              </div>
-            </CardContent>
-          </Card>
+          <BillingPanel tenantId={currentTenant?.id} currentPlan={currentTenant?.planType || "FREE"} />
         </TabsContent>
 
         {/* Integrations Tab */}
@@ -964,5 +924,338 @@ function IntegrationsPanel({ tenantId, isOwnerOrAdmin }: { tenantId?: string; is
         </div>
       </CardContent>
     </Card>
+  );
+}
+
+type Plan = {
+  id: string;
+  name: string;
+  description: string;
+  metadata: { tier?: string; features?: string } | null;
+  prices: {
+    id: string;
+    unitAmount: number;
+    currency: string;
+    recurring: { interval: string } | null;
+  }[];
+};
+
+type BillingStatus = {
+  status: string | null;
+  subscription: any;
+  currentPeriodEnd: string | null;
+};
+
+function BillingPanel({ tenantId, currentPlan }: { tenantId?: string; currentPlan: string }) {
+  const { toast } = useToast();
+  const [billingPeriod, setBillingPeriod] = useState<"monthly" | "yearly">("monthly");
+
+  const { data: plansData, isLoading: plansLoading } = useQuery<{ plans: Plan[] }>({
+    queryKey: ["/api/billing/plans"],
+  });
+
+  const { data: billingStatus, isLoading: statusLoading } = useQuery<BillingStatus>({
+    queryKey: ["/api/billing/status"],
+    enabled: !!tenantId,
+  });
+
+  const checkoutMutation = useMutation({
+    mutationFn: async (priceId: string) => {
+      const res = await apiRequest("POST", "/api/billing/checkout", { priceId });
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to start checkout", variant: "destructive" });
+    },
+  });
+
+  const portalMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/billing/portal", {});
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) {
+        window.location.href = data.url;
+      }
+    },
+    onError: () => {
+      toast({ title: "Failed to open billing portal", variant: "destructive" });
+    },
+  });
+
+  const plans = plansData?.plans || [];
+  const freePlan = plans.find(p => p.metadata?.tier === "free");
+  const proPlan = plans.find(p => p.metadata?.tier === "pro");
+  const enterprisePlan = plans.find(p => p.metadata?.tier === "enterprise");
+
+  const getPrice = (plan: Plan | undefined, interval: string) => {
+    if (!plan) return null;
+    return plan.prices.find(p => p.recurring?.interval === interval);
+  };
+
+  const formatPrice = (amount: number) => {
+    return new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      minimumFractionDigits: 0,
+    }).format(amount / 100);
+  };
+
+  const parseFeatures = (plan: Plan | undefined): string[] => {
+    if (!plan?.metadata?.features) return [];
+    try {
+      return JSON.parse(plan.metadata.features);
+    } catch {
+      return [];
+    }
+  };
+
+  if (!tenantId) {
+    return (
+      <Card>
+        <CardContent className="flex flex-col items-center justify-center py-16">
+          <CreditCard className="h-12 w-12 text-muted-foreground/50 mb-4" />
+          <h3 className="text-lg font-semibold mb-2">No organization selected</h3>
+          <p className="text-muted-foreground text-center max-w-sm">
+            Select or create an organization to manage billing
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (plansLoading || statusLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <Skeleton className="h-6 w-48" />
+          <Skeleton className="h-4 w-64" />
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4">
+            {[1, 2, 3].map((i) => (
+              <Skeleton key={i} className="h-64 w-full" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const hasSubscription = billingStatus?.status && billingStatus.status !== "canceled";
+
+  return (
+    <>
+      {hasSubscription && (
+        <Card className="mb-4">
+          <CardHeader>
+            <CardTitle>Current Subscription</CardTitle>
+            <CardDescription>Manage your active subscription</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap items-center justify-between gap-4 p-4 rounded-lg border border-border">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <Badge variant="default" className="text-base px-3 py-1">
+                    {currentPlan}
+                  </Badge>
+                  <Badge variant="outline" className="capitalize">
+                    {billingStatus?.status}
+                  </Badge>
+                </div>
+                {billingStatus?.currentPeriodEnd && (
+                  <p className="text-sm text-muted-foreground">
+                    Renews on {new Date(billingStatus.currentPeriodEnd).toLocaleDateString()}
+                  </p>
+                )}
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => portalMutation.mutate()}
+                disabled={portalMutation.isPending}
+                data-testid="button-manage-subscription"
+              >
+                {portalMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                )}
+                Manage Subscription
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <CardTitle>Subscription Plans</CardTitle>
+              <CardDescription>
+                Choose the plan that fits your hiring needs
+              </CardDescription>
+            </div>
+            <div className="flex items-center rounded-lg border border-border p-1">
+              <Button
+                variant={billingPeriod === "monthly" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setBillingPeriod("monthly")}
+                data-testid="button-billing-monthly"
+              >
+                Monthly
+              </Button>
+              <Button
+                variant={billingPeriod === "yearly" ? "default" : "ghost"}
+                size="sm"
+                onClick={() => setBillingPeriod("yearly")}
+                data-testid="button-billing-yearly"
+              >
+                Yearly
+                <Badge variant="secondary" className="ml-2">Save 15%</Badge>
+              </Button>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid md:grid-cols-3 gap-4">
+            {/* Free Plan */}
+            <div className={`rounded-lg border p-6 ${currentPlan === "FREE" ? "border-primary" : "border-border"}`}>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">{freePlan?.name || "Free"}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {freePlan?.description || "Get started with basic features"}
+                </p>
+              </div>
+              <div className="mb-4">
+                <span className="text-3xl font-bold">$0</span>
+                <span className="text-muted-foreground">/month</span>
+              </div>
+              <ul className="space-y-2 mb-6">
+                {parseFeatures(freePlan).map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              {currentPlan === "FREE" ? (
+                <Button variant="outline" className="w-full" disabled data-testid="button-plan-free-current">
+                  Current Plan
+                </Button>
+              ) : (
+                <Button variant="outline" className="w-full" disabled data-testid="button-plan-free">
+                  Downgrade
+                </Button>
+              )}
+            </div>
+
+            {/* Pro Plan */}
+            <div className={`rounded-lg border p-6 relative ${currentPlan === "PRO" ? "border-primary" : "border-border"}`}>
+              <Badge className="absolute -top-2 right-4">Popular</Badge>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">{proPlan?.name || "Pro"}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {proPlan?.description || "For growing teams"}
+                </p>
+              </div>
+              <div className="mb-4">
+                {proPlan && (
+                  <>
+                    <span className="text-3xl font-bold">
+                      {formatPrice(getPrice(proPlan, billingPeriod === "monthly" ? "month" : "year")?.unitAmount || 4900)}
+                    </span>
+                    <span className="text-muted-foreground">/{billingPeriod === "monthly" ? "month" : "year"}</span>
+                  </>
+                )}
+              </div>
+              <ul className="space-y-2 mb-6">
+                {parseFeatures(proPlan).map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              {currentPlan === "PRO" ? (
+                <Button variant="outline" className="w-full" disabled data-testid="button-plan-pro-current">
+                  Current Plan
+                </Button>
+              ) : (
+                <Button
+                  className="w-full"
+                  onClick={() => {
+                    const price = getPrice(proPlan, billingPeriod === "monthly" ? "month" : "year");
+                    if (price) checkoutMutation.mutate(price.id);
+                  }}
+                  disabled={checkoutMutation.isPending || !proPlan}
+                  data-testid="button-upgrade-pro"
+                >
+                  {checkoutMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : null}
+                  Upgrade to Pro
+                </Button>
+              )}
+            </div>
+
+            {/* Enterprise Plan */}
+            <div className={`rounded-lg border p-6 ${currentPlan === "ENTERPRISE" ? "border-primary" : "border-border"}`}>
+              <div className="mb-4">
+                <h3 className="text-lg font-semibold">{enterprisePlan?.name || "Enterprise"}</h3>
+                <p className="text-sm text-muted-foreground">
+                  {enterprisePlan?.description || "For large organizations"}
+                </p>
+              </div>
+              <div className="mb-4">
+                {enterprisePlan && (
+                  <>
+                    <span className="text-3xl font-bold">
+                      {formatPrice(getPrice(enterprisePlan, billingPeriod === "monthly" ? "month" : "year")?.unitAmount || 14900)}
+                    </span>
+                    <span className="text-muted-foreground">/{billingPeriod === "monthly" ? "month" : "year"}</span>
+                  </>
+                )}
+              </div>
+              <ul className="space-y-2 mb-6">
+                {parseFeatures(enterprisePlan).map((feature, i) => (
+                  <li key={i} className="flex items-start gap-2 text-sm">
+                    <CheckCircle2 className="h-4 w-4 text-primary mt-0.5 shrink-0" />
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+              {currentPlan === "ENTERPRISE" ? (
+                <Button variant="outline" className="w-full" disabled data-testid="button-plan-enterprise-current">
+                  Current Plan
+                </Button>
+              ) : (
+                <Button
+                  variant="secondary"
+                  className="w-full"
+                  onClick={() => {
+                    const price = getPrice(enterprisePlan, billingPeriod === "monthly" ? "month" : "year");
+                    if (price) checkoutMutation.mutate(price.id);
+                  }}
+                  disabled={checkoutMutation.isPending || !enterprisePlan}
+                  data-testid="button-upgrade-enterprise"
+                >
+                  {checkoutMutation.isPending ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : null}
+                  Upgrade to Enterprise
+                </Button>
+              )}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   );
 }

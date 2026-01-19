@@ -16,6 +16,8 @@ import {
   workerProfiles,
   userProfiles,
   savedJobs,
+  tenantBilling,
+  workerPayoutAccounts,
   type Tenant,
   type InsertTenant,
   type TenantMembership,
@@ -48,6 +50,10 @@ import {
   type InsertUserProfile,
   type SavedJob,
   type InsertSavedJob,
+  type TenantBilling,
+  type InsertTenantBilling,
+  type WorkerPayoutAccount,
+  type InsertWorkerPayoutAccount,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte } from "drizzle-orm";
@@ -172,6 +178,16 @@ export interface IStorage {
     totalApplications: number;
     totalGigs: number;
   }>;
+
+  // Billing
+  getTenantBilling(tenantId: string): Promise<TenantBilling | undefined>;
+  createTenantBilling(data: InsertTenantBilling): Promise<TenantBilling>;
+  updateTenantBilling(tenantId: string, data: Partial<InsertTenantBilling>): Promise<TenantBilling | undefined>;
+
+  // Worker Payout Accounts
+  getWorkerPayoutAccount(userId: string): Promise<WorkerPayoutAccount | undefined>;
+  createWorkerPayoutAccount(data: InsertWorkerPayoutAccount): Promise<WorkerPayoutAccount>;
+  updateWorkerPayoutAccount(userId: string, data: Partial<InsertWorkerPayoutAccount>): Promise<WorkerPayoutAccount | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -666,6 +682,46 @@ export class DatabaseStorage implements IStorage {
       totalApplications: appCount?.count || 0,
       totalGigs: gigCount?.count || 0,
     };
+  }
+
+  // Billing
+  async getTenantBilling(tenantId: string): Promise<TenantBilling | undefined> {
+    const [billing] = await db.select().from(tenantBilling).where(eq(tenantBilling.tenantId, tenantId));
+    return billing || undefined;
+  }
+
+  async createTenantBilling(data: InsertTenantBilling): Promise<TenantBilling> {
+    const [billing] = await db.insert(tenantBilling).values(data).returning();
+    return billing;
+  }
+
+  async updateTenantBilling(tenantId: string, data: Partial<InsertTenantBilling>): Promise<TenantBilling | undefined> {
+    const [billing] = await db
+      .update(tenantBilling)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tenantBilling.tenantId, tenantId))
+      .returning();
+    return billing || undefined;
+  }
+
+  // Worker Payout Accounts
+  async getWorkerPayoutAccount(userId: string): Promise<WorkerPayoutAccount | undefined> {
+    const [account] = await db.select().from(workerPayoutAccounts).where(eq(workerPayoutAccounts.userId, userId));
+    return account || undefined;
+  }
+
+  async createWorkerPayoutAccount(data: InsertWorkerPayoutAccount): Promise<WorkerPayoutAccount> {
+    const [account] = await db.insert(workerPayoutAccounts).values(data).returning();
+    return account;
+  }
+
+  async updateWorkerPayoutAccount(userId: string, data: Partial<InsertWorkerPayoutAccount>): Promise<WorkerPayoutAccount | undefined> {
+    const [account] = await db
+      .update(workerPayoutAccounts)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(workerPayoutAccounts.userId, userId))
+      .returning();
+    return account || undefined;
   }
 }
 

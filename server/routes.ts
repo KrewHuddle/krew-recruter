@@ -4,6 +4,8 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated, registerAuthRoutes } from "./replit_integrations/auth";
 import { z } from "zod";
 import { randomBytes } from "crypto";
+import { stripeService } from "./stripeService";
+import { getStripePublishableKey } from "./stripeClient";
 
 // Helper to safely get user ID from claims
 function getUserId(req: Request): string | undefined {
@@ -1138,6 +1140,194 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error updating user:", error);
       res.status(500).json({ error: "Failed to update user" });
+    }
+  });
+
+  // ============ BILLING ROUTES ============
+
+  // Get Stripe publishable key
+  app.get("/api/billing/config", async (req, res) => {
+    try {
+      const publishableKey = await getStripePublishableKey();
+      res.json({ publishableKey });
+    } catch (error) {
+      console.error("Error getting Stripe config:", error);
+      res.status(500).json({ error: "Failed to get billing config" });
+    }
+  });
+
+  // Get subscription plans
+  app.get("/api/billing/plans", async (req, res) => {
+    try {
+      const products = await stripeService.listProductsWithPrices();
+      
+      const productsMap = new Map();
+      for (const row of products) {
+        if (!productsMap.has(row.product_id)) {
+          productsMap.set(row.product_id, {
+            id: row.product_id,
+            name: row.product_name,
+            description: row.product_description,
+            active: row.product_active,
+            metadata: row.product_metadata,
+            prices: []
+          });
+        }
+        if (row.price_id) {
+          productsMap.get(row.product_id).prices.push({
+            id: row.price_id,
+            unitAmount: row.unit_amount,
+            currency: row.currency,
+            recurring: row.recurring,
+            active: row.price_active,
+          });
+        }
+      }
+
+      res.json({ plans: Array.from(productsMap.values()) });
+    } catch (error) {
+      console.error("Error fetching plans:", error);
+      res.status(500).json({ error: "Failed to fetch plans" });
+    }
+  });
+
+  // Create checkout session for subscription
+  app.post("/api/billing/checkout", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const { priceId } = req.body;
+
+      if (!priceId) {
+        return res.status(400).json({ error: "Price ID required" });
+      }
+
+      const tenant = await storage.getTenant(tenantId);
+      if (!tenant) {
+        return res.status(404).json({ error: "Tenant not found" });
+      }
+
+      const billingInfo = await storage.getTenantBilling(tenantId);
+      let customerId = billingInfo?.stripeCustomerId;
+
+      if (!customerId) {
+        const claims = getUserClaims(req);
+        const customer = await stripeService.createCustomer(
+          claims.email || "",
+          tenantId,
+          tenant.name
+        );
+        await storage.createTenantBilling({
+          tenantId,
+          stripeCustomerId: customer.id,
+        });
+        customerId = customer.id;
+      }
+
+      const session = await stripeService.createCheckoutSession(
+        customerId,
+        priceId,
+        `${req.protocol}://${req.get('host')}/app/settings?tab=billing&success=true`,
+        `${req.protocol}://${req.get('host')}/app/settings?tab=billing&canceled=true`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating checkout:", error);
+      res.status(500).json({ error: "Failed to create checkout session" });
+    }
+  });
+
+  // Get tenant billing status
+  app.get("/api/billing/status", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const billing = await storage.getTenantBilling(tenantId);
+
+      if (!billing || !billing.stripeSubscriptionId) {
+        return res.json({ status: null, subscription: null });
+      }
+
+      const subscription = await stripeService.getSubscription(billing.stripeSubscriptionId);
+      res.json({ 
+        status: billing.subscriptionStatus,
+        subscription,
+        currentPeriodEnd: billing.currentPeriodEnd,
+      });
+    } catch (error) {
+      console.error("Error fetching billing status:", error);
+      res.status(500).json({ error: "Failed to fetch billing status" });
+    }
+  });
+
+  // Create customer portal session
+  app.post("/api/billing/portal", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const billing = await storage.getTenantBilling(tenantId);
+
+      if (!billing?.stripeCustomerId) {
+        return res.status(400).json({ error: "No billing account found" });
+      }
+
+      const session = await stripeService.createCustomerPortalSession(
+        billing.stripeCustomerId,
+        `${req.protocol}://${req.get('host')}/app/settings?tab=billing`
+      );
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating portal session:", error);
+      res.status(500).json({ error: "Failed to create portal session" });
+    }
+  });
+
+  // ============ WORKER PAYOUT ROUTES ============
+
+  // Get worker payout account status
+  app.get("/api/worker/payout-account", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const account = await storage.getWorkerPayoutAccount(userId);
+      res.json(account || null);
+    } catch (error) {
+      console.error("Error fetching payout account:", error);
+      res.status(500).json({ error: "Failed to fetch payout account" });
+    }
+  });
+
+  // Create Connect onboarding link
+  app.post("/api/worker/payout-account/onboard", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const claims = getUserClaims(req);
+      let account = await storage.getWorkerPayoutAccount(userId);
+
+      if (!account) {
+        const stripeAccount = await stripeService.createConnectAccount(
+          claims.email || "",
+          userId
+        );
+        account = await storage.createWorkerPayoutAccount({
+          userId,
+          stripeAccountId: stripeAccount.id,
+          email: claims.email,
+        });
+      }
+
+      const accountLink = await stripeService.createConnectAccountLink(
+        account.stripeAccountId!,
+        `${req.protocol}://${req.get('host')}/seeker?refresh=true`,
+        `${req.protocol}://${req.get('host')}/seeker?onboarded=true`
+      );
+
+      res.json({ url: accountLink.url });
+    } catch (error) {
+      console.error("Error creating onboarding link:", error);
+      res.status(500).json({ error: "Failed to create onboarding link" });
     }
   });
 
