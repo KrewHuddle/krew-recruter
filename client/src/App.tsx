@@ -24,6 +24,7 @@ import Gigs from "@/pages/gigs";
 import GigCreate from "@/pages/gig-create";
 import GigDetail from "@/pages/gig-detail";
 import GigBoard from "@/pages/gig-board";
+import GigJoin from "@/pages/gig-join";
 import Interviews from "@/pages/interviews";
 import Settings from "@/pages/settings";
 import SeekerDashboard from "@/pages/seeker-dashboard";
@@ -234,6 +235,8 @@ function AppRouter() {
       <Route path="/jobs" component={JobSearch} />
       
       <Route path="/gigs" component={GigBoard} />
+      
+      <Route path="/gigs/join" component={GigJoin} />
       
       <Route path="/onboarding">
         <ProtectedRoute>

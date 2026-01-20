@@ -30,7 +30,7 @@ import {
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
 import { useState } from "react";
-import type { GigPost, Location, Tenant, GigAssignment } from "@shared/schema";
+import type { GigPost, Location, Tenant, GigAssignment, UserProfile } from "@shared/schema";
 import { FOH_ROLES, BOH_ROLES } from "@shared/schema";
 
 type PublicGig = GigPost & {
@@ -51,6 +51,13 @@ export default function GigBoard() {
   const [payFilter, setPayFilter] = useState<string>("all");
   const [applyingGigId, setApplyingGigId] = useState<string | null>(null);
 
+  const { data: userProfile } = useQuery<UserProfile | null>({
+    queryKey: ["/api/user/profile"],
+    enabled: isAuthenticated,
+  });
+
+  const isJobSeeker = userProfile?.userType === "JOB_SEEKER";
+
   const { data: gigs, isLoading } = useQuery<PublicGig[]>({
     queryKey: ["/api/gigs/public"],
   });
@@ -58,7 +65,7 @@ export default function GigBoard() {
   // Get worker's current applications
   const { data: myGigs } = useQuery<{ gigPostId: string; status: string }[]>({
     queryKey: ["/api/worker/gigs"],
-    enabled: isAuthenticated && user?.userType === "seeker",
+    enabled: isAuthenticated && isJobSeeker,
   });
 
   const appliedGigIds = new Set(myGigs?.map((g) => g.gigPostId) || []);
@@ -89,10 +96,10 @@ export default function GigBoard() {
 
   const handleApply = (gigId: string) => {
     if (!isAuthenticated) {
-      navigate("/login");
+      navigate("/gigs/join");
       return;
     }
-    if (user?.userType !== "seeker") {
+    if (!isJobSeeker) {
       toast({
         title: "Seeker account required",
         description: "Please log in as a job seeker to apply for gigs.",
