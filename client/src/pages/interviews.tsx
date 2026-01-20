@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +55,7 @@ import {
   Brain,
   Users,
   Loader2,
+  RefreshCw,
 } from "lucide-react";
 import type { InterviewTemplate, InterviewQuestion, InterviewInvite, InterviewResponse } from "@shared/schema";
 
@@ -78,6 +79,10 @@ type InviteReviewData = InterviewInvite & {
 const templateFormSchema = z.object({
   name: z.string().min(1, "Name is required"),
   role: z.string().optional(),
+  introText: z.string().optional(),
+  outroText: z.string().optional(),
+  brandPrimaryColor: z.string().optional(),
+  language: z.string().default("en"),
 });
 
 type TemplateFormValues = z.infer<typeof templateFormSchema>;
@@ -87,6 +92,7 @@ const questionFormSchema = z.object({
   responseType: z.enum(["VIDEO", "TEXT"]).default("VIDEO"),
   timeLimitSeconds: z.coerce.number().min(30).max(300).default(120),
   thinkingTimeSeconds: z.coerce.number().min(0).max(120).default(30),
+  maxRetakes: z.coerce.number().min(0).max(10).default(3),
 });
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
@@ -132,14 +138,24 @@ export default function Interviews() {
     enabled: !!reviewInviteId,
   });
 
+  // Sync selectedTemplate with refreshed templates data
+  useEffect(() => {
+    if (selectedTemplate && templates) {
+      const updatedTemplate = templates.find(t => t.id === selectedTemplate.id);
+      if (updatedTemplate) {
+        setSelectedTemplate(updatedTemplate);
+      }
+    }
+  }, [templates, selectedTemplate?.id]);
+
   const templateForm = useForm<TemplateFormValues>({
     resolver: zodResolver(templateFormSchema),
-    defaultValues: { name: "", role: "" },
+    defaultValues: { name: "", role: "", introText: "", outroText: "", brandPrimaryColor: "", language: "en" },
   });
 
   const questionForm = useForm<QuestionFormValues>({
     resolver: zodResolver(questionFormSchema),
-    defaultValues: { promptText: "", responseType: "VIDEO", timeLimitSeconds: 120 },
+    defaultValues: { promptText: "", responseType: "VIDEO", timeLimitSeconds: 120, thinkingTimeSeconds: 30, maxRetakes: 3 },
   });
 
   const inviteForm = useForm<InviteFormValues>({
@@ -457,6 +473,97 @@ export default function Interviews() {
                       </FormItem>
                     )}
                   />
+                  <FormField
+                    control={templateForm.control}
+                    name="introText"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Welcome Message</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Welcome to our interview! We're excited to learn more about you..." 
+                            {...field} 
+                            rows={2}
+                            data-testid="input-intro-text" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={templateForm.control}
+                    name="outroText"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Thank You Message</FormLabel>
+                        <FormControl>
+                          <Textarea 
+                            placeholder="Thank you for completing this interview! We'll be in touch soon..." 
+                            {...field} 
+                            rows={2}
+                            data-testid="input-outro-text" 
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <div className="grid grid-cols-2 gap-4">
+                    <FormField
+                      control={templateForm.control}
+                      name="brandPrimaryColor"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Brand Color</FormLabel>
+                          <FormControl>
+                            <div className="flex gap-2">
+                              <Input 
+                                type="color" 
+                                {...field} 
+                                className="w-12 h-9 p-1 cursor-pointer"
+                                data-testid="input-brand-color" 
+                              />
+                              <Input 
+                                placeholder="#8B5CF6" 
+                                value={field.value || ""} 
+                                onChange={field.onChange}
+                                className="flex-1"
+                              />
+                            </div>
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={templateForm.control}
+                      name="language"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Language</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value || "en"}>
+                            <FormControl>
+                              <SelectTrigger data-testid="select-language">
+                                <SelectValue placeholder="Select language" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="en">English</SelectItem>
+                              <SelectItem value="es">Español</SelectItem>
+                              <SelectItem value="fr">Français</SelectItem>
+                              <SelectItem value="de">Deutsch</SelectItem>
+                              <SelectItem value="pt">Português</SelectItem>
+                              <SelectItem value="it">Italiano</SelectItem>
+                              <SelectItem value="nl">Nederlands</SelectItem>
+                              <SelectItem value="pl">Polski</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                   <div className="flex justify-end gap-3 pt-4">
                     <Button type="button" variant="outline" onClick={() => setIsTemplateDialogOpen(false)}>
                       Cancel
@@ -621,13 +728,13 @@ export default function Interviews() {
                               </FormItem>
                             )}
                           />
-                          <div className="grid grid-cols-2 gap-4">
+                          <div className="grid grid-cols-3 gap-4">
                             <FormField
                               control={questionForm.control}
                               name="timeLimitSeconds"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Recording Time (seconds)</FormLabel>
+                                  <FormLabel>Recording Time (s)</FormLabel>
                                   <FormControl>
                                     <Input type="number" min={30} max={300} {...field} data-testid="input-question-time" />
                                   </FormControl>
@@ -640,9 +747,22 @@ export default function Interviews() {
                               name="thinkingTimeSeconds"
                               render={({ field }) => (
                                 <FormItem>
-                                  <FormLabel>Thinking Time (seconds)</FormLabel>
+                                  <FormLabel>Think Time (s)</FormLabel>
                                   <FormControl>
                                     <Input type="number" min={0} max={120} {...field} data-testid="input-thinking-time" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={questionForm.control}
+                              name="maxRetakes"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Max Retakes</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" min={0} max={10} {...field} data-testid="input-max-retakes" />
                                   </FormControl>
                                   <FormMessage />
                                 </FormItem>
@@ -697,6 +817,12 @@ export default function Interviews() {
                               <span className="flex items-center gap-1">
                                 <Brain className="h-3.5 w-3.5" />
                                 {question.thinkingTimeSeconds}s prep time
+                              </span>
+                            )}
+                            {question.maxRetakes !== undefined && question.maxRetakes !== null && (
+                              <span className="flex items-center gap-1">
+                                <RefreshCw className="h-3.5 w-3.5" />
+                                {question.maxRetakes === 0 ? "No" : question.maxRetakes} retake{question.maxRetakes !== 1 ? "s" : ""}
                               </span>
                             )}
                             <Badge variant={question.responseType === "VIDEO" ? "default" : "secondary"} className="text-xs">

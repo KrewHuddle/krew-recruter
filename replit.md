@@ -225,6 +225,24 @@ npm run build        # Build for production
 - **Thinking Time**: Candidates get configurable prep time before recording starts
 - **Security**: All new endpoints enforce multi-tenant isolation via storage layer
 
+### Hireflix Feature Parity (January 2026)
+- **Template Branding**: 
+  - Welcome and thank you message customization
+  - Brand color picker with hex input support
+  - Multi-language support (8 languages: English, Spanish, French, German, Portuguese, Italian, Dutch, Polish)
+  - Intro/outro video paths for future video message support
+- **Question Controls**:
+  - Max retakes per question (0-10 retakes, default 3)
+  - 3-column layout for recording time, think time, and max retakes
+  - Retake count displayed on question cards
+- **Email Tracking Fields**: 
+  - emailSentAt, emailOpenedAt, reminderSentAt timestamps for delivery analytics
+  - startedAt timestamp for interview progress tracking
+- **Schema Updates**:
+  - interview_templates: Added introVideoPath, introText, outroVideoPath, outroText, brandLogoPath, brandPrimaryColor, language
+  - interview_questions: Added maxRetakes field
+  - interview_invites: Added emailSentAt, emailOpenedAt, reminderSentAt, startedAt fields
+
 ### Super Admin Portal Enhancement (January 2026)
 - **Business Intelligence Dashboard**: Comprehensive analytics for platform management
   - MRR/ARR tracking with monthly breakdown and growth trends
