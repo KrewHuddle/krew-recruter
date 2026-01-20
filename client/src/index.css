@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - Purple/magenta theme matching Krew Recruiter logo */
+/* LIGHT MODE - Warm Hospitality Theme (Coral/Teal with Amber accents) */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -14,50 +14,50 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 260 20% 98%;
-  --foreground: 260 25% 12%;
+  --background: 30 25% 98%;
+  --foreground: 200 35% 12%;
 
-  --border: 260 15% 88%;
+  --border: 30 15% 88%;
 
   --card: 0 0% 100%;
-  --card-foreground: 260 25% 12%;
-  --card-border: 260 15% 90%;
+  --card-foreground: 200 35% 12%;
+  --card-border: 30 15% 90%;
 
-  --sidebar: 260 20% 97%;
-  --sidebar-foreground: 260 25% 20%;
-  --sidebar-border: 260 15% 90%;
-  --sidebar-primary: 280 70% 52%;
+  --sidebar: 30 20% 97%;
+  --sidebar-foreground: 200 30% 20%;
+  --sidebar-border: 30 15% 90%;
+  --sidebar-primary: 12 76% 58%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 280 40% 94%;
-  --sidebar-accent-foreground: 280 70% 35%;
-  --sidebar-ring: 280 70% 52%;
+  --sidebar-accent: 175 45% 92%;
+  --sidebar-accent-foreground: 175 55% 30%;
+  --sidebar-ring: 12 76% 58%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 260 25% 12%;
-  --popover-border: 260 15% 88%;
+  --popover-foreground: 200 35% 12%;
+  --popover-border: 30 15% 88%;
 
-  --primary: 280 70% 52%;
+  --primary: 12 76% 58%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 320 70% 55%;
-  --secondary-foreground: 320 95% 15%;
+  --secondary: 175 55% 42%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 260 15% 94%;
-  --muted-foreground: 260 15% 45%;
+  --muted: 30 15% 94%;
+  --muted-foreground: 200 15% 45%;
 
-  --accent: 280 40% 94%;
-  --accent-foreground: 280 70% 35%;
+  --accent: 175 45% 92%;
+  --accent-foreground: 175 55% 30%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 260 15% 85%;
-  --ring: 280 70% 52%;
-  --chart-1: 280 70% 52%;
-  --chart-2: 320 70% 55%;
-  --chart-3: 200 60% 50%;
-  --chart-4: 340 75% 55%;
-  --chart-5: 45 90% 55%;
+  --input: 30 15% 85%;
+  --ring: 12 76% 58%;
+  --chart-1: 12 76% 58%;
+  --chart-2: 175 55% 42%;
+  --chart-3: 38 92% 55%;
+  --chart-4: 200 70% 50%;
+  --chart-5: 340 75% 55%;
 
   --font-sans: 'Inter', sans-serif;
   --font-serif: 'Playfair Display', Georgia, serif;
@@ -115,51 +115,51 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 260 25% 8%;
-  --foreground: 260 10% 95%;
+  --background: 200 30% 8%;
+  --foreground: 30 10% 95%;
 
-  --border: 260 15% 18%;
+  --border: 200 20% 18%;
 
-  --card: 260 20% 11%;
-  --card-foreground: 260 10% 95%;
-  --card-border: 260 15% 16%;
+  --card: 200 25% 11%;
+  --card-foreground: 30 10% 95%;
+  --card-border: 200 20% 16%;
 
-  --sidebar: 260 25% 10%;
-  --sidebar-foreground: 260 10% 90%;
-  --sidebar-border: 260 15% 16%;
-  --sidebar-primary: 280 70% 60%;
+  --sidebar: 200 28% 10%;
+  --sidebar-foreground: 30 10% 90%;
+  --sidebar-border: 200 20% 16%;
+  --sidebar-primary: 12 76% 62%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 280 35% 18%;
-  --sidebar-accent-foreground: 280 50% 75%;
-  --sidebar-ring: 280 70% 60%;
+  --sidebar-accent: 175 40% 18%;
+  --sidebar-accent-foreground: 175 50% 70%;
+  --sidebar-ring: 12 76% 62%;
 
-  --popover: 260 20% 11%;
-  --popover-foreground: 260 10% 95%;
-  --popover-border: 260 15% 18%;
+  --popover: 200 25% 11%;
+  --popover-foreground: 30 10% 95%;
+  --popover-border: 200 20% 18%;
 
-  --primary: 280 70% 60%;
+  --primary: 12 76% 62%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 320 70% 55%;
-  --secondary-foreground: 320 95% 95%;
+  --secondary: 175 55% 48%;
+  --secondary-foreground: 0 0% 100%;
 
-  --muted: 260 15% 18%;
-  --muted-foreground: 260 10% 60%;
+  --muted: 200 20% 18%;
+  --muted-foreground: 30 10% 60%;
 
-  --accent: 280 35% 18%;
-  --accent-foreground: 280 50% 75%;
+  --accent: 175 40% 18%;
+  --accent-foreground: 175 50% 70%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
   /* Used as the border around inputs. Dark mode: Should be a border that is light enough to have high contrast when rendered on a --card background. More contrast than standard --border */
-  --input: 260 15% 25%;
-  --ring: 280 70% 60%;
-  --chart-1: 280 70% 60%;
-  --chart-2: 320 70% 55%;
-  --chart-3: 200 60% 55%;
-  --chart-4: 340 75% 60%;
-  --chart-5: 45 90% 60%;
+  --input: 200 20% 25%;
+  --ring: 12 76% 62%;
+  --chart-1: 12 76% 62%;
+  --chart-2: 175 55% 48%;
+  --chart-3: 38 92% 60%;
+  --chart-4: 200 70% 55%;
+  --chart-5: 340 75% 60%;
 
   --shadow-2xs: 0px 1px 2px 0px rgba(0, 0, 0, 0.15);
   --shadow-xs: 0px 1px 3px 0px rgba(0, 0, 0, 0.2);

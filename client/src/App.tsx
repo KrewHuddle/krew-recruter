@@ -226,7 +226,7 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
 function AppRouter() {
   return (
     <Switch>
-      <Route path="/" component={Home} />
+      <Route path="/" component={Landing} />
       
       <Route path="/login" component={Login} />
       
