@@ -1,57 +1,27 @@
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { ThemeToggle } from "@/components/theme-toggle";
 import {
   Users,
   Clock,
   Video,
   Briefcase,
-  Globe,
+  Heart,
   ArrowRight,
   CheckCircle2,
   Star,
+  Calendar,
+  DollarSign,
+  Play,
+  MessageSquare,
+  Zap,
+  Building2,
+  UserCheck,
+  Sparkles,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
-
-const features = [
-  {
-    icon: Briefcase,
-    title: "Smart ATS Pipeline",
-    description:
-      "Streamline your hiring with an intuitive applicant tracking system built for hospitality. From screening to offer, manage every stage effortlessly.",
-  },
-  {
-    icon: Clock,
-    title: "Krew Gigs Marketplace",
-    description:
-      "Fill last-minute shifts instantly. Access a pool of vetted hospitality workers ready to work on-demand with reliability scores.",
-  },
-  {
-    icon: Video,
-    title: "Async Video Interviews",
-    description:
-      "Screen candidates faster with one-way video interviews. Review responses on your schedule and make better hiring decisions.",
-  },
-  {
-    icon: Globe,
-    title: "Job Board Distribution",
-    description:
-      "Post once, reach everywhere. Distribute jobs to Indeed, ZipRecruiter, and more with a single click.",
-  },
-  {
-    icon: Star,
-    title: "Sponsored Promotions",
-    description:
-      "Boost visibility for your most critical roles. Sponsored jobs get priority placement in search results.",
-  },
-  {
-    icon: Users,
-    title: "Multi-Location Management",
-    description:
-      "Manage hiring across all your locations from one dashboard. Perfect for restaurant groups and hotel chains.",
-  },
-];
 
 const testimonials = [
   {
@@ -70,48 +40,75 @@ const testimonials = [
   },
   {
     quote:
-      "Video interviews let us screen candidates faster and find the perfect fit for our fine dining service team.",
+      "Video interviews let us see the personality behind the resume. We finally hire people who genuinely love hospitality.",
     author: "Elena Rodriguez",
     role: "Talent Acquisition, Hospitality Group",
     rating: 5,
   },
 ];
 
+const hospitalityBenefits = [
+  {
+    icon: Heart,
+    title: "Passion-First Hiring",
+    description: "Video interviews reveal personality and service mindset before the first day.",
+  },
+  {
+    icon: Zap,
+    title: "Fill Shifts Instantly",
+    description: "Access vetted gig workers ready for last-minute coverage when you need it.",
+  },
+  {
+    icon: Calendar,
+    title: "Seasonal Flexibility",
+    description: "Scale your team up or down with a mix of full-time staff and gig workers.",
+  },
+  {
+    icon: Building2,
+    title: "Multi-Location Ready",
+    description: "Manage hiring across all your venues from one centralized dashboard.",
+  },
+  {
+    icon: UserCheck,
+    title: "Pre-Vetted Talent",
+    description: "Every gig worker is verified with ratings and reliability scores.",
+  },
+  {
+    icon: Sparkles,
+    title: "Smart Matching",
+    description: "AI-powered matching connects you with candidates who fit your culture.",
+  },
+];
+
 export default function Landing() {
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-2">
+        <div className="mx-auto flex flex-wrap h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <div className="flex flex-wrap items-center gap-2">
             <img src={logoImage} alt="Krew Recruiter" className="h-9 w-9 rounded-lg object-contain" data-testid="img-logo-nav" />
-            <span className="text-xl font-semibold">Krew Recruiter</span>
+            <span className="text-xl font-semibold" data-testid="text-brand-nav">Krew Recruiter</span>
           </div>
-          <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Features
+          <div className="hidden md:flex flex-wrap items-center gap-8">
+            <a href="#gigs" className="text-sm text-muted-foreground" data-testid="link-nav-gigs">
+              Krew Gigs
             </a>
-            <a
-              href="#testimonials"
-              className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-            >
+            <a href="#interviews" className="text-sm text-muted-foreground" data-testid="link-nav-interviews">
+              Video Interviews
+            </a>
+            <a href="#testimonials" className="text-sm text-muted-foreground" data-testid="link-nav-testimonials">
               Testimonials
             </a>
             <Link href="/gigs">
-              <span className="text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer">
-                Gig Board
+              <span className="text-sm text-muted-foreground cursor-pointer" data-testid="link-nav-find-gigs">
+                Find Gigs
               </span>
             </Link>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <ThemeToggle />
             <a href="/login">
-              <Button variant="ghost" data-testid="button-login">
-                Sign in
-              </Button>
+              <Button variant="ghost" data-testid="button-login">Sign in</Button>
             </a>
             <a href="/login">
               <Button data-testid="button-get-started">Get Started</Button>
@@ -120,197 +117,252 @@ export default function Landing() {
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32">
-        <div className="absolute inset-0 -z-10 overflow-hidden">
-          <div className="absolute top-1/4 left-1/4 h-96 w-96 rounded-full bg-primary/5 blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 h-96 w-96 rounded-full bg-secondary/10 blur-3xl" />
+      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+        <div className="absolute inset-0 -z-10">
+          <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/10 blur-3xl" />
+          <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-secondary/15 blur-3xl" />
         </div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl text-center">
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75"></span>
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-primary"></span>
-              </span>
-              Now with video interviews
+          <div className="mx-auto max-w-4xl text-center">
+            <div className="mb-6 inline-flex flex-wrap items-center gap-2 rounded-full border border-border bg-card px-4 py-1.5 text-sm text-muted-foreground" data-testid="text-hero-tagline">
+              <Heart className="h-4 w-4 text-primary" />
+              <span data-testid="text-hero-tagline-text">Built for hospitality, by hospitality</span>
             </div>
-            <h1 className="font-serif text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              Hire hospitality talent{" "}
-              <span className="text-primary">faster</span> and{" "}
-              <span className="text-secondary">smarter</span>
+            <h1 className="font-serif text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl" data-testid="text-hero-heading">
+              Find people who{" "}
+              <span className="text-primary">love to serve</span>
             </h1>
-            <p className="mt-6 text-lg text-muted-foreground leading-relaxed max-w-2xl mx-auto">
-              The all-in-one hiring platform for restaurants, hotels, and
-              hospitality groups. From full-time staff to last-minute gig
-              workers, find the right talent when you need it.
+            <p className="mt-6 text-xl text-muted-foreground leading-relaxed max-w-3xl mx-auto" data-testid="text-hero-description">
+              Great hospitality starts with great people. Krew Recruiter helps you discover passionate talent through video interviews, and fills last-minute shifts with our gig worker marketplace.
             </p>
-            <div className="mt-10 flex flex-col sm:flex-row items-center justify-center gap-4">
+            <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
               <a href="/login">
-                <Button size="lg" className="gap-2" data-testid="button-hero-cta">
-                  Start Hiring for Free
-                  <ArrowRight className="h-4 w-4" />
+                <Button size="lg" className="gap-2" data-testid="button-hero-employer">
+                  I'm Hiring
+                  <Briefcase className="h-4 w-4" />
                 </Button>
               </a>
-              <Link href="/gigs">
-                <Button variant="outline" size="lg" data-testid="button-browse-gigs">
-                  Browse Gig Shifts
+              <Link href="/gigs/join">
+                <Button variant="outline" size="lg" className="gap-2" data-testid="button-hero-worker">
+                  I Want to Work
+                  <ArrowRight className="h-4 w-4" />
                 </Button>
               </Link>
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-free">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                Free forever plan
+                Free to start
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-video">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                No credit card required
+                Video interviews included
               </div>
-              <div className="flex items-center gap-1.5">
+              <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-gigs">
                 <CheckCircle2 className="h-4 w-4 text-primary" />
-                Sign up with email or Google
+                Access gig workers instantly
               </div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Stats Section */}
       <section className="border-y border-border bg-card/50 py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">10K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Jobs Posted
-              </div>
-            </div>
-            <div className="text-center">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-4" data-testid="stats-container">
+            <div className="text-center" data-testid="stat-hospitality-pros">
               <div className="text-3xl font-bold text-primary">50K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Candidates Placed
-              </div>
+              <div className="mt-1 text-sm text-muted-foreground">Hospitality Pros</div>
             </div>
-            <div className="text-center">
+            <div className="text-center" data-testid="stat-video-interviews">
+              <div className="text-3xl font-bold text-primary">10K+</div>
+              <div className="mt-1 text-sm text-muted-foreground">Video Interviews</div>
+            </div>
+            <div className="text-center" data-testid="stat-venues-served">
               <div className="text-3xl font-bold text-primary">2K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Hospitality Venues
-              </div>
+              <div className="mt-1 text-sm text-muted-foreground">Venues Served</div>
             </div>
-            <div className="text-center">
-              <div className="text-3xl font-bold text-primary">4.8</div>
-              <div className="mt-1 text-sm text-muted-foreground">
-                Average Rating
-              </div>
+            <div className="text-center" data-testid="stat-time-to-fill">
+              <div className="text-3xl font-bold text-primary">4hrs</div>
+              <div className="mt-1 text-sm text-muted-foreground">Avg. Time to Fill Gig</div>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-20 lg:py-32">
+      <section id="gigs" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
-              Everything you need to hire great hospitality talent
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              From sourcing to onboarding, we've got you covered with powerful
-              tools designed specifically for hospitality.
-            </p>
-          </div>
-          <div className="mt-16 grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {features.map((feature, index) => (
-              <Card
-                key={index}
-                className="group relative overflow-visible hover-elevate transition-all duration-300"
-              >
-                <CardContent className="p-6">
-                  <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary transition-colors group-hover:bg-primary group-hover:text-primary-foreground">
-                    <feature.icon className="h-6 w-6" />
-                  </div>
-                  <h3 className="text-lg font-semibold">{feature.title}</h3>
-                  <p className="mt-2 text-muted-foreground leading-relaxed">
-                    {feature.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Testimonials Section */}
-      <section
-        id="testimonials"
-        className="border-y border-border bg-card/50 py-20 lg:py-32"
-      >
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
-            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
-              Trusted by hospitality leaders
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              See why thousands of venues choose Krew Recruiter for their
-              hiring needs.
-            </p>
-          </div>
-          <div className="mt-16 grid gap-8 md:grid-cols-3">
-            {testimonials.map((testimonial, index) => (
-              <Card key={index} className="overflow-visible">
-                <CardContent className="p-6">
-                  <div className="flex gap-1 text-secondary">
-                    {[...Array(testimonial.rating)].map((_, i) => (
-                      <Star key={i} className="h-4 w-4 fill-current" />
-                    ))}
-                  </div>
-                  <blockquote className="mt-4 text-foreground leading-relaxed">
-                    "{testimonial.quote}"
-                  </blockquote>
-                  <div className="mt-6 flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-medium text-primary">
-                      {testimonial.author[0]}
-                    </div>
-                    <div>
-                      <div className="font-medium">{testimonial.author}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {testimonial.role}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 lg:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="relative overflow-hidden rounded-2xl bg-primary px-6 py-16 sm:px-12 lg:px-20">
-            <div className="absolute inset-0 -z-10">
-              <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-              <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
-            </div>
-            <div className="mx-auto max-w-2xl text-center">
-              <h2 className="font-serif text-3xl font-bold text-primary-foreground sm:text-4xl">
-                Ready to transform your hiring?
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div>
+              <Badge variant="secondary" className="mb-4" data-testid="badge-gigs-marketplace">
+                <Clock className="h-3 w-3 mr-1" />
+                Krew Gigs Marketplace
+              </Badge>
+              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl" data-testid="text-gigs-heading">
+                Fill shifts in hours, not weeks
               </h2>
-              <p className="mt-4 text-lg text-primary-foreground/80">
-                Join thousands of hospitality venues already using Krew
-                Recruiter to find and hire the best talent.
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed" data-testid="text-gigs-description">
+                Short-staffed for tonight's rush? Access a pool of pre-vetted hospitality professionals ready to work on your schedule. From bartenders to line cooks, find reliable gig workers who know the industry.
               </p>
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-4">
-                <a href="/login">
-                  <Button
-                    size="lg"
-                    variant="secondary"
-                    className="gap-2"
-                    data-testid="button-cta-bottom"
-                  >
-                    Get Started Free
+              <div className="mt-8 space-y-4">
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <Zap className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-instant-booking">Instant Booking</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-instant-booking-desc">Post a shift and get confirmed workers within hours</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <Star className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-reliability">Reliability Scores</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-reliability-desc">Every worker rated by venues. No more no-shows.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <DollarSign className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-pricing">Transparent Pricing</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-pricing-desc">Set your rate. Workers see what they'll earn upfront.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-10 flex flex-wrap gap-4">
+                <a href="/login" data-testid="link-post-gig">
+                  <Button className="gap-2" data-testid="button-post-gig">
+                    Post a Gig Shift
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </a>
+                <Link href="/gigs">
+                  <Button variant="outline" className="gap-2" data-testid="button-browse-shifts">
+                    Browse Available Shifts
+                  </Button>
+                </Link>
+              </div>
+            </div>
+            <div className="relative">
+              <Card className="p-6 space-y-4" data-testid="card-gig-mockup">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <Badge data-testid="badge-open-shift">Open Shift</Badge>
+                  <span className="text-sm text-muted-foreground" data-testid="text-posted-time">Posted 2h ago</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-semibold" data-testid="text-gig-title">Bartender Needed Tonight</h3>
+                  <p className="text-muted-foreground mt-1" data-testid="text-gig-location">The Brass Monkey - Downtown</p>
+                </div>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  <div className="flex flex-wrap items-center gap-1.5" data-testid="text-gig-time">
+                    <Calendar className="h-4 w-4 text-muted-foreground" />
+                    Tonight, 6PM - 2AM
+                  </div>
+                  <div className="flex flex-wrap items-center gap-1.5" data-testid="text-gig-pay">
+                    <DollarSign className="h-4 w-4 text-muted-foreground" />
+                    $28/hr + tips
+                  </div>
+                </div>
+                <div className="pt-4 border-t border-border">
+                  <p className="text-sm text-muted-foreground mb-3" data-testid="text-workers-interested">3 workers interested</p>
+                  <div className="flex flex-wrap -space-x-2" data-testid="avatars-workers">
+                    <div className="h-8 w-8 rounded-full bg-primary flex flex-wrap items-center justify-center text-xs font-medium text-primary-foreground ring-2 ring-background" data-testid="avatar-jm">JM</div>
+                    <div className="h-8 w-8 rounded-full bg-secondary flex flex-wrap items-center justify-center text-xs font-medium text-secondary-foreground ring-2 ring-background" data-testid="avatar-ak">AK</div>
+                    <div className="h-8 w-8 rounded-full bg-muted flex flex-wrap items-center justify-center text-xs font-medium text-muted-foreground ring-2 ring-background" data-testid="avatar-more">+1</div>
+                  </div>
+                </div>
+              </Card>
+              <div className="absolute -bottom-6 -right-6 -z-10 h-full w-full rounded-2xl bg-primary/5" />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="interviews" className="py-20 lg:py-32 bg-card/50 border-y border-border">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
+            <div className="order-2 lg:order-1 relative">
+              <Card className="p-6" data-testid="card-interview-mockup">
+                <div className="flex flex-wrap items-center gap-3 mb-4">
+                  <div className="h-10 w-10 rounded-full bg-primary flex flex-wrap items-center justify-center text-sm font-medium text-primary-foreground" data-testid="avatar-candidate">SR</div>
+                  <div>
+                    <p className="font-semibold" data-testid="text-candidate-name">Sofia Rodriguez</p>
+                    <p className="text-sm text-muted-foreground" data-testid="text-candidate-role">Applying for Server</p>
+                  </div>
+                </div>
+                <div className="aspect-video bg-muted rounded-lg flex flex-wrap items-center justify-center mb-4 relative overflow-hidden" data-testid="video-placeholder">
+                  <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-secondary/20" />
+                  <div className="relative h-16 w-16 rounded-full bg-primary/20 flex flex-wrap items-center justify-center">
+                    <Play className="h-8 w-8 text-primary ml-1" />
+                  </div>
+                </div>
+                <div className="space-y-3">
+                  <div className="flex flex-wrap items-start gap-3">
+                    <MessageSquare className="h-4 w-4 text-primary mt-1 shrink-0" />
+                    <div>
+                      <p className="text-sm font-medium" data-testid="text-interview-question">"Tell us about a time you turned an unhappy guest into a regular."</p>
+                      <p className="text-xs text-muted-foreground mt-1" data-testid="text-response-duration">2:34 response</p>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <Badge variant="secondary" data-testid="badge-personality">
+                      <CheckCircle2 className="h-3 w-3 mr-1" />
+                      Great personality
+                    </Badge>
+                    <Badge variant="outline" data-testid="badge-experience">5 yrs experience</Badge>
+                  </div>
+                </div>
+              </Card>
+              <div className="absolute -bottom-6 -left-6 -z-10 h-full w-full rounded-2xl bg-secondary/10" />
+            </div>
+            <div className="order-1 lg:order-2">
+              <Badge variant="secondary" className="mb-4" data-testid="badge-video-interviews">
+                <Video className="h-3 w-3 mr-1" />
+                Async Video Interviews
+              </Badge>
+              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl" data-testid="text-interviews-heading">
+                See the person behind the resume
+              </h2>
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed" data-testid="text-interviews-description">
+                In hospitality, personality matters as much as skills. Our async video interviews let candidates show their service mindset, communication style, and passion for the industry - on their time.
+              </p>
+              <div className="mt-8 space-y-4">
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <Clock className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-screening">Screen 10x Faster</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-screening-desc">Review video responses at your pace. No more scheduling phone screens.</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <Heart className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-questions">Hospitality-Focused Questions</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-questions-desc">Templates designed for service roles. "Tell me about a difficult guest..."</p>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-start gap-3">
+                  <div className="h-8 w-8 rounded-lg bg-primary/10 flex flex-wrap items-center justify-center shrink-0 mt-0.5">
+                    <Users className="h-4 w-4 text-primary" />
+                  </div>
+                  <div>
+                    <h4 className="font-semibold" data-testid="text-feature-collaboration">Team Collaboration</h4>
+                    <p className="text-sm text-muted-foreground" data-testid="text-feature-collaboration-desc">Share videos with your management team. Get everyone's input.</p>
+                  </div>
+                </div>
+              </div>
+              <div className="mt-10">
+                <a href="/login" data-testid="link-try-interviews">
+                  <Button className="gap-2" data-testid="button-try-interviews">
+                    Try Video Interviews Free
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </a>
@@ -320,28 +372,151 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Footer */}
+      <section className="py-20 lg:py-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center mb-16">
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl" data-testid="text-benefits-heading">
+              Why hospitality teams love Krew
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground" data-testid="text-benefits-description">
+              Built specifically for the unique challenges of hospitality hiring.
+            </p>
+          </div>
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {hospitalityBenefits.map((benefit, index) => (
+              <Card key={index} className="relative overflow-visible hover-elevate transition-all duration-300" data-testid={`card-benefit-${index}`}>
+                <CardContent className="p-6">
+                  <div className="mb-4 inline-flex flex-wrap h-12 w-12 items-center justify-center rounded-lg bg-primary/10 text-primary" data-testid={`icon-benefit-${index}`}>
+                    <benefit.icon className="h-6 w-6" />
+                  </div>
+                  <h3 className="text-lg font-semibold" data-testid={`text-benefit-title-${index}`}>{benefit.title}</h3>
+                  <p className="mt-2 text-muted-foreground leading-relaxed" data-testid={`text-benefit-desc-${index}`}>
+                    {benefit.description}
+                  </p>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="testimonials" className="border-y border-border bg-card/50 py-20 lg:py-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="mx-auto max-w-2xl text-center">
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl" data-testid="text-testimonials-heading">
+              Trusted by hospitality leaders
+            </h2>
+            <p className="mt-4 text-lg text-muted-foreground" data-testid="text-testimonials-description">
+              See why venues choose Krew to find people who love to serve.
+            </p>
+          </div>
+          <div className="mt-16 grid gap-8 md:grid-cols-3">
+            {testimonials.map((testimonial, index) => (
+              <Card key={index} className="overflow-visible" data-testid={`card-testimonial-${index}`}>
+                <CardContent className="p-6">
+                  <div className="flex flex-wrap gap-1 text-secondary" data-testid={`rating-testimonial-${index}`}>
+                    {[...Array(testimonial.rating)].map((_, i) => (
+                      <Star key={i} className="h-4 w-4 fill-current" />
+                    ))}
+                  </div>
+                  <blockquote className="mt-4 text-foreground leading-relaxed" data-testid={`quote-testimonial-${index}`}>
+                    "{testimonial.quote}"
+                  </blockquote>
+                  <div className="mt-6 flex flex-wrap items-center gap-3">
+                    <div className="flex flex-wrap h-10 w-10 items-center justify-center rounded-full bg-primary/10 font-medium text-primary" data-testid={`avatar-testimonial-${index}`}>
+                      {testimonial.author[0]}
+                    </div>
+                    <div>
+                      <div className="font-medium" data-testid={`author-testimonial-${index}`}>{testimonial.author}</div>
+                      <div className="text-sm text-muted-foreground" data-testid={`role-testimonial-${index}`}>{testimonial.role}</div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section className="py-20 lg:py-32">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="relative overflow-hidden rounded-2xl bg-primary px-6 py-16 sm:px-12 lg:px-20">
+            <div className="absolute inset-0 -z-10">
+              <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl" />
+            </div>
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 className="font-serif text-3xl font-bold text-primary-foreground sm:text-4xl" data-testid="text-cta-heading">
+                Ready to find people who love to serve?
+              </h2>
+              <p className="mt-4 text-lg text-primary-foreground/80" data-testid="text-cta-subheading">
+                Whether you need full-time staff or gig workers for tonight, Krew Recruiter has you covered.
+              </p>
+              <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
+                <a href="/login">
+                  <Button size="lg" variant="secondary" className="gap-2" data-testid="button-cta-employer">
+                    Start Hiring Free
+                    <Briefcase className="h-4 w-4" />
+                  </Button>
+                </a>
+                <Link href="/gigs/join">
+                  <Button size="lg" variant="secondary" className="gap-2" data-testid="button-cta-worker">
+                    Join as a Worker
+                    <ArrowRight className="h-4 w-4" />
+                  </Button>
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <footer className="border-t border-border py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
-            <div className="flex items-center gap-2">
-              <img src={logoImage} alt="Krew Recruiter" className="h-8 w-8 rounded-lg object-contain" data-testid="img-logo-footer" />
-              <span className="font-semibold">Krew Recruiter</span>
+          <div className="grid gap-8 md:grid-cols-4">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 mb-4">
+                <img src={logoImage} alt="Krew Recruiter" className="h-8 w-8 rounded-lg object-contain" data-testid="img-logo-footer" />
+                <span className="font-semibold" data-testid="text-brand-footer">Krew Recruiter</span>
+              </div>
+              <p className="text-sm text-muted-foreground" data-testid="text-footer-tagline">
+                The hiring platform for hospitality teams who care about service.
+              </p>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">
-                Privacy
-              </a>
-              <a href="#" className="hover:text-foreground transition-colors">
-                Terms
-              </a>
-              <a href="#" className="hover:text-foreground transition-colors">
-                Contact
-              </a>
+            <div>
+              <h4 className="font-semibold mb-4" data-testid="text-footer-employers-heading">For Employers</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="/login" data-testid="link-footer-post-jobs">Post Jobs</a></li>
+                <li><a href="/login" data-testid="link-footer-post-gigs">Post Gig Shifts</a></li>
+                <li><a href="/login" data-testid="link-footer-video-interviews">Video Interviews</a></li>
+                <li><a href="/employers" data-testid="link-footer-pricing">Pricing</a></li>
+              </ul>
             </div>
-            <div className="text-sm text-muted-foreground">
-              &copy; {new Date().getFullYear()} Krew Recruiter. All rights
-              reserved.
+            <div>
+              <h4 className="font-semibold mb-4" data-testid="text-footer-workers-heading">For Workers</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><Link href="/gigs"><span className="cursor-pointer" data-testid="link-footer-browse-gigs">Browse Gigs</span></Link></li>
+                <li><Link href="/gigs/join"><span className="cursor-pointer" data-testid="link-footer-join-worker">Join as Worker</span></Link></li>
+                <li><Link href="/jobs"><span className="cursor-pointer" data-testid="link-footer-full-time">Full-Time Jobs</span></Link></li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-semibold mb-4" data-testid="text-footer-company-heading">Company</h4>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li><a href="#" data-testid="link-footer-about">About</a></li>
+                <li><a href="#" data-testid="link-footer-contact">Contact</a></li>
+                <li><a href="#" data-testid="link-footer-privacy">Privacy</a></li>
+                <li><a href="#" data-testid="link-footer-terms">Terms</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row flex-wrap items-center justify-between gap-4">
+            <div className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
+              &copy; {new Date().getFullYear()} Krew Recruiter. All rights reserved.
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid="text-footer-love">
+              <Heart className="h-4 w-4 text-primary" />
+              Built for people who love to serve
             </div>
           </div>
         </div>
