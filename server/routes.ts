@@ -1951,6 +1951,18 @@ export async function registerRoutes(
 
   // ============ SUPER ADMIN ROUTES ============
 
+  // Helper to check if user is super admin (checks both profile and env variable)
+  function checkIsSuperAdmin(userProfile: { email?: string | null; isSuperAdmin?: boolean | null } | null): boolean {
+    // Check if explicitly marked as super admin in profile
+    if (userProfile?.isSuperAdmin) return true;
+    
+    // Also check against SUPER_ADMIN_EMAILS env variable at runtime
+    const email = userProfile?.email?.toLowerCase();
+    if (email && SUPER_ADMIN_EMAILS.includes(email)) return true;
+    
+    return false;
+  }
+
   // Middleware to require super admin
   async function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
     const userId = getUserId(req);
@@ -1959,7 +1971,7 @@ export async function registerRoutes(
     }
 
     const userProfile = await storage.getUserProfile(userId);
-    if (!userProfile?.isSuperAdmin) {
+    if (!checkIsSuperAdmin(userProfile)) {
       return res.status(403).json({ error: "Super admin access required" });
     }
 
@@ -1973,7 +1985,7 @@ export async function registerRoutes(
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
       const userProfile = await storage.getUserProfile(userId);
-      res.json({ isSuperAdmin: userProfile?.isSuperAdmin || false });
+      res.json({ isSuperAdmin: checkIsSuperAdmin(userProfile) });
     } catch (error) {
       console.error("Error checking admin status:", error);
       res.status(500).json({ error: "Failed to check admin status" });
