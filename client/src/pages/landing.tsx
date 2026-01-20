@@ -133,7 +133,7 @@ export default function Landing() {
             <a href="#gigs" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-gigs">
               Krew Gigs
             </a>
-            <a href="#interviews" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-interviews">
+            <a href="/video-interviews" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-interviews">
               Video Interviews
             </a>
             <a href="#testimonials" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-testimonials">
@@ -610,7 +610,7 @@ export default function Landing() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="/login" className="transition-colors duration-200" data-testid="link-footer-post-jobs">Post Jobs</a></li>
                 <li><a href="/login" className="transition-colors duration-200" data-testid="link-footer-post-gigs">Post Gig Shifts</a></li>
-                <li><a href="/login" className="transition-colors duration-200" data-testid="link-footer-video-interviews">Video Interviews</a></li>
+                <li><a href="/video-interviews" className="transition-colors duration-200" data-testid="link-footer-video-interviews">Video Interviews</a></li>
                 <li><a href="/employers" className="transition-colors duration-200" data-testid="link-footer-pricing">Pricing</a></li>
               </ul>
             </div>

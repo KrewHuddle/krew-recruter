@@ -34,6 +34,7 @@ import SeekerGigs from "@/pages/seeker-gigs";
 import Onboarding from "@/pages/onboarding";
 import AdminDashboard from "@/pages/admin-dashboard";
 import CandidateInterview from "@/pages/candidate-interview";
+import VideoInterviews from "@/pages/video-interviews";
 import Login from "@/pages/login";
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
@@ -237,6 +238,8 @@ function AppRouter() {
       <Route path="/gigs" component={GigBoard} />
       
       <Route path="/gigs/join" component={GigJoin} />
+      
+      <Route path="/video-interviews" component={VideoInterviews} />
       
       <Route path="/onboarding">
         <ProtectedRoute>
