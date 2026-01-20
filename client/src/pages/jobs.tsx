@@ -39,12 +39,38 @@ import {
   Download,
   AlertCircle,
   Loader2,
+  Building2,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import { useState, useRef } from "react";
-import type { Job, Location, SponsoredCampaign, JobDistributionChannel } from "@shared/schema";
+import { useLocation } from "wouter";
+import type { Job, Location as LocationType, SponsoredCampaign, JobDistributionChannel } from "@shared/schema";
+
+type ExternalJob = {
+  slug: string;
+  company_name: string;
+  title: string;
+  description: string;
+  remote: boolean;
+  url: string;
+  tags: string[];
+  job_types: string[];
+  location: string;
+  created_at: number;
+};
+
+type ExternalJobsResponse = {
+  jobs: ExternalJob[];
+  totalJobs: number;
+  page: number;
+  totalPages: number;
+  source: string;
+};
 
 type JobWithRelations = Job & {
-  location?: Location;
+  location?: LocationType;
   _count?: { applications: number };
   sponsoredCampaign?: SponsoredCampaign | null;
   distributionChannels?: JobDistributionChannel[];
@@ -167,6 +193,7 @@ function parseCSV(text: string): ParsedCSV {
 export default function Jobs() {
   const { currentTenant } = useTenant();
   const { toast } = useToast();
+  const [, navigate] = useLocation();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
@@ -174,11 +201,24 @@ export default function Jobs() {
   const [parsedData, setParsedData] = useState<ParsedCSV | null>(null);
   const [parseWarning, setParseWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // External job board state
+  const [externalJobsDialogOpen, setExternalJobsDialogOpen] = useState(false);
+  const [externalSearch, setExternalSearch] = useState("");
+  const [externalSearchInput, setExternalSearchInput] = useState("");
+  const [externalPage, setExternalPage] = useState(1);
 
   const { data: jobs, isLoading } = useQuery<JobWithRelations[]>({
     queryKey: ["/api/jobs"],
     enabled: !!currentTenant,
     refetchOnMount: "always",
+  });
+
+  // External jobs query - uses URL with params as queryKey for caching
+  const externalJobsQueryKey = `/api/external-jobs?search=${externalSearch}&page=${externalPage}`;
+  const { data: externalJobsData, isLoading: isLoadingExternalJobs } = useQuery<ExternalJobsResponse>({
+    queryKey: [externalJobsQueryKey],
+    enabled: externalJobsDialogOpen,
   });
 
   const importMutation = useMutation({
@@ -243,6 +283,38 @@ export default function Jobs() {
     a.download = "jobs_import_template.csv";
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExternalSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    setExternalSearch(externalSearchInput);
+    setExternalPage(1);
+  };
+
+  const handleImportExternalJob = (job: ExternalJob) => {
+    // Strip HTML from description
+    const cleanDescription = job.description
+      .replace(/<[^>]*>/g, "")
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .slice(0, 5000);
+
+    // Store imported job data in sessionStorage to pre-fill form
+    const importedData = {
+      title: job.title,
+      description: cleanDescription,
+      role: job.tags?.[0] || "Other",
+      jobType: job.job_types?.includes("Full Time") ? "FULL_TIME" : "PART_TIME",
+      sourceUrl: job.url,
+      sourceCompany: job.company_name,
+    };
+    sessionStorage.setItem("importedJobData", JSON.stringify(importedData));
+    
+    setExternalJobsDialogOpen(false);
+    toast({ title: "Job data imported! Complete the form to create your posting." });
+    navigate("/app/jobs/new");
   };
 
   const filteredJobs = jobs?.filter((job) => {
@@ -428,6 +500,152 @@ export default function Jobs() {
                   )}
                 </div>
               </div>
+            </DialogContent>
+          </Dialog>
+
+          {/* External Job Board Browser */}
+          <Dialog open={externalJobsDialogOpen} onOpenChange={(open) => {
+            setExternalJobsDialogOpen(open);
+            if (!open) {
+              setExternalSearch("");
+              setExternalSearchInput("");
+              setExternalPage(1);
+            }
+          }}>
+            <DialogTrigger asChild>
+              <Button variant="outline" className="gap-2" data-testid="button-browse-job-boards">
+                <Globe className="h-4 w-4" />
+                Browse Job Boards
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-hidden flex flex-col">
+              <DialogHeader>
+                <DialogTitle>Browse External Job Boards</DialogTitle>
+                <DialogDescription>
+                  Search and import job postings from external sources to use as templates
+                </DialogDescription>
+              </DialogHeader>
+              
+              <form onSubmit={handleExternalSearch} className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search jobs (e.g., developer, marketing, sales...)"
+                    value={externalSearchInput}
+                    onChange={(e) => setExternalSearchInput(e.target.value)}
+                    className="pl-9"
+                    data-testid="input-external-search"
+                  />
+                </div>
+                <Button type="submit" data-testid="button-external-search">
+                  Search
+                </Button>
+              </form>
+
+              <div className="flex-1 overflow-y-auto space-y-3 min-h-0">
+                {isLoadingExternalJobs ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                  </div>
+                ) : externalJobsData?.jobs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-12 text-center">
+                    <Globe className="h-12 w-12 text-muted-foreground mb-4" />
+                    <p className="text-muted-foreground">
+                      {externalSearch ? "No jobs found. Try a different search term." : "Search for jobs to get started"}
+                    </p>
+                  </div>
+                ) : (
+                  externalJobsData?.jobs.map((job, index) => (
+                    <Card key={job.slug} className="hover-elevate" data-testid={`card-external-job-${index}`}>
+                      <CardContent className="p-4">
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 mb-1">
+                              <h3 className="font-semibold truncate" data-testid={`text-external-job-title-${index}`}>{job.title}</h3>
+                              {job.remote && (
+                                <Badge variant="secondary" className="shrink-0" data-testid={`badge-remote-${index}`}>Remote</Badge>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                              <Building2 className="h-3 w-3" />
+                              <span className="truncate" data-testid={`text-external-job-company-${index}`}>{job.company_name}</span>
+                              {job.location && (
+                                <>
+                                  <MapPin className="h-3 w-3 ml-2" />
+                                  <span className="truncate" data-testid={`text-external-job-location-${index}`}>{job.location}</span>
+                                </>
+                              )}
+                            </div>
+                            <p className="text-sm text-muted-foreground line-clamp-2" data-testid={`text-external-job-description-${index}`}>
+                              {job.description.replace(/<[^>]*>/g, "").slice(0, 200)}...
+                            </p>
+                            {job.tags && job.tags.length > 0 && (
+                              <div className="flex gap-1 mt-2 flex-wrap">
+                                {job.tags.slice(0, 3).map((tag) => (
+                                  <Badge key={tag} variant="outline" className="text-xs">{tag}</Badge>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-2 shrink-0">
+                            <Button
+                              size="sm"
+                              onClick={() => handleImportExternalJob(job)}
+                              className="gap-1"
+                              data-testid={`button-import-external-${index}`}
+                            >
+                              <ArrowRight className="h-3 w-3" />
+                              Use as Template
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              asChild
+                              data-testid={`link-view-original-${index}`}
+                            >
+                              <a href={job.url} target="_blank" rel="noopener noreferrer" className="gap-1">
+                                <ExternalLink className="h-3 w-3" />
+                                View Original
+                              </a>
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              {externalJobsData && externalJobsData.totalPages > 1 && (
+                <div className="flex items-center justify-between pt-4 border-t" data-testid="external-jobs-pagination">
+                  <p className="text-sm text-muted-foreground" data-testid="text-external-jobs-count">
+                    Showing {externalJobsData.jobs.length} of {externalJobsData.totalJobs} jobs
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExternalPage((p) => Math.max(1, p - 1))}
+                      disabled={externalPage === 1}
+                      data-testid="button-external-prev"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <span className="text-sm" data-testid="text-external-page-info">
+                      Page {externalPage} of {externalJobsData.totalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setExternalPage((p) => Math.min(externalJobsData.totalPages, p + 1))}
+                      disabled={externalPage === externalJobsData.totalPages}
+                      data-testid="button-external-next"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              )}
             </DialogContent>
           </Dialog>
           

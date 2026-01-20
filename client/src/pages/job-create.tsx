@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useLocation } from "wouter";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
@@ -93,6 +93,39 @@ export default function JobCreate() {
       distributionChannels: ["KREW"],
     },
   });
+
+  // Check for imported job data from external job boards
+  useEffect(() => {
+    const importedData = sessionStorage.getItem("importedJobData");
+    if (importedData) {
+      try {
+        const parsed = JSON.parse(importedData);
+        
+        // Pre-fill form with imported data
+        if (parsed.title) form.setValue("title", parsed.title);
+        if (parsed.description) form.setValue("description", parsed.description);
+        if (parsed.jobType) form.setValue("jobType", parsed.jobType);
+        
+        // Try to match role to existing roles, fallback to "Other" if no match
+        if (parsed.role) {
+          const matchedRole = allRoles.find(
+            r => r.toLowerCase() === parsed.role.toLowerCase()
+          );
+          // Use matched role or default to "Other" (which is in BOH_ROLES)
+          form.setValue("role", matchedRole || "Other");
+        } else {
+          // If no role provided, default to "Other"
+          form.setValue("role", "Other");
+        }
+        
+        // Clear the imported data after use
+        sessionStorage.removeItem("importedJobData");
+      } catch (e) {
+        console.error("Failed to parse imported job data:", e);
+        sessionStorage.removeItem("importedJobData");
+      }
+    }
+  }, [form]);
 
   const createMutation = useMutation({
     mutationFn: async (data: JobFormValues) => {

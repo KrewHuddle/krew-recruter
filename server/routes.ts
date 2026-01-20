@@ -490,6 +490,92 @@ export async function registerRoutes(
     }
   );
 
+  // ============ EXTERNAL JOB BOARD IMPORT ============
+
+  // Cache for external job board data (simple in-memory cache)
+  let arbeitnowCache: { data: any[]; timestamp: number } | null = null;
+  const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+  // Fetch jobs from Arbeitnow (free API, no key required)
+  app.get("/api/external-jobs", isAuthenticated, async (req, res) => {
+    try {
+      const { search, page = "1" } = req.query;
+      const pageNum = parseInt(page as string, 10) || 1;
+
+      // Check cache first
+      const now = Date.now();
+      if (arbeitnowCache && (now - arbeitnowCache.timestamp) < CACHE_TTL) {
+        let jobs = arbeitnowCache.data;
+        
+        // Apply search filter
+        if (search && typeof search === "string") {
+          const searchLower = search.toLowerCase();
+          jobs = jobs.filter((job: any) =>
+            job.title?.toLowerCase().includes(searchLower) ||
+            job.company_name?.toLowerCase().includes(searchLower) ||
+            job.description?.toLowerCase().includes(searchLower)
+          );
+        }
+
+        // Paginate (20 per page)
+        const start = (pageNum - 1) * 20;
+        const paginatedJobs = jobs.slice(start, start + 20);
+
+        return res.json({
+          jobs: paginatedJobs,
+          totalJobs: jobs.length,
+          page: pageNum,
+          totalPages: Math.ceil(jobs.length / 20),
+          source: "arbeitnow",
+          cached: true,
+        });
+      }
+
+      // Fetch from Arbeitnow API
+      const response = await fetch("https://www.arbeitnow.com/api/job-board-api", {
+        headers: { "Accept": "application/json" },
+      });
+
+      if (!response.ok) {
+        throw new Error(`Arbeitnow API returned ${response.status}`);
+      }
+
+      const apiData = await response.json();
+      const allJobs = apiData.data || [];
+
+      // Cache the results
+      arbeitnowCache = { data: allJobs, timestamp: now };
+
+      let jobs = allJobs;
+
+      // Apply search filter
+      if (search && typeof search === "string") {
+        const searchLower = search.toLowerCase();
+        jobs = jobs.filter((job: any) =>
+          job.title?.toLowerCase().includes(searchLower) ||
+          job.company_name?.toLowerCase().includes(searchLower) ||
+          job.description?.toLowerCase().includes(searchLower)
+        );
+      }
+
+      // Paginate (20 per page)
+      const start = (pageNum - 1) * 20;
+      const paginatedJobs = jobs.slice(start, start + 20);
+
+      res.json({
+        jobs: paginatedJobs,
+        totalJobs: jobs.length,
+        page: pageNum,
+        totalPages: Math.ceil(jobs.length / 20),
+        source: "arbeitnow",
+        cached: false,
+      });
+    } catch (error) {
+      console.error("Error fetching external jobs:", error);
+      res.status(500).json({ error: "Failed to fetch external jobs" });
+    }
+  });
+
   // ============ APPLICATION ROUTES ============
 
   app.get("/api/applications", isAuthenticated, requireTenant, async (req, res) => {

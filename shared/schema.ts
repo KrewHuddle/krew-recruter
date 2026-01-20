@@ -40,7 +40,8 @@ export const BOH_ROLES = [
   "Line Cook", "Prep Cook", "Grill Cook", "Fry Cook", "Saute Cook",
   "Pantry / Garde Manger", "Pizza Cook", "Sushi Cook", "Breakfast Cook", "Short Order Cook",
   "Broiler Cook", "Pastry Cook", "Baker", "Dishwasher / Steward", "Kitchen Porter",
-  "Butcher", "Catering Prep / Production Cook", "Sous Chef", "Kitchen Manager", "Lead Line Cook"
+  "Butcher", "Catering Prep / Production Cook", "Sous Chef", "Kitchen Manager", "Lead Line Cook",
+  "Other"
 ] as const;
 
 export type FOHRole = typeof FOH_ROLES[number];
