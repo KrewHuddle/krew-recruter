@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -25,6 +26,7 @@ import logoImage from "@assets/3_1768835575859.png";
 import bartenderImage from "@assets/stock_images/american_bartender_s_130b2a50.jpg";
 import serverImage from "@assets/stock_images/american_waiter_serv_e9242854.jpg";
 import chefImage from "@assets/stock_images/american_chef_cookin_bc491ccc.jpg";
+const interviewVideo = "/candidate_recording_video_interview.mp4";
 
 const testimonials = [
   {
@@ -84,6 +86,41 @@ const hospitalityBenefits = [
 ];
 
 export default function Landing() {
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const [showPlayButton, setShowPlayButton] = useState(true);
+  const [videoError, setVideoError] = useState(false);
+
+  useEffect(() => {
+    const video = videoRef.current;
+    if (video) {
+      video.addEventListener('canplay', () => {
+        const playPromise = video.play();
+        if (playPromise !== undefined) {
+          playPromise
+            .then(() => {
+              setShowPlayButton(false);
+            })
+            .catch(() => {
+              setShowPlayButton(true);
+            });
+        }
+      });
+      video.addEventListener('error', () => {
+        setVideoError(true);
+        setShowPlayButton(true);
+      });
+    }
+  }, []);
+
+  const handlePlayClick = () => {
+    const video = videoRef.current;
+    if (video && !videoError) {
+      video.play().then(() => {
+        setShowPlayButton(false);
+      }).catch(() => {});
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
@@ -352,17 +389,39 @@ export default function Landing() {
                     <p className="text-sm text-muted-foreground" data-testid="text-candidate-role">Applying for Server</p>
                   </div>
                 </div>
-                <div className="aspect-video rounded-lg flex flex-wrap items-center justify-center mb-4 relative overflow-hidden" data-testid="video-placeholder">
-                  <img 
-                    src={serverImage} 
-                    alt="Server interview" 
-                    className="absolute inset-0 w-full h-full object-cover"
-                    data-testid="img-interview-preview"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
-                  <div className="relative h-16 w-16 rounded-full bg-primary/90 flex flex-wrap items-center justify-center shadow-xl">
-                    <Play className="h-8 w-8 text-primary-foreground ml-1" />
-                  </div>
+                <div className="aspect-video rounded-lg flex flex-wrap items-center justify-center mb-4 relative overflow-hidden bg-muted" data-testid="video-container">
+                  {!videoError && (
+                    <video 
+                      ref={videoRef}
+                      src={interviewVideo}
+                      poster={serverImage}
+                      autoPlay
+                      loop
+                      muted
+                      playsInline
+                      preload="auto"
+                      className="absolute inset-0 w-full h-full object-cover"
+                      data-testid="video-interview-demo"
+                      onError={() => setVideoError(true)}
+                    />
+                  )}
+                  {videoError && (
+                    <img 
+                      src={serverImage} 
+                      alt="Video interview demo" 
+                      className="absolute inset-0 w-full h-full object-cover"
+                      data-testid="img-interview-fallback"
+                    />
+                  )}
+                  {showPlayButton && !videoError && (
+                    <button
+                      onClick={handlePlayClick}
+                      className="relative z-10 h-16 w-16 rounded-full bg-primary/90 flex items-center justify-center shadow-xl cursor-pointer"
+                      data-testid="button-play-video"
+                    >
+                      <Play className="h-8 w-8 text-primary-foreground ml-1" />
+                    </button>
+                  )}
                 </div>
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-start gap-3">
