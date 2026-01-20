@@ -139,6 +139,9 @@ All routes prefixed with `/api`
 - `DELETE /api/interviews/templates/:id` - Delete template
 - `POST /api/interviews/questions` - Add question
 - `GET /api/interviews/invites` - List interview invites
+- `POST /api/interviews/invites/bulk` - Bulk invite multiple candidates
+- `POST /api/interviews/responses/rate` - Rate a response (1-5 stars)
+- `POST /api/interviews/responses/comment` - Add comment to response
 
 ## Design System
 Professional hospitality theme with:
@@ -211,6 +214,16 @@ npm run build        # Build for production
   - Job seekers trying to access /app/* are redirected to /seeker
   - Employers trying to access /seeker/* are redirected to /app
   - Users without profiles are redirected to /onboarding
+
+### Video Interview Enhancements (January 2026)
+- **Playback Speed Control**: Review video responses at 1x, 1.5x, or 2x speed
+- **Star Rating System**: Rate individual responses 1-5 stars for team evaluation
+- **Comment/Notes System**: Add comments on responses for team collaboration
+- **Bulk Invite**: Send interview invites to multiple candidates at once (up to 100)
+  - Format: "Name, Email" per line or just "Email"
+  - Zod validation and tenant ownership checks
+- **Thinking Time**: Candidates get configurable prep time before recording starts
+- **Security**: All new endpoints enforce multi-tenant isolation via storage layer
 
 ### Super Admin Portal Enhancement (January 2026)
 - **Business Intelligence Dashboard**: Comprehensive analytics for platform management

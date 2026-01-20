@@ -104,6 +104,12 @@ import {
   type InsertImpersonationSession,
   type TenantUsageMetrics,
   type InsertTenantUsageMetrics,
+  type ResponseRating,
+  type InsertResponseRating,
+  type ResponseComment,
+  type InsertResponseComment,
+  responseRatings,
+  responseComments,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
@@ -197,8 +203,18 @@ export interface IStorage {
   // Interview Responses
   getInterviewResponsesByInvite(inviteId: string): Promise<InterviewResponse[]>;
   getInterviewResponse(inviteId: string, questionId: string): Promise<InterviewResponse | undefined>;
+  getInterviewResponseById(id: string): Promise<InterviewResponse | undefined>;
+  getInterviewResponseByIdForTenant(id: string, tenantId: string): Promise<InterviewResponse | undefined>;
   createInterviewResponse(data: InsertInterviewResponse): Promise<InterviewResponse>;
   updateInterviewResponse(id: string, data: Partial<InsertInterviewResponse>): Promise<InterviewResponse | undefined>;
+
+  // Response Ratings
+  getResponseRating(responseId: string, reviewerUserId: string, tenantId: string): Promise<ResponseRating | undefined>;
+  upsertResponseRating(data: InsertResponseRating): Promise<ResponseRating>;
+  
+  // Response Comments
+  createResponseComment(data: InsertResponseComment): Promise<ResponseComment>;
+  getResponseCommentsByResponse(responseId: string, tenantId: string): Promise<ResponseComment[]>;
 
   // Dashboard Stats
   getDashboardStats(tenantId: string): Promise<{
@@ -791,6 +807,26 @@ export class DatabaseStorage implements IStorage {
     return response || undefined;
   }
 
+  async getInterviewResponseById(id: string): Promise<InterviewResponse | undefined> {
+    const [response] = await db
+      .select()
+      .from(interviewResponses)
+      .where(eq(interviewResponses.id, id));
+    return response || undefined;
+  }
+
+  async getInterviewResponseByIdForTenant(id: string, tenantId: string): Promise<InterviewResponse | undefined> {
+    const [result] = await db
+      .select({ response: interviewResponses })
+      .from(interviewResponses)
+      .innerJoin(interviewInvites, eq(interviewResponses.inviteId, interviewInvites.id))
+      .where(and(
+        eq(interviewResponses.id, id),
+        eq(interviewInvites.tenantId, tenantId)
+      ));
+    return result?.response || undefined;
+  }
+
   async createInterviewResponse(data: InsertInterviewResponse): Promise<InterviewResponse> {
     const [response] = await db.insert(interviewResponses).values(data).returning();
     return response;
@@ -803,6 +839,55 @@ export class DatabaseStorage implements IStorage {
       .where(eq(interviewResponses.id, id))
       .returning();
     return response || undefined;
+  }
+
+  // Response Ratings
+  async getResponseRating(responseId: string, reviewerUserId: string, tenantId: string): Promise<ResponseRating | undefined> {
+    const [rating] = await db
+      .select()
+      .from(responseRatings)
+      .where(and(
+        eq(responseRatings.responseId, responseId),
+        eq(responseRatings.reviewerUserId, reviewerUserId),
+        eq(responseRatings.tenantId, tenantId)
+      ));
+    return rating || undefined;
+  }
+
+  async upsertResponseRating(data: InsertResponseRating): Promise<ResponseRating> {
+    const existing = await this.getResponseRating(data.responseId, data.reviewerUserId, data.tenantId);
+    
+    if (existing) {
+      const [updated] = await db
+        .update(responseRatings)
+        .set({ rating: data.rating })
+        .where(and(
+          eq(responseRatings.id, existing.id),
+          eq(responseRatings.tenantId, data.tenantId)
+        ))
+        .returning();
+      return updated;
+    }
+    
+    const [created] = await db.insert(responseRatings).values(data).returning();
+    return created;
+  }
+
+  // Response Comments
+  async createResponseComment(data: InsertResponseComment): Promise<ResponseComment> {
+    const [comment] = await db.insert(responseComments).values(data).returning();
+    return comment;
+  }
+
+  async getResponseCommentsByResponse(responseId: string, tenantId: string): Promise<ResponseComment[]> {
+    return db
+      .select()
+      .from(responseComments)
+      .where(and(
+        eq(responseComments.responseId, responseId),
+        eq(responseComments.tenantId, tenantId)
+      ))
+      .orderBy(desc(responseComments.createdAt));
   }
 
   // Dashboard Stats

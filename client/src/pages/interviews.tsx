@@ -51,6 +51,10 @@ import {
   Play,
   User,
   X,
+  Star,
+  Brain,
+  Users,
+  Loader2,
 } from "lucide-react";
 import type { InterviewTemplate, InterviewQuestion, InterviewInvite, InterviewResponse } from "@shared/schema";
 
@@ -82,6 +86,7 @@ const questionFormSchema = z.object({
   promptText: z.string().min(1, "Question text is required"),
   responseType: z.enum(["VIDEO", "TEXT"]).default("VIDEO"),
   timeLimitSeconds: z.coerce.number().min(30).max(300).default(120),
+  thinkingTimeSeconds: z.coerce.number().min(0).max(120).default(30),
 });
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
@@ -103,6 +108,11 @@ export default function Interviews() {
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [reviewInviteId, setReviewInviteId] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState<string | null>(null);
+  const [playbackSpeed, setPlaybackSpeed] = useState(1);
+  const [responseRatings, setResponseRatings] = useState<Record<string, number>>({});
+  const [responseComments, setResponseComments] = useState<Record<string, string>>({});
+  const [isBulkInviteOpen, setIsBulkInviteOpen] = useState(false);
+  const [bulkEmails, setBulkEmails] = useState("");
 
   const { data: templates, isLoading } = useQuery<TemplateWithQuestions[]>({
     queryKey: ["/api/interviews/templates"],
@@ -211,12 +221,89 @@ export default function Interviews() {
     },
   });
 
+  const bulkInviteMutation = useMutation({
+    mutationFn: async (data: { templateId: string; candidates: { name: string; email: string }[] }) => {
+      return apiRequest("POST", "/api/interviews/invites/bulk", {
+        ...data,
+        tenantId: currentTenant?.id,
+      });
+    },
+    onSuccess: (data: any) => {
+      queryClient.invalidateQueries({ queryKey: ["/api/interviews/invites"] });
+      toast({ 
+        title: `${data.created || 0} invites created!`,
+        description: "Candidates can now access their interviews",
+      });
+      setIsBulkInviteOpen(false);
+      setBulkEmails("");
+    },
+    onError: () => {
+      toast({ title: "Failed to create bulk invites", variant: "destructive" });
+    },
+  });
+
+  const rateResponseMutation = useMutation({
+    mutationFn: async (data: { responseId: string; rating: number }) => {
+      return apiRequest("POST", "/api/interviews/responses/rate", {
+        ...data,
+        tenantId: currentTenant?.id,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Rating saved" });
+    },
+  });
+
+  const addCommentMutation = useMutation({
+    mutationFn: async (data: { responseId: string; comment: string }) => {
+      return apiRequest("POST", "/api/interviews/responses/comment", {
+        ...data,
+        tenantId: currentTenant?.id,
+      });
+    },
+    onSuccess: () => {
+      toast({ title: "Comment added" });
+    },
+  });
+
   const copyInviteLink = (token: string) => {
     const link = `${window.location.origin}/interview/${token}`;
     navigator.clipboard.writeText(link);
     setCopiedLink(token);
     toast({ title: "Link copied to clipboard" });
     setTimeout(() => setCopiedLink(null), 2000);
+  };
+
+  const handleBulkInvite = () => {
+    const lines = bulkEmails.split("\n").filter(line => line.trim());
+    const candidates = lines.map(line => {
+      const parts = line.split(",").map(p => p.trim());
+      if (parts.length >= 2) {
+        return { name: parts[0], email: parts[1] };
+      }
+      return { name: parts[0], email: parts[0] };
+    }).filter(c => c.email.includes("@"));
+
+    if (candidates.length === 0) {
+      toast({ title: "No valid emails found", variant: "destructive" });
+      return;
+    }
+
+    if (!selectedTemplate) {
+      toast({ title: "Please select a template first", variant: "destructive" });
+      return;
+    }
+
+    bulkInviteMutation.mutate({
+      templateId: selectedTemplate.id,
+      candidates,
+    });
+  };
+
+  const handleVideoPlaybackSpeed = (videoElement: HTMLVideoElement | null, speed: number) => {
+    if (videoElement) {
+      videoElement.playbackRate = speed;
+    }
   };
 
   if (!currentTenant) {
@@ -239,6 +326,10 @@ export default function Interviews() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button variant="outline" className="gap-2" onClick={() => setIsBulkInviteOpen(true)} data-testid="button-bulk-invite">
+            <Users className="h-4 w-4" />
+            Bulk Invite
+          </Button>
           <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
             <DialogTrigger asChild>
               <Button variant="outline" className="gap-2" data-testid="button-create-invite">
@@ -530,19 +621,34 @@ export default function Interviews() {
                               </FormItem>
                             )}
                           />
-                          <FormField
-                            control={questionForm.control}
-                            name="timeLimitSeconds"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Time Limit (seconds)</FormLabel>
-                                <FormControl>
-                                  <Input type="number" min={30} max={300} {...field} data-testid="input-question-time" />
-                                </FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
+                          <div className="grid grid-cols-2 gap-4">
+                            <FormField
+                              control={questionForm.control}
+                              name="timeLimitSeconds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Recording Time (seconds)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" min={30} max={300} {...field} data-testid="input-question-time" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                            <FormField
+                              control={questionForm.control}
+                              name="thinkingTimeSeconds"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel>Thinking Time (seconds)</FormLabel>
+                                  <FormControl>
+                                    <Input type="number" min={0} max={120} {...field} data-testid="input-thinking-time" />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+                          </div>
                           <div className="flex justify-end gap-3 pt-4">
                             <Button type="button" variant="outline" onClick={() => setIsQuestionDialogOpen(false)}>
                               Cancel
@@ -582,11 +688,17 @@ export default function Interviews() {
                         </div>
                         <div className="flex-1">
                           <p className="font-medium">{question.promptText}</p>
-                          <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground">
+                          <div className="mt-2 flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
                             <span className="flex items-center gap-1">
                               <Clock className="h-3.5 w-3.5" />
-                              {question.timeLimitSeconds}s
+                              {question.timeLimitSeconds}s recording
                             </span>
+                            {question.thinkingTimeSeconds && question.thinkingTimeSeconds > 0 && (
+                              <span className="flex items-center gap-1">
+                                <Brain className="h-3.5 w-3.5" />
+                                {question.thinkingTimeSeconds}s prep time
+                              </span>
+                            )}
                             <Badge variant={question.responseType === "VIDEO" ? "default" : "secondary"} className="text-xs">
                               {question.responseType === "VIDEO" ? "Video" : "Text"}
                             </Badge>
@@ -700,12 +812,26 @@ export default function Interviews() {
       <Dialog open={!!reviewInviteId} onOpenChange={() => setReviewInviteId(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-4">
               <div>
                 <DialogTitle>Interview Review</DialogTitle>
                 <DialogDescription>
                   {reviewData?.candidateName || "Candidate"} - {reviewData?.template?.name}
                 </DialogDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-muted-foreground">Speed:</span>
+                {[1, 1.5, 2].map((speed) => (
+                  <Button
+                    key={speed}
+                    size="sm"
+                    variant={playbackSpeed === speed ? "default" : "outline"}
+                    onClick={() => setPlaybackSpeed(speed)}
+                    data-testid={`button-speed-${speed}`}
+                  >
+                    {speed}x
+                  </Button>
+                ))}
               </div>
             </div>
           </DialogHeader>
@@ -719,6 +845,9 @@ export default function Interviews() {
             <div className="space-y-6">
               {reviewData.questions.map((question, idx) => {
                 const response = reviewData.responses?.find(r => r.questionId === question.id);
+                const currentRating = response ? responseRatings[response.id] || 0 : 0;
+                const currentComment = response ? responseComments[response.id] || "" : "";
+                
                 return (
                   <div key={question.id} className="border border-border rounded-lg p-4">
                     <div className="flex items-start gap-3 mb-4">
@@ -734,13 +863,16 @@ export default function Interviews() {
                     </div>
                     
                     {response ? (
-                      <div className="ml-11">
+                      <div className="ml-11 space-y-4">
                         {response.type === "VIDEO" && response.videoPath ? (
                           <video
                             src={response.videoPath}
                             controls
                             className="w-full max-w-2xl rounded-lg bg-black aspect-video"
                             data-testid={`video-response-${question.id}`}
+                            ref={(el) => {
+                              if (el) el.playbackRate = playbackSpeed;
+                            }}
                           />
                         ) : response.text ? (
                           <div className="bg-muted rounded-lg p-4">
@@ -749,6 +881,49 @@ export default function Interviews() {
                         ) : (
                           <p className="text-muted-foreground italic">No response submitted</p>
                         )}
+                        
+                        <div className="flex items-center gap-4 flex-wrap pt-2 border-t border-border">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm text-muted-foreground">Rate:</span>
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <button
+                                key={star}
+                                onClick={() => {
+                                  setResponseRatings(prev => ({ ...prev, [response.id]: star }));
+                                  rateResponseMutation.mutate({ responseId: response.id, rating: star });
+                                }}
+                                className="p-0.5"
+                                data-testid={`button-rate-${response.id}-${star}`}
+                              >
+                                <Star
+                                  className={`h-5 w-5 ${star <= currentRating ? "fill-yellow-400 text-yellow-400" : "text-muted-foreground"}`}
+                                />
+                              </button>
+                            ))}
+                          </div>
+                          <div className="flex-1 flex items-center gap-2">
+                            <Input
+                              placeholder="Add a note..."
+                              value={currentComment}
+                              onChange={(e) => setResponseComments(prev => ({ ...prev, [response.id]: e.target.value }))}
+                              className="flex-1"
+                              data-testid={`input-comment-${response.id}`}
+                            />
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                if (currentComment.trim()) {
+                                  addCommentMutation.mutate({ responseId: response.id, comment: currentComment });
+                                }
+                              }}
+                              disabled={!currentComment.trim() || addCommentMutation.isPending}
+                              data-testid={`button-add-comment-${response.id}`}
+                            >
+                              {addCommentMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <MessageSquare className="h-4 w-4" />}
+                            </Button>
+                          </div>
+                        </div>
                       </div>
                     ) : (
                       <div className="ml-11">
@@ -764,6 +939,77 @@ export default function Interviews() {
               No responses to review
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isBulkInviteOpen} onOpenChange={setIsBulkInviteOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Bulk Invite Candidates</DialogTitle>
+            <DialogDescription>
+              Invite multiple candidates at once. Enter one candidate per line in format: Name, Email
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium mb-2 block">Select Template</label>
+              <Select
+                value={selectedTemplate?.id || ""}
+                onValueChange={(id) => {
+                  const template = templates?.find(t => t.id === id);
+                  if (template) setSelectedTemplate(template);
+                }}
+              >
+                <SelectTrigger data-testid="select-bulk-template">
+                  <SelectValue placeholder="Choose a template" />
+                </SelectTrigger>
+                <SelectContent>
+                  {templates?.map((template) => (
+                    <SelectItem key={template.id} value={template.id}>
+                      {template.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <label className="text-sm font-medium mb-2 block">Candidates (one per line)</label>
+              <Textarea
+                placeholder="John Doe, john@email.com&#10;Jane Smith, jane@email.com"
+                value={bulkEmails}
+                onChange={(e) => setBulkEmails(e.target.value)}
+                rows={8}
+                className="font-mono text-sm"
+                data-testid="textarea-bulk-emails"
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Format: Name, Email (or just Email)
+              </p>
+            </div>
+            <div className="flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setIsBulkInviteOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                onClick={handleBulkInvite}
+                disabled={!selectedTemplate || !bulkEmails.trim() || bulkInviteMutation.isPending}
+                className="gap-2"
+                data-testid="button-send-bulk-invites"
+              >
+                {bulkInviteMutation.isPending ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4" />
+                    Send Invites
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

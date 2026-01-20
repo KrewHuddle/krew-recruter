@@ -1379,6 +1379,153 @@ export async function registerRoutes(
     }
   });
 
+  // Bulk invite candidates
+  app.post(
+    "/api/interviews/invites/bulk",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const { templateId, candidates } = req.body;
+        
+        // Validate input
+        const bulkInviteSchema = z.object({
+          templateId: z.string().uuid(),
+          candidates: z.array(z.object({
+            name: z.string().optional(),
+            email: z.string().email(),
+          })).min(1).max(100),
+        });
+        
+        const validated = bulkInviteSchema.safeParse({ templateId, candidates });
+        if (!validated.success) {
+          return res.status(400).json({ error: "Invalid input: Template ID and valid candidate emails are required (max 100)" });
+        }
+        
+        // Verify the template belongs to this tenant
+        const template = await storage.getInterviewTemplate(templateId);
+        if (!template || template.tenantId !== tenantId) {
+          return res.status(403).json({ error: "Template not found or access denied" });
+        }
+        
+        const createdInvites = [];
+        
+        for (const candidate of validated.data.candidates) {
+          const inviteToken = randomBytes(32).toString("hex");
+          
+          const invite = await storage.createInterviewInvite({
+            tenantId,
+            templateId,
+            inviteToken,
+            candidateName: candidate.name || null,
+            candidateEmail: candidate.email || null,
+          });
+          
+          createdInvites.push(invite);
+        }
+        
+        res.json({ created: createdInvites.length, invites: createdInvites });
+      } catch (error) {
+        console.error("Error creating bulk invites:", error);
+        res.status(500).json({ error: "Failed to create bulk invites" });
+      }
+    }
+  );
+
+  // Rate a response
+  app.post(
+    "/api/interviews/responses/rate",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const userId = (req as any).userId;
+        const { responseId, rating } = req.body;
+        
+        // Validate input
+        const ratingSchema = z.object({
+          responseId: z.string().uuid(),
+          rating: z.number().int().min(1).max(5),
+        });
+        
+        const validated = ratingSchema.safeParse({ responseId, rating });
+        if (!validated.success) {
+          return res.status(400).json({ error: "Invalid input: Response ID and rating (1-5) are required" });
+        }
+        
+        // Verify the response belongs to this tenant using tenant-scoped lookup
+        const response = await storage.getInterviewResponseByIdForTenant(responseId, tenantId);
+        if (!response) {
+          return res.status(404).json({ error: "Response not found or access denied" });
+        }
+        
+        // Use storage method which enforces tenant scoping
+        await storage.upsertResponseRating({
+          tenantId,
+          responseId,
+          reviewerUserId: userId,
+          rating,
+        });
+        
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error rating response:", error);
+        res.status(500).json({ error: "Failed to rate response" });
+      }
+    }
+  );
+
+  // Add comment to a response
+  app.post(
+    "/api/interviews/responses/comment",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const userId = (req as any).userId;
+        const { responseId, comment } = req.body;
+        
+        // Validate input
+        const commentSchema = z.object({
+          responseId: z.string().uuid(),
+          comment: z.string().min(1).max(2000),
+        });
+        
+        const validated = commentSchema.safeParse({ responseId, comment });
+        if (!validated.success) {
+          return res.status(400).json({ error: "Invalid input: Response ID and comment are required" });
+        }
+        
+        // Verify the response belongs to this tenant using tenant-scoped lookup
+        const response = await storage.getInterviewResponseByIdForTenant(responseId, tenantId);
+        if (!response) {
+          return res.status(404).json({ error: "Response not found or access denied" });
+        }
+        
+        // Get user name for the comment
+        const user = await storage.getUser(userId);
+        
+        // Use storage method which enforces tenant scoping
+        await storage.createResponseComment({
+          tenantId,
+          responseId,
+          userId,
+          userName: user?.displayName || user?.email || "Unknown",
+          comment,
+        });
+        
+        res.json({ success: true });
+      } catch (error) {
+        console.error("Error adding comment:", error);
+        res.status(500).json({ error: "Failed to add comment" });
+      }
+    }
+  );
+
   // ============ PUBLIC INTERVIEW ROUTES (Candidate) ============
   
   // Get interview by token (public - for candidates)

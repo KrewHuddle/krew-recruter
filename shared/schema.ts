@@ -381,6 +381,11 @@ export const interviewTemplates = pgTable("interview_templates", {
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   name: text("name").notNull(),
   role: text("role"),
+  introVideoPath: text("intro_video_path"),
+  introText: text("intro_text"),
+  outroText: text("outro_text"),
+  emailSubject: text("email_subject"),
+  emailBody: text("email_body"),
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
 }, (table) => [
@@ -406,6 +411,7 @@ export const interviewQuestions = pgTable("interview_questions", {
   promptText: text("prompt_text").notNull(),
   responseType: interviewResponseTypeEnum("response_type").notNull().default("TEXT"),
   timeLimitSeconds: integer("time_limit_seconds").default(120),
+  thinkingTimeSeconds: integer("thinking_time_seconds").default(30),
   maxRetakes: integer("max_retakes").default(3),
   sortOrder: integer("sort_order").default(0),
 }, (table) => [
@@ -497,6 +503,72 @@ export const interviewReviewsRelations = relations(interviewReviews, ({ one }) =
 export const insertInterviewReviewSchema = createInsertSchema(interviewReviews).omit({ id: true, createdAt: true });
 export type InsertInterviewReview = z.infer<typeof insertInterviewReviewSchema>;
 export type InterviewReview = typeof interviewReviews.$inferSelect;
+
+// ============ RESPONSE RATINGS ============
+
+export const responseRatings = pgTable("response_ratings", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  responseId: varchar("response_id").notNull().references(() => interviewResponses.id, { onDelete: "cascade" }),
+  reviewerUserId: varchar("reviewer_user_id").notNull(),
+  rating: integer("rating").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_rating_response").on(table.responseId),
+]);
+
+export const responseRatingsRelations = relations(responseRatings, ({ one }) => ({
+  response: one(interviewResponses, { fields: [responseRatings.responseId], references: [interviewResponses.id] }),
+}));
+
+export const insertResponseRatingSchema = createInsertSchema(responseRatings).omit({ id: true, createdAt: true });
+export type InsertResponseRating = z.infer<typeof insertResponseRatingSchema>;
+export type ResponseRating = typeof responseRatings.$inferSelect;
+
+// ============ RESPONSE COMMENTS ============
+
+export const responseComments = pgTable("response_comments", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  responseId: varchar("response_id").notNull().references(() => interviewResponses.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull(),
+  userName: text("user_name"),
+  comment: text("comment").notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => [
+  index("idx_comment_response").on(table.responseId),
+]);
+
+export const responseCommentsRelations = relations(responseComments, ({ one }) => ({
+  response: one(interviewResponses, { fields: [responseComments.responseId], references: [interviewResponses.id] }),
+}));
+
+export const insertResponseCommentSchema = createInsertSchema(responseComments).omit({ id: true, createdAt: true });
+export type InsertResponseComment = z.infer<typeof insertResponseCommentSchema>;
+export type ResponseComment = typeof responseComments.$inferSelect;
+
+// ============ INTERVIEW ANALYTICS ============
+
+export const interviewAnalytics = pgTable("interview_analytics", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  templateId: varchar("template_id").notNull().references(() => interviewTemplates.id, { onDelete: "cascade" }),
+  totalInvites: integer("total_invites").default(0),
+  completedInvites: integer("completed_invites").default(0),
+  expiredInvites: integer("expired_invites").default(0),
+  avgCompletionTimeSeconds: integer("avg_completion_time_seconds"),
+  lastUpdatedAt: timestamp("last_updated_at").defaultNow(),
+}, (table) => [
+  index("idx_analytics_template").on(table.templateId),
+]);
+
+export const interviewAnalyticsRelations = relations(interviewAnalytics, ({ one }) => ({
+  template: one(interviewTemplates, { fields: [interviewAnalytics.templateId], references: [interviewTemplates.id] }),
+}));
+
+export const insertInterviewAnalyticsSchema = createInsertSchema(interviewAnalytics).omit({ id: true, lastUpdatedAt: true });
+export type InsertInterviewAnalytics = z.infer<typeof insertInterviewAnalyticsSchema>;
+export type InterviewAnalytics = typeof interviewAnalytics.$inferSelect;
 
 // ============ INTEGRATION CONNECTIONS ============
 

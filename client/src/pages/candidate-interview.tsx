@@ -32,6 +32,7 @@ interface InterviewQuestion {
   promptText: string;
   responseType: "VIDEO" | "TEXT";
   timeLimitSeconds: number | null;
+  thinkingTimeSeconds: number | null;
   maxRetakes: number | null;
   sortOrder: number | null;
 }
@@ -77,12 +78,15 @@ export default function CandidateInterview() {
   const [cameraEnabled, setCameraEnabled] = useState(true);
   const [micEnabled, setMicEnabled] = useState(true);
   const [permissionGranted, setPermissionGranted] = useState(false);
+  const [thinkingTimeRemaining, setThinkingTimeRemaining] = useState<number | null>(null);
+  const [isThinkingPhase, setIsThinkingPhase] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const thinkingTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { data: interviewData, isLoading, error } = useQuery<InterviewData>({
     queryKey: ["/api/public/interview", params.token],
@@ -155,8 +159,51 @@ export default function CandidateInterview() {
       if (timerRef.current) {
         clearInterval(timerRef.current);
       }
+      if (thinkingTimerRef.current) {
+        clearInterval(thinkingTimerRef.current);
+      }
     };
   }, [stopStream]);
+
+  const startThinkingTime = useCallback(() => {
+    const currentQuestion = interviewData?.questions[currentQuestionIndex];
+    if (!currentQuestion || currentQuestion.responseType !== "VIDEO") return;
+    
+    const thinkingTime = currentQuestion.thinkingTimeSeconds;
+    if (!thinkingTime || thinkingTime <= 0) return;
+    
+    setIsThinkingPhase(true);
+    setThinkingTimeRemaining(thinkingTime);
+    
+    thinkingTimerRef.current = setInterval(() => {
+      setThinkingTimeRemaining((prev) => {
+        if (prev === null || prev <= 1) {
+          if (thinkingTimerRef.current) {
+            clearInterval(thinkingTimerRef.current);
+            thinkingTimerRef.current = null;
+          }
+          setIsThinkingPhase(false);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+  }, [interviewData, currentQuestionIndex]);
+
+  useEffect(() => {
+    if (hasStarted && interviewData && permissionGranted) {
+      const currentQuestion = interviewData.questions[currentQuestionIndex];
+      if (currentQuestion?.responseType === "VIDEO" && 
+          currentQuestion.thinkingTimeSeconds && 
+          currentQuestion.thinkingTimeSeconds > 0 &&
+          !completedQuestions.has(currentQuestion.id) &&
+          !recordedBlob &&
+          !isRecording &&
+          !isThinkingPhase) {
+        startThinkingTime();
+      }
+    }
+  }, [hasStarted, permissionGranted, currentQuestionIndex, interviewData, completedQuestions, recordedBlob, isRecording, isThinkingPhase, startThinkingTime]);
 
   const handleStart = async () => {
     await startMutation.mutateAsync();
@@ -264,6 +311,11 @@ export default function CandidateInterview() {
     }
     setRetakeCount((prev) => prev + 1);
     setTimeRemaining(null);
+    
+    const currentQuestion = interviewData?.questions[currentQuestionIndex];
+    if (currentQuestion?.thinkingTimeSeconds && currentQuestion.thinkingTimeSeconds > 0) {
+      startThinkingTime();
+    }
   };
 
   const uploadVideoAndSubmit = async () => {
@@ -295,7 +347,7 @@ export default function CandidateInterview() {
         videoPath: objectPath,
       });
 
-      setCompletedQuestions((prev) => new Set([...prev, currentQuestion.id]));
+      setCompletedQuestions((prev) => new Set([...Array.from(prev), currentQuestion.id]));
       toast({ title: "Response submitted successfully" });
       moveToNextQuestion();
     } catch (err) {
@@ -322,7 +374,7 @@ export default function CandidateInterview() {
         text: textAnswer,
       });
 
-      setCompletedQuestions((prev) => new Set([...prev, currentQuestion.id]));
+      setCompletedQuestions((prev) => new Set([...Array.from(prev), currentQuestion.id]));
       toast({ title: "Response submitted successfully" });
       moveToNextQuestion();
     } catch (err) {
@@ -348,6 +400,12 @@ export default function CandidateInterview() {
     setTextAnswer("");
     setRetakeCount(0);
     setTimeRemaining(null);
+    setThinkingTimeRemaining(null);
+    setIsThinkingPhase(false);
+    if (thinkingTimerRef.current) {
+      clearInterval(thinkingTimerRef.current);
+      thinkingTimerRef.current = null;
+    }
 
     if (currentQuestionIndex < interviewData.questions.length - 1) {
       setCurrentQuestionIndex((prev) => prev + 1);
@@ -568,6 +626,36 @@ export default function CandidateInterview() {
                 </div>
               ) : (
                 <div className="space-y-4">
+                  {isThinkingPhase && thinkingTimeRemaining !== null && (
+                    <div className="flex flex-col items-center justify-center py-6 space-y-4" data-testid="thinking-time-countdown">
+                      <div className="text-center">
+                        <p className="text-xl font-semibold text-primary mb-1">Get Ready</p>
+                        <p className="text-sm text-muted-foreground">Take a moment to prepare your answer</p>
+                      </div>
+                      <div className="relative flex items-center justify-center">
+                        <div className="h-24 w-24 rounded-full border-4 border-primary/20 flex items-center justify-center">
+                          <span className="text-4xl font-bold text-primary font-mono">
+                            {thinkingTimeRemaining}
+                          </span>
+                        </div>
+                        <svg className="absolute h-24 w-24 -rotate-90" viewBox="0 0 100 100">
+                          <circle
+                            cx="50"
+                            cy="50"
+                            r="46"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="4"
+                            className="text-primary"
+                            strokeDasharray={`${((currentQuestion.thinkingTimeSeconds || 0) - thinkingTimeRemaining) / (currentQuestion.thinkingTimeSeconds || 1) * 289} 289`}
+                            strokeLinecap="round"
+                          />
+                        </svg>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Recording will start after countdown</p>
+                    </div>
+                  )}
+                  
                   {timeRemaining !== null && isRecording && (
                     <div className="flex items-center justify-center gap-2 text-lg font-mono">
                       <div className="h-3 w-3 rounded-full bg-red-500 animate-pulse" />
@@ -575,7 +663,7 @@ export default function CandidateInterview() {
                     </div>
                   )}
                   
-                  {!recordedBlob ? (
+                  {!isThinkingPhase && !recordedBlob && (
                     <div className="flex gap-2 justify-center">
                       {!isRecording ? (
                         <Button
@@ -599,7 +687,9 @@ export default function CandidateInterview() {
                         </Button>
                       )}
                     </div>
-                  ) : (
+                  )}
+                  
+                  {recordedBlob && (
                     <div className="space-y-4">
                       {recordedUrl && (
                         <video
