@@ -2,7 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
-/* LIGHT MODE - Warm Hospitality Theme (Coral/Teal with Amber accents) */
+/* LIGHT MODE - Purple/Magenta Theme (Matching Logo Colors) */
 :root {
   --button-outline: rgba(0,0,0, .10);
   --badge-outline: rgba(0,0,0, .05);
@@ -14,48 +14,48 @@
   --elevate-1: rgba(0,0,0, .03);
   --elevate-2: rgba(0,0,0, .08);
 
-  --background: 30 25% 98%;
-  --foreground: 200 35% 12%;
+  --background: 270 15% 98%;
+  --foreground: 270 25% 12%;
 
-  --border: 30 15% 88%;
+  --border: 270 12% 88%;
 
   --card: 0 0% 100%;
-  --card-foreground: 200 35% 12%;
-  --card-border: 30 15% 90%;
+  --card-foreground: 270 25% 12%;
+  --card-border: 270 12% 90%;
 
-  --sidebar: 30 20% 97%;
-  --sidebar-foreground: 200 30% 20%;
-  --sidebar-border: 30 15% 90%;
-  --sidebar-primary: 12 76% 58%;
+  --sidebar: 270 15% 97%;
+  --sidebar-foreground: 270 20% 20%;
+  --sidebar-border: 270 12% 90%;
+  --sidebar-primary: 280 70% 52%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 175 45% 92%;
-  --sidebar-accent-foreground: 175 55% 30%;
-  --sidebar-ring: 12 76% 58%;
+  --sidebar-accent: 280 40% 92%;
+  --sidebar-accent-foreground: 280 50% 35%;
+  --sidebar-ring: 280 70% 52%;
 
   --popover: 0 0% 100%;
-  --popover-foreground: 200 35% 12%;
-  --popover-border: 30 15% 88%;
+  --popover-foreground: 270 25% 12%;
+  --popover-border: 270 12% 88%;
 
-  --primary: 12 76% 58%;
+  --primary: 280 70% 52%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 175 55% 42%;
+  --secondary: 320 65% 48%;
   --secondary-foreground: 0 0% 100%;
 
-  --muted: 30 15% 94%;
-  --muted-foreground: 200 15% 45%;
+  --muted: 270 12% 94%;
+  --muted-foreground: 270 12% 45%;
 
-  --accent: 175 45% 92%;
-  --accent-foreground: 175 55% 30%;
+  --accent: 280 40% 92%;
+  --accent-foreground: 280 50% 35%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
-  --input: 30 15% 85%;
-  --ring: 12 76% 58%;
-  --chart-1: 12 76% 58%;
-  --chart-2: 175 55% 42%;
-  --chart-3: 38 92% 55%;
+  --input: 270 12% 85%;
+  --ring: 280 70% 52%;
+  --chart-1: 280 70% 52%;
+  --chart-2: 320 65% 48%;
+  --chart-3: 35 90% 55%;
   --chart-4: 200 70% 50%;
   --chart-5: 340 75% 55%;
 
@@ -115,49 +115,49 @@
   --elevate-1: rgba(255,255,255, .04);
   --elevate-2: rgba(255,255,255, .09);
 
-  --background: 200 30% 8%;
-  --foreground: 30 10% 95%;
+  --background: 270 20% 8%;
+  --foreground: 270 10% 95%;
 
-  --border: 200 20% 18%;
+  --border: 270 15% 18%;
 
-  --card: 200 25% 11%;
-  --card-foreground: 30 10% 95%;
-  --card-border: 200 20% 16%;
+  --card: 270 18% 11%;
+  --card-foreground: 270 10% 95%;
+  --card-border: 270 15% 16%;
 
-  --sidebar: 200 28% 10%;
-  --sidebar-foreground: 30 10% 90%;
-  --sidebar-border: 200 20% 16%;
-  --sidebar-primary: 12 76% 62%;
+  --sidebar: 270 20% 10%;
+  --sidebar-foreground: 270 10% 90%;
+  --sidebar-border: 270 15% 16%;
+  --sidebar-primary: 280 70% 60%;
   --sidebar-primary-foreground: 0 0% 100%;
-  --sidebar-accent: 175 40% 18%;
-  --sidebar-accent-foreground: 175 50% 70%;
-  --sidebar-ring: 12 76% 62%;
+  --sidebar-accent: 280 35% 20%;
+  --sidebar-accent-foreground: 280 50% 75%;
+  --sidebar-ring: 280 70% 60%;
 
-  --popover: 200 25% 11%;
-  --popover-foreground: 30 10% 95%;
-  --popover-border: 200 20% 18%;
+  --popover: 270 18% 11%;
+  --popover-foreground: 270 10% 95%;
+  --popover-border: 270 15% 18%;
 
-  --primary: 12 76% 62%;
+  --primary: 280 70% 60%;
   --primary-foreground: 0 0% 100%;
 
-  --secondary: 175 55% 48%;
+  --secondary: 320 65% 55%;
   --secondary-foreground: 0 0% 100%;
 
-  --muted: 200 20% 18%;
-  --muted-foreground: 30 10% 60%;
+  --muted: 270 15% 18%;
+  --muted-foreground: 270 10% 60%;
 
-  --accent: 175 40% 18%;
-  --accent-foreground: 175 50% 70%;
+  --accent: 280 35% 20%;
+  --accent-foreground: 280 50% 75%;
 
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
 
   /* Used as the border around inputs. Dark mode: Should be a border that is light enough to have high contrast when rendered on a --card background. More contrast than standard --border */
-  --input: 200 20% 25%;
-  --ring: 12 76% 62%;
-  --chart-1: 12 76% 62%;
-  --chart-2: 175 55% 48%;
-  --chart-3: 38 92% 60%;
+  --input: 270 15% 25%;
+  --ring: 280 70% 60%;
+  --chart-1: 280 70% 60%;
+  --chart-2: 320 65% 55%;
+  --chart-3: 35 90% 60%;
   --chart-4: 200 70% 55%;
   --chart-5: 340 75% 60%;
 

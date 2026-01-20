@@ -22,9 +22,9 @@ import {
   Sparkles,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
-import bartenderImage from "@assets/stock_images/professional_bartend_1db7c91e.jpg";
-import serverImage from "@assets/stock_images/friendly_server_wait_3f557bb6.jpg";
-import chefImage from "@assets/stock_images/chef_kitchen_profess_3d2a4a77.jpg";
+import bartenderImage from "@assets/stock_images/american_bartender_s_130b2a50.jpg";
+import serverImage from "@assets/stock_images/american_waiter_serv_e9242854.jpg";
+import chefImage from "@assets/stock_images/american_chef_cookin_bc491ccc.jpg";
 
 const testimonials = [
   {
