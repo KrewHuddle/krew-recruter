@@ -7,6 +7,7 @@ import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeClient";
+import { adzunaService } from "./services/adzuna";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -612,6 +613,53 @@ export async function registerRoutes(
         console.error("Error updating application:", error);
         res.status(500).json({ error: "Failed to update application" });
       }
+    }
+  );
+
+  // ============ EXTERNAL JOBS (ADZUNA) ROUTES ============
+
+  // Check if Adzuna is configured
+  app.get("/api/external-jobs/status", async (req, res) => {
+    res.json({ 
+      configured: adzunaService.isConfigured(),
+      source: "adzuna" 
+    });
+  });
+
+  // Search external jobs (public endpoint for job seekers)
+  app.get("/api/external-jobs", async (req, res) => {
+    try {
+      const { query, location, page, limit } = req.query;
+      
+      const result = await adzunaService.searchJobs({
+        query: (query as string) || "restaurant hospitality",
+        location: location as string,
+        page: parseInt(page as string) || 1,
+        resultsPerPage: parseInt(limit as string) || 20,
+      });
+      
+      res.json({
+        jobs: result.jobs,
+        totalCount: result.totalCount,
+        page: parseInt(page as string) || 1,
+        source: "adzuna",
+        configured: adzunaService.isConfigured(),
+      });
+    } catch (error) {
+      console.error("Error fetching external jobs:", error);
+      res.status(500).json({ error: "Failed to fetch external jobs" });
+    }
+  });
+
+  // Clear Adzuna cache (admin only)
+  app.post(
+    "/api/external-jobs/refresh",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN"),
+    async (req, res) => {
+      adzunaService.clearCache();
+      res.json({ success: true, message: "External jobs cache cleared" });
     }
   );
 

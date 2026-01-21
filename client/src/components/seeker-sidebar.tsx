@@ -32,6 +32,7 @@ import {
   ChevronUp,
   User,
   Bell,
+  Globe,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
 
@@ -39,6 +40,7 @@ const menuItems = [
   { title: "Dashboard", icon: LayoutDashboard, href: "/seeker" },
   { title: "Find Jobs", icon: Briefcase, href: "/jobs" },
   { title: "Find Gigs", icon: Clock, href: "/gigs" },
+  { title: "Browse All Jobs", icon: Globe, href: "/seeker/external-jobs" },
   { title: "My Gigs", icon: FileText, href: "/seeker/gigs" },
   { title: "Saved Jobs", icon: Bookmark, href: "/seeker/saved" },
 ];

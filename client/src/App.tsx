@@ -35,6 +35,7 @@ import Onboarding from "@/pages/onboarding";
 import AdminDashboard from "@/pages/admin-dashboard";
 import CandidateInterview from "@/pages/candidate-interview";
 import VideoInterviews from "@/pages/video-interviews";
+import ExternalJobs from "@/pages/external-jobs";
 import Login from "@/pages/login";
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
@@ -274,6 +275,12 @@ function AppRouter() {
       <Route path="/seeker/gigs">
         <ProtectedSeekerRoute>
           <SeekerGigs />
+        </ProtectedSeekerRoute>
+      </Route>
+      
+      <Route path="/seeker/external-jobs">
+        <ProtectedSeekerRoute>
+          <ExternalJobs />
         </ProtectedSeekerRoute>
       </Route>
       
