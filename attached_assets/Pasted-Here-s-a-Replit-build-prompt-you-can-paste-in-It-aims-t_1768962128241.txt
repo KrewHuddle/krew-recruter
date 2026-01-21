@@ -1,0 +1,130 @@
+Here’s a **Replit build prompt** you can paste in. It aims to create an app with **the same *category* of functionality as Hireflix (one-way / asynchronous video interviews)**, without copying their branding/UI or anything proprietary. Hireflix is positioned as one-way video interview software for screening candidates. ([Hireflix][1])
+
+---
+
+## Replit prompt (copy/paste)
+
+Build a production-ready web app for **asynchronous (one-way) video interviews**—a platform where recruiters create interview “kits” (job + questions) and invite candidates to record video responses on their own time. The app must be mobile-friendly and optimized for high-volume screening.
+
+### Tech stack
+
+* Frontend: React + TypeScript + Tailwind (clean, modern UI)
+* Backend: Node.js (Express or Fastify) + TypeScript
+* Database: Postgres (use Prisma ORM)
+* Auth: email+password + magic link option; JWT sessions
+* Storage: S3-compatible object storage for videos (use presigned upload URLs); store metadata in DB
+* Email: transactional email provider (SendGrid/Mailgun) for invitations + reminders
+* Hosting: run fully in Replit; use env vars for secrets
+
+### Core user roles
+
+* Admin (workspace owner)
+* Recruiter (create interviews, invite candidates)
+* Hiring Manager / Reviewer (view, rate, comment)
+* Candidate (no login required; access via secure token link)
+
+### Data model (minimum)
+
+* Workspace, User, Role, Team
+* Job (title, description, status)
+* InterviewKit (belongs to Job): branding settings, language, deadline, instructions
+* Question: text prompt + optional recorded “question video”, think-time, answer-time, retake policy
+* Candidate, Invitation (tokenized link), Consent record
+* Response: per-question video URL + duration + transcript(optional) + timestamps
+* Review: ratings, notes, tags, pass/fail, share links
+* AuditLog
+
+### Recruiter workflow (must implement)
+
+1. Create Job
+2. Create InterviewKit:
+
+   * Add questions (text + optionally record/upload a short question video)
+   * Configure per-question settings: think time, max answer duration, max retakes (including “0 retakes”), and whether candidate can preview before submitting
+   * Set kit deadline, instructions, and “candidate experience” branding (logo, primary color, welcome text)
+3. Invite candidates:
+
+   * Upload CSV or add manually (name, email)
+   * Send invitation emails with secure token link
+   * Automated reminders (e.g., 24h before deadline and 2 days after invite if not started)
+4. Review dashboard:
+
+   * List candidates with status: invited / started / submitted / expired
+   * Watch responses per candidate, per question
+   * Leave ratings + notes + tags; shortlist/reject
+   * Share a candidate review link internally (authenticated) and optionally export
+
+### Candidate experience (must implement)
+
+* Open token link, accept consent, see instructions + deadline
+* System check page (camera/mic permissions)
+* For each question:
+
+  * Show question text and optional question video
+  * “Think time” countdown (optional) before recording
+  * Record answer with a visible timer (stop at max duration)
+  * Retake logic based on kit settings
+* Submit flow:
+
+  * Confirm submission, then lock responses
+  * Show completion message
+* Must be smooth on mobile and modern browsers
+
+### Video handling requirements
+
+* Record video in-browser (MediaRecorder)
+* Upload directly to object storage via presigned URLs
+* Store metadata: duration, file size, mime type, upload timestamp
+* Generate thumbnails (server-side or client-side capture)
+* Basic playback UI with speed controls
+
+### Collaboration & management
+
+* Role-based access control (RBAC)
+* Multiple reviewers can rate/comment
+* Activity/audit log for key actions (invite sent, submission received, review updated)
+
+### Reporting (basic MVP)
+
+* Time-to-complete per kit
+* Completion rate per kit
+* Candidate funnel counts by status
+  (Keep it simple but real.)
+
+### Integrations (MVP-level)
+
+* Webhooks:
+
+  * interview.submitted
+  * candidate.invited
+  * review.updated
+* CSV export of candidate list + ratings + timestamps
+  (Design it so future ATS integrations are easy—ATS integrations are a common expectation in this space. ([ScreeningHive][2]))
+
+### Non-functional requirements
+
+* Secure token links (random, long, expiring; one candidate = one token; rotate if resent)
+* Rate limiting on candidate endpoints
+* Input validation everywhere
+* GDPR-style delete candidate data (soft delete + hard delete option)
+* Clear error states and loading states
+* Seed data for a demo workspace + sample interview kit
+* Provide a README with setup steps and env vars
+
+### Deliverables
+
+* Full codebase in the Replit project
+* Database migrations + seed script
+* Minimal but polished UI
+* A short “How to demo” section: create kit → invite → complete as candidate → review
+
+### Important constraint
+
+Do NOT copy Hireflix branding, UI, text, or proprietary wording. Build an original product that provides the same general **one-way video interview** capabilities.
+
+---
+
+If you tell me what you’re using for storage (S3, Cloudflare R2, Supabase Storage, etc.) and email (SendGrid vs Mailgun), I can tailor the prompt to the exact services Replit supports in your setup.
+
+[1]: https://hireflix.com/?utm_source=chatgpt.com "Hireflix® Official - #1 One Way Video Interview Software"
+[2]: https://screeninghive.com/tools/hireflix?utm_source=chatgpt.com "Hireflix Overview: Features, Pricing, Reviews & Key Insights"
