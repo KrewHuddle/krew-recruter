@@ -199,6 +199,7 @@ export interface IStorage {
   getInterviewInviteByToken(token: string): Promise<InterviewInvite | undefined>;
   createInterviewInvite(data: InsertInterviewInvite): Promise<InterviewInvite>;
   updateInterviewInvite(id: string, data: Partial<InsertInterviewInvite>): Promise<InterviewInvite | undefined>;
+  deleteInterviewInvite(id: string): Promise<boolean>;
 
   // Interview Responses
   getInterviewResponsesByInvite(inviteId: string): Promise<InterviewResponse[]>;
@@ -207,9 +208,15 @@ export interface IStorage {
   getInterviewResponseByIdForTenant(id: string, tenantId: string): Promise<InterviewResponse | undefined>;
   createInterviewResponse(data: InsertInterviewResponse): Promise<InterviewResponse>;
   updateInterviewResponse(id: string, data: Partial<InsertInterviewResponse>): Promise<InterviewResponse | undefined>;
+  deleteInterviewResponsesByInvite(inviteId: string): Promise<number>;
+  
+  // Response ratings and comments deletion for GDPR
+  deleteResponseRatingsByResponse(responseId: string): Promise<number>;
+  deleteResponseCommentsByResponse(responseId: string): Promise<number>;
 
   // Response Ratings
   getResponseRating(responseId: string, reviewerUserId: string, tenantId: string): Promise<ResponseRating | undefined>;
+  getResponseRatings(responseId: string, tenantId: string): Promise<ResponseRating[]>;
   upsertResponseRating(data: InsertResponseRating): Promise<ResponseRating>;
   
   // Response Comments
@@ -224,6 +231,10 @@ export interface IStorage {
     newApplicants: number;
     openGigs: number;
     pendingAssignments: number;
+    totalInterviews: number;
+    completedInterviews: number;
+    pendingInterviews: number;
+    interviewCompletionRate: number;
   }>;
 
   // Public Jobs
@@ -787,6 +798,13 @@ export class DatabaseStorage implements IStorage {
     return invite || undefined;
   }
 
+  async deleteInterviewInvite(id: string): Promise<boolean> {
+    const result = await db
+      .delete(interviewInvites)
+      .where(eq(interviewInvites.id, id));
+    return true;
+  }
+
   // Interview Responses
   async getInterviewResponsesByInvite(inviteId: string): Promise<InterviewResponse[]> {
     return db
@@ -841,6 +859,48 @@ export class DatabaseStorage implements IStorage {
     return response || undefined;
   }
 
+  async deleteInterviewResponsesByInvite(inviteId: string): Promise<number> {
+    // Count before delete since Drizzle doesn't return affected rows
+    const existing = await db
+      .select()
+      .from(interviewResponses)
+      .where(eq(interviewResponses.inviteId, inviteId));
+    const count = existing.length;
+    
+    await db
+      .delete(interviewResponses)
+      .where(eq(interviewResponses.inviteId, inviteId));
+    return count;
+  }
+
+  async deleteResponseRatingsByResponse(responseId: string): Promise<number> {
+    // Count before delete since Drizzle doesn't return affected rows
+    const existing = await db
+      .select()
+      .from(responseRatings)
+      .where(eq(responseRatings.responseId, responseId));
+    const count = existing.length;
+    
+    await db
+      .delete(responseRatings)
+      .where(eq(responseRatings.responseId, responseId));
+    return count;
+  }
+
+  async deleteResponseCommentsByResponse(responseId: string): Promise<number> {
+    // Count before delete since Drizzle doesn't return affected rows
+    const existing = await db
+      .select()
+      .from(responseComments)
+      .where(eq(responseComments.responseId, responseId));
+    const count = existing.length;
+    
+    await db
+      .delete(responseComments)
+      .where(eq(responseComments.responseId, responseId));
+    return count;
+  }
+
   // Response Ratings
   async getResponseRating(responseId: string, reviewerUserId: string, tenantId: string): Promise<ResponseRating | undefined> {
     const [rating] = await db
@@ -852,6 +912,16 @@ export class DatabaseStorage implements IStorage {
         eq(responseRatings.tenantId, tenantId)
       ));
     return rating || undefined;
+  }
+
+  async getResponseRatings(responseId: string, tenantId: string): Promise<ResponseRating[]> {
+    return db
+      .select()
+      .from(responseRatings)
+      .where(and(
+        eq(responseRatings.responseId, responseId),
+        eq(responseRatings.tenantId, tenantId)
+      ));
   }
 
   async upsertResponseRating(data: InsertResponseRating): Promise<ResponseRating> {
@@ -898,6 +968,10 @@ export class DatabaseStorage implements IStorage {
     newApplicants: number;
     openGigs: number;
     pendingAssignments: number;
+    totalInterviews: number;
+    completedInterviews: number;
+    pendingInterviews: number;
+    interviewCompletionRate: number;
   }> {
     const oneWeekAgo = new Date();
     oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -932,6 +1006,27 @@ export class DatabaseStorage implements IStorage {
       .from(gigAssignments)
       .where(and(eq(gigAssignments.tenantId, tenantId), eq(gigAssignments.status, "PENDING")));
 
+    const [totalInterviewsResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(interviewInvites)
+      .where(eq(interviewInvites.tenantId, tenantId));
+
+    const [completedInterviewsResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(interviewInvites)
+      .where(and(eq(interviewInvites.tenantId, tenantId), eq(interviewInvites.status, "COMPLETED")));
+
+    const [pendingInterviewsResult] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(interviewInvites)
+      .where(and(eq(interviewInvites.tenantId, tenantId), eq(interviewInvites.status, "PENDING")));
+
+    const totalInterviews = totalInterviewsResult?.count || 0;
+    const completedInterviews = completedInterviewsResult?.count || 0;
+    const interviewCompletionRate = totalInterviews > 0 
+      ? Math.round((completedInterviews / totalInterviews) * 100) 
+      : 0;
+
     return {
       totalJobs: totalJobsResult?.count || 0,
       activeJobs: activeJobsResult?.count || 0,
@@ -939,6 +1034,10 @@ export class DatabaseStorage implements IStorage {
       newApplicants: newApplicantsResult?.count || 0,
       openGigs: openGigsResult?.count || 0,
       pendingAssignments: pendingAssignmentsResult?.count || 0,
+      totalInterviews,
+      completedInterviews,
+      pendingInterviews: pendingInterviewsResult?.count || 0,
+      interviewCompletionRate,
     };
   }
 

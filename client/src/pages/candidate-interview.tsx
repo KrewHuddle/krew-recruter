@@ -1,13 +1,15 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useParams } from "wouter";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { SystemCheck } from "@/components/system-check";
 import {
   Video,
   Mic,
@@ -24,6 +26,8 @@ import {
   AlertCircle,
   Loader2,
   CheckCircle2,
+  Calendar,
+  ArrowRight,
 } from "lucide-react";
 import logoUrl from "@assets/3_1768835575859.png";
 
@@ -49,12 +53,21 @@ interface InterviewData {
     id: string;
     status: string;
     candidateName: string | null;
+    candidateEmail: string | null;
     deadlineAt: string | null;
+    consentAcceptedAt: string | null;
+    systemCheckPassedAt: string | null;
+    startedAt: string | null;
+    completedAt: string | null;
   };
   template: {
     id: string;
     name: string;
     role: string | null;
+    introText: string | null;
+    outroText: string | null;
+    brandPrimaryColor: string | null;
+    language: string | null;
   };
   questions: InterviewQuestion[];
   existingResponses: ExistingResponse[];
@@ -64,6 +77,8 @@ interface InterviewData {
 export default function CandidateInterview() {
   const params = useParams<{ token: string }>();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [consentChecked, setConsentChecked] = useState(false);
   
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [isRecording, setIsRecording] = useState(false);
@@ -115,6 +130,30 @@ export default function CandidateInterview() {
   const completeMutation = useMutation({
     mutationFn: async () => {
       return fetch(`/api/public/interview/${params.token}/complete`, { method: "POST" });
+    },
+  });
+
+  const consentMutation = useMutation({
+    mutationFn: async () => {
+      return fetch(`/api/public/interview/${params.token}/consent`, { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/public/interview", params.token] });
+    },
+    onError: () => {
+      toast({ title: "Failed to accept consent", variant: "destructive" });
+    },
+  });
+
+  const systemCheckMutation = useMutation({
+    mutationFn: async () => {
+      return fetch(`/api/public/interview/${params.token}/system-check`, { method: "POST" });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/public/interview", params.token] });
+    },
+    onError: () => {
+      toast({ title: "Failed to save system check", variant: "destructive" });
     },
   });
 
@@ -444,6 +483,102 @@ export default function CandidateInterview() {
             </p>
           </CardContent>
         </Card>
+      </div>
+    );
+  }
+
+  const brandColor = interviewData.template.brandPrimaryColor || undefined;
+
+  if (!interviewData.invite.consentAcceptedAt) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <Card className="w-full max-w-lg">
+          <CardHeader className="text-center">
+            <img src={logoUrl} alt="Krew" className="h-12 mx-auto mb-4" />
+            <CardTitle className="text-2xl">Video Interview</CardTitle>
+            <CardDescription>
+              {interviewData.organization} • {interviewData.template.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {interviewData.invite.candidateName && (
+              <p className="text-center text-lg">
+                Welcome, <strong>{interviewData.invite.candidateName}</strong>!
+              </p>
+            )}
+
+            <div className="bg-muted/50 rounded-lg p-4 space-y-3">
+              <h3 className="font-semibold">Before you begin:</h3>
+              <ul className="space-y-2 text-sm text-muted-foreground">
+                <li className="flex items-start gap-2">
+                  <Video className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>You'll record video responses to {interviewData.questions.length} questions</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <Clock className="h-4 w-4 mt-0.5 shrink-0" />
+                  <span>Each question has a time limit for your response</span>
+                </li>
+                {interviewData.invite.deadlineAt && (
+                  <li className="flex items-start gap-2">
+                    <Calendar className="h-4 w-4 mt-0.5 shrink-0" />
+                    <span>
+                      Complete by: {new Date(interviewData.invite.deadlineAt).toLocaleDateString(undefined, {
+                        weekday: "long",
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </span>
+                  </li>
+                )}
+              </ul>
+            </div>
+
+            <div className="flex items-start gap-3 p-4 border rounded-lg">
+              <Checkbox 
+                id="consent" 
+                checked={consentChecked}
+                onCheckedChange={(checked) => setConsentChecked(checked === true)}
+                data-testid="checkbox-consent"
+              />
+              <label htmlFor="consent" className="text-sm cursor-pointer">
+                I consent to have my video responses recorded and shared with {interviewData.organization} 
+                for the purpose of evaluating my job application. I understand that my 
+                responses will be stored securely and reviewed by the hiring team.
+              </label>
+            </div>
+          </CardContent>
+          <CardFooter>
+            <Button 
+              className="w-full gap-2" 
+              disabled={!consentChecked || consentMutation.isPending}
+              onClick={() => consentMutation.mutate()}
+              style={brandColor ? { backgroundColor: brandColor } : undefined}
+              data-testid="button-accept-consent"
+            >
+              {consentMutation.isPending ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <>
+                  Continue
+                  <ArrowRight className="h-4 w-4" />
+                </>
+              )}
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  if (!interviewData.invite.systemCheckPassedAt) {
+    return (
+      <div className="min-h-screen bg-muted/30 flex items-center justify-center p-4">
+        <SystemCheck 
+          onComplete={() => systemCheckMutation.mutate()}
+        />
       </div>
     );
   }

@@ -1434,6 +1434,178 @@ export async function registerRoutes(
     }
   );
 
+  // GDPR: Delete candidate interview data (complete deletion with audit trail)
+  app.delete(
+    "/api/interviews/invites/:inviteId/gdpr",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const userId = (req as any).userId;
+        const { inviteId } = req.params;
+        
+        // Verify the invite belongs to this tenant
+        const invite = await storage.getInterviewInvite(inviteId);
+        if (!invite || invite.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Interview invite not found" });
+        }
+        
+        // Get all responses for this invite
+        const responses = await storage.getInterviewResponsesByInvite(inviteId);
+        let deletedFiles = 0;
+        let deletedRatings = 0;
+        let deletedComments = 0;
+        
+        // Explicitly delete all related data for GDPR compliance
+        for (const response of responses) {
+          // Delete video files from object storage
+          if (response.videoPath) {
+            try {
+              await objectStorageService.deleteObject(response.videoPath);
+              deletedFiles++;
+            } catch (err) {
+              console.error("Failed to delete video:", response.videoPath, err);
+            }
+          }
+          
+          // Delete ratings for this response
+          const ratingsDeleted = await storage.deleteResponseRatingsByResponse(response.id);
+          deletedRatings += ratingsDeleted;
+          
+          // Delete comments for this response
+          const commentsDeleted = await storage.deleteResponseCommentsByResponse(response.id);
+          deletedComments += commentsDeleted;
+        }
+        
+        // Delete all responses for this invite
+        await storage.deleteInterviewResponsesByInvite(inviteId);
+        
+        // Delete the invite itself
+        const deleted = await storage.deleteInterviewInvite(inviteId);
+        if (!deleted) {
+          return res.status(500).json({ error: "Failed to delete interview invite" });
+        }
+        
+        // Log the GDPR deletion for audit
+        const auditLog = {
+          action: "GDPR_DELETE",
+          userId,
+          tenantId,
+          inviteId,
+          candidateEmail: invite.candidateEmail,
+          deletedAt: new Date().toISOString(),
+          deletedResponses: responses.length,
+          deletedFiles,
+          deletedRatings,
+          deletedComments,
+        };
+        console.log("GDPR DELETE AUDIT:", JSON.stringify(auditLog));
+        
+        res.json({ 
+          success: true, 
+          message: "Candidate interview data permanently deleted",
+          audit: {
+            deletedResponses: responses.length,
+            deletedFiles,
+            deletedRatings,
+            deletedComments,
+          },
+        });
+      } catch (error) {
+        console.error("Error performing GDPR delete:", error);
+        res.status(500).json({ error: "Failed to delete candidate data" });
+      }
+    }
+  );
+
+  // Export interview candidates with ratings as CSV (with pagination limit)
+  app.get(
+    "/api/interviews/export",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const { templateId, limit: limitStr } = req.query;
+        
+        // Limit to 500 records by default to prevent timeout
+        const maxRecords = Math.min(Number(limitStr) || 500, 1000);
+        
+        // Get all invites for this tenant (optionally filtered by template)
+        let invites = await storage.getInterviewInvitesByTenant(tenantId);
+        
+        if (templateId && typeof templateId === "string") {
+          invites = invites.filter(inv => inv.templateId === templateId);
+        }
+        
+        // Apply limit to prevent timeout on large exports
+        invites = invites.slice(0, maxRecords);
+        
+        // Build CSV data
+        const headers = [
+          "Candidate Name",
+          "Candidate Email",
+          "Template",
+          "Status",
+          "Sent At",
+          "Started At",
+          "Completed At",
+          "Deadline",
+          "Response Count",
+          "Average Rating",
+        ];
+        
+        const rows: string[][] = [];
+        
+        for (const invite of invites) {
+          const template = await storage.getInterviewTemplate(invite.templateId);
+          const responses = await storage.getInterviewResponsesByInvite(invite.id);
+          
+          // Calculate average rating from response ratings
+          let totalRating = 0;
+          let ratingCount = 0;
+          for (const resp of responses) {
+            const ratings = await storage.getResponseRatings(resp.id, tenantId);
+            for (const r of ratings) {
+              totalRating += r.rating;
+              ratingCount++;
+            }
+          }
+          const avgRating = ratingCount > 0 ? (totalRating / ratingCount).toFixed(1) : "N/A";
+          
+          rows.push([
+            invite.candidateName || "",
+            invite.candidateEmail || "",
+            template?.name || "",
+            invite.status,
+            invite.createdAt?.toISOString() || "",
+            invite.startedAt?.toISOString() || "",
+            invite.completedAt?.toISOString() || "",
+            invite.deadlineAt?.toISOString() || "",
+            responses.length.toString(),
+            avgRating,
+          ]);
+        }
+        
+        // Build CSV string
+        const csvContent = [
+          headers.join(","),
+          ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(",")),
+        ].join("\n");
+        
+        res.setHeader("Content-Type", "text/csv");
+        res.setHeader("Content-Disposition", "attachment; filename=interview-candidates.csv");
+        res.send(csvContent);
+      } catch (error) {
+        console.error("Error exporting interviews:", error);
+        res.status(500).json({ error: "Failed to export interviews" });
+      }
+    }
+  );
+
   // Rate a response
   app.post(
     "/api/interviews/responses/rate",
@@ -1559,18 +1731,28 @@ export async function registerRoutes(
           id: invite.id,
           status: invite.status,
           candidateName: invite.candidateName,
+          candidateEmail: invite.candidateEmail,
           deadlineAt: invite.deadlineAt,
+          consentAcceptedAt: invite.consentAcceptedAt,
+          systemCheckPassedAt: invite.systemCheckPassedAt,
+          startedAt: invite.startedAt,
+          completedAt: invite.completedAt,
         },
         template: {
           id: template?.id,
           name: template?.name,
           role: template?.role,
+          introText: template?.introText,
+          outroText: template?.outroText,
+          brandPrimaryColor: template?.brandPrimaryColor,
+          language: template?.language,
         },
         questions: questions.map(q => ({
           id: q.id,
           promptText: q.promptText,
           responseType: q.responseType,
           timeLimitSeconds: q.timeLimitSeconds,
+          thinkingTimeSeconds: q.thinkingTimeSeconds,
           maxRetakes: q.maxRetakes,
           sortOrder: q.sortOrder,
         })),
@@ -1588,6 +1770,56 @@ export async function registerRoutes(
     }
   });
   
+  // Accept consent for interview
+  app.post("/api/public/interview/:token/consent", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "COMPLETED" || invite.status === "EXPIRED") {
+        return res.status(400).json({ error: "Interview is no longer available" });
+      }
+      
+      await storage.updateInterviewInvite(invite.id, { 
+        consentAcceptedAt: new Date() 
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error accepting consent:", error);
+      res.status(500).json({ error: "Failed to accept consent" });
+    }
+  });
+
+  // Record system check passed
+  app.post("/api/public/interview/:token/system-check", async (req, res) => {
+    try {
+      const { token } = req.params;
+      const invite = await storage.getInterviewInviteByToken(token);
+      
+      if (!invite) {
+        return res.status(404).json({ error: "Interview not found" });
+      }
+      
+      if (invite.status === "COMPLETED" || invite.status === "EXPIRED") {
+        return res.status(400).json({ error: "Interview is no longer available" });
+      }
+      
+      await storage.updateInterviewInvite(invite.id, { 
+        systemCheckPassedAt: new Date() 
+      });
+      
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error recording system check:", error);
+      res.status(500).json({ error: "Failed to record system check" });
+    }
+  });
+  
   // Start interview (update status to IN_PROGRESS)
   app.post("/api/public/interview/:token/start", async (req, res) => {
     try {
@@ -1599,7 +1831,10 @@ export async function registerRoutes(
       }
       
       if (invite.status === "PENDING") {
-        await storage.updateInterviewInvite(invite.id, { status: "IN_PROGRESS" });
+        await storage.updateInterviewInvite(invite.id, { 
+          status: "IN_PROGRESS",
+          startedAt: new Date()
+        });
       }
       
       res.json({ success: true });
@@ -1925,6 +2160,19 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error fetching integrations:", error);
       res.status(500).json({ error: "Failed to fetch integrations" });
+    }
+  });
+
+  // Get upload URL for authenticated users (e.g., video prompts)
+  app.post("/api/upload-url", isAuthenticated, async (req, res) => {
+    try {
+      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
+      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
+      
+      res.json({ uploadURL, objectPath });
+    } catch (error) {
+      console.error("Error getting upload URL:", error);
+      res.status(500).json({ error: "Failed to get upload URL" });
     }
   });
 

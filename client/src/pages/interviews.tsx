@@ -1,10 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { VideoRecorder } from "@/components/video-recorder";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -93,6 +94,7 @@ const questionFormSchema = z.object({
   timeLimitSeconds: z.coerce.number().min(30).max(300).default(120),
   thinkingTimeSeconds: z.coerce.number().min(0).max(120).default(30),
   maxRetakes: z.coerce.number().min(0).max(10).default(3),
+  videoPromptPath: z.string().optional(),
 });
 
 type QuestionFormValues = z.infer<typeof questionFormSchema>;
@@ -101,6 +103,7 @@ const inviteFormSchema = z.object({
   templateId: z.string().min(1, "Template is required"),
   candidateName: z.string().min(1, "Candidate name is required"),
   candidateEmail: z.string().email("Valid email required"),
+  deadlineDays: z.coerce.number().min(1).max(30).optional(),
 });
 
 type InviteFormValues = z.infer<typeof inviteFormSchema>;
@@ -119,6 +122,9 @@ export default function Interviews() {
   const [responseComments, setResponseComments] = useState<Record<string, string>>({});
   const [isBulkInviteOpen, setIsBulkInviteOpen] = useState(false);
   const [bulkEmails, setBulkEmails] = useState("");
+  const [isRecordingVideoPrompt, setIsRecordingVideoPrompt] = useState(false);
+  const [videoPromptBlob, setVideoPromptBlob] = useState<Blob | null>(null);
+  const [videoPromptUploading, setVideoPromptUploading] = useState(false);
 
   const { data: templates, isLoading } = useQuery<TemplateWithQuestions[]>({
     queryKey: ["/api/interviews/templates"],
@@ -155,12 +161,12 @@ export default function Interviews() {
 
   const questionForm = useForm<QuestionFormValues>({
     resolver: zodResolver(questionFormSchema),
-    defaultValues: { promptText: "", responseType: "VIDEO", timeLimitSeconds: 120, thinkingTimeSeconds: 30, maxRetakes: 3 },
+    defaultValues: { promptText: "", responseType: "VIDEO", timeLimitSeconds: 120, thinkingTimeSeconds: 30, maxRetakes: 3, videoPromptPath: "" },
   });
 
   const inviteForm = useForm<InviteFormValues>({
     resolver: zodResolver(inviteFormSchema),
-    defaultValues: { templateId: "", candidateName: "", candidateEmail: "" },
+    defaultValues: { templateId: "", candidateName: "", candidateEmail: "", deadlineDays: 7 },
   });
 
   const createTemplateMutation = useMutation({
@@ -193,6 +199,8 @@ export default function Interviews() {
       queryClient.invalidateQueries({ queryKey: ["/api/interviews/templates"] });
       toast({ title: "Question added successfully" });
       setIsQuestionDialogOpen(false);
+      setIsRecordingVideoPrompt(false);
+      setVideoPromptBlob(null);
       questionForm.reset();
     },
     onError: () => {
@@ -216,8 +224,13 @@ export default function Interviews() {
 
   const createInviteMutation = useMutation({
     mutationFn: async (data: InviteFormValues) => {
+      const { deadlineDays, ...rest } = data;
+      const deadlineAt = deadlineDays 
+        ? new Date(Date.now() + deadlineDays * 24 * 60 * 60 * 1000).toISOString()
+        : null;
       return apiRequest("POST", "/api/interviews/invites", {
-        ...data,
+        ...rest,
+        deadlineAt,
         tenantId: currentTenant?.id,
       });
     },
@@ -342,6 +355,15 @@ export default function Interviews() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button 
+            variant="outline" 
+            className="gap-2" 
+            onClick={() => window.open("/api/interviews/export", "_blank")}
+            data-testid="button-export-csv"
+          >
+            <FileText className="h-4 w-4" />
+            Export CSV
+          </Button>
           <Button variant="outline" className="gap-2" onClick={() => setIsBulkInviteOpen(true)} data-testid="button-bulk-invite">
             <Users className="h-4 w-4" />
             Bulk Invite
@@ -411,6 +433,29 @@ export default function Interviews() {
                         <FormControl>
                           <Input type="email" placeholder="john@example.com" {...field} data-testid="input-candidate-email" />
                         </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={inviteForm.control}
+                    name="deadlineDays"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Response Deadline (Days)</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="number" 
+                            min={1} 
+                            max={30} 
+                            placeholder="7" 
+                            {...field} 
+                            data-testid="input-deadline-days" 
+                          />
+                        </FormControl>
+                        <p className="text-xs text-muted-foreground">
+                          Candidate must complete the interview within this many days
+                        </p>
                         <FormMessage />
                       </FormItem>
                     )}
@@ -769,11 +814,87 @@ export default function Interviews() {
                               )}
                             />
                           </div>
+                          <div className="space-y-2">
+                            <FormLabel>Video Prompt (Optional)</FormLabel>
+                            <p className="text-xs text-muted-foreground">
+                              Record a video to introduce this question to candidates
+                            </p>
+                            {videoPromptBlob ? (
+                              <div className="space-y-2">
+                                <video 
+                                  src={URL.createObjectURL(videoPromptBlob)} 
+                                  controls 
+                                  className="w-full rounded-lg max-h-32"
+                                />
+                                <div className="flex gap-2">
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="gap-2"
+                                    onClick={() => {
+                                      setVideoPromptBlob(null);
+                                      questionForm.setValue("videoPromptPath", "");
+                                    }}
+                                    data-testid="button-remove-video-prompt"
+                                  >
+                                    <X className="h-3 w-3" />
+                                    Remove
+                                  </Button>
+                                </div>
+                              </div>
+                            ) : isRecordingVideoPrompt ? (
+                              <div className="border rounded-lg p-4">
+                                <VideoRecorder
+                                  maxDurationSeconds={60}
+                                  maxRetakes={5}
+                                  onRecordingComplete={async (blob, duration) => {
+                                    setVideoPromptBlob(blob);
+                                    setVideoPromptUploading(true);
+                                    try {
+                                      const res = await fetch("/api/upload-url", { method: "POST" });
+                                      const { uploadURL, objectPath } = await res.json();
+                                      await fetch(uploadURL, { 
+                                        method: "PUT", 
+                                        body: blob,
+                                        headers: { "Content-Type": blob.type }
+                                      });
+                                      questionForm.setValue("videoPromptPath", objectPath);
+                                      toast({ title: "Video prompt uploaded" });
+                                    } catch (err) {
+                                      toast({ title: "Failed to upload video", variant: "destructive" });
+                                    } finally {
+                                      setVideoPromptUploading(false);
+                                      setIsRecordingVideoPrompt(false);
+                                    }
+                                  }}
+                                  onCancel={() => setIsRecordingVideoPrompt(false)}
+                                  disabled={videoPromptUploading}
+                                />
+                              </div>
+                            ) : (
+                              <Button 
+                                type="button" 
+                                variant="outline" 
+                                size="sm" 
+                                className="gap-2"
+                                onClick={() => setIsRecordingVideoPrompt(true)}
+                                data-testid="button-record-video-prompt"
+                              >
+                                <Video className="h-4 w-4" />
+                                Record Video Prompt
+                              </Button>
+                            )}
+                          </div>
                           <div className="flex justify-end gap-3 pt-4">
-                            <Button type="button" variant="outline" onClick={() => setIsQuestionDialogOpen(false)}>
+                            <Button type="button" variant="outline" onClick={() => {
+                              setIsQuestionDialogOpen(false);
+                              setIsRecordingVideoPrompt(false);
+                              setVideoPromptBlob(null);
+                            }}>
                               Cancel
                             </Button>
-                            <Button type="submit" disabled={addQuestionMutation.isPending} data-testid="button-save-question">
+                            <Button type="submit" disabled={addQuestionMutation.isPending || videoPromptUploading} data-testid="button-save-question">
                               {addQuestionMutation.isPending ? "Adding..." : "Add Question"}
                             </Button>
                           </div>

@@ -14,6 +14,8 @@ import {
   ArrowRight,
   MapPin,
   Calendar,
+  Video,
+  CheckCircle2,
 } from "lucide-react";
 import type { Job, Application, GigPost, Location } from "@shared/schema";
 
@@ -24,6 +26,10 @@ interface DashboardStats {
   newApplicants: number;
   openGigs: number;
   pendingAssignments: number;
+  totalInterviews: number;
+  completedInterviews: number;
+  pendingInterviews: number;
+  interviewCompletionRate: number;
 }
 
 export default function Dashboard() {
@@ -166,18 +172,21 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between gap-2 pb-2">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              Hiring Rate
+              Video Interviews
             </CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+            <Video className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
             {statsLoading ? (
               <Skeleton className="h-8 w-16" />
             ) : (
               <>
-                <div className="text-2xl font-bold">24%</div>
+                <div className="text-2xl font-bold">
+                  {stats?.completedInterviews || 0}
+                  <span className="text-sm font-normal text-muted-foreground">/{stats?.totalInterviews || 0}</span>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  +5% from last month
+                  {stats?.interviewCompletionRate || 0}% completion rate
                 </p>
               </>
             )}
