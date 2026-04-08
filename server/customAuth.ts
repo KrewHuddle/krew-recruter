@@ -3,6 +3,7 @@ import session from "express-session";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 import { db } from "./db";
+import { pool } from "./db";
 import { users, passwordResetTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
@@ -13,7 +14,7 @@ export function getSession() {
   const sessionTtl = 7 * 24 * 60 * 60 * 1000; // 1 week
   const pgStore = connectPg(session);
   const sessionStore = new pgStore({
-    conString: process.env.DATABASE_URL,
+    pool,
     createTableIfMissing: false,
     ttl: sessionTtl,
     tableName: "sessions",
