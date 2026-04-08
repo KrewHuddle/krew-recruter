@@ -55,10 +55,19 @@ export function getDb() {
   return _db;
 }
 
-// Lazy proxies so existing `import { db, pool }` calls work without changes
+// Lazy proxies so existing `import { db, pool }` calls work without changes.
+// Methods are bound to the real instance so `this` context is preserved.
 export const pool: pg.Pool = new Proxy({} as pg.Pool, {
-  get(_, prop) { return (getPool() as any)[prop]; },
+  get(_, prop) {
+    const target = getPool();
+    const value = (target as any)[prop];
+    return typeof value === "function" ? value.bind(target) : value;
+  },
 });
 export const db: ReturnType<typeof drizzle> = new Proxy({} as any, {
-  get(_, prop) { return (getDb() as any)[prop]; },
+  get(_, prop) {
+    const target = getDb();
+    const value = (target as any)[prop];
+    return typeof value === "function" ? value.bind(target) : value;
+  },
 });
