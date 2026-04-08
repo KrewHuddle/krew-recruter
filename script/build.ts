@@ -8,6 +8,7 @@ const allowlist = [
   "bcryptjs",
   "connect-pg-simple",
   "cookie-parser",
+  "dotenv",
   "date-fns",
   "drizzle-orm",
   "drizzle-zod",
