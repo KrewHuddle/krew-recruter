@@ -11,7 +11,7 @@ const httpServer = createServer(app);
 // Log env var status on startup
 console.log("=== Environment Check ===");
 console.log("NODE_ENV:", process.env.NODE_ENV || "NOT SET");
-console.log("DATABASE_URL:", process.env.DATABASE_URL ? "SET (host: " + new URL(process.env.DATABASE_URL).hostname + ")" : "NOT SET");
+console.log("DATABASE_URL:", process.env.DATABASE_URL ? "SET (" + process.env.DATABASE_URL.substring(0, 30) + "...)" : "NOT SET");
 console.log("SESSION_SECRET:", process.env.SESSION_SECRET ? "SET" : "NOT SET");
 console.log("PORT:", process.env.PORT || "NOT SET (defaulting to 5000)");
 console.log("=========================");
