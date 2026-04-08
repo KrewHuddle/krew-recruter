@@ -9,8 +9,11 @@ import { SeekerSidebar } from "@/components/seeker-sidebar";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { TenantProvider } from "@/lib/tenant-context";
 import { useAuth } from "@/hooks/use-auth";
+import { CampaignAuthProvider, useCampaignAuth } from "@/lib/campaign-auth";
+import { CampaignSidebar } from "@/components/campaign-sidebar";
+
+// Original pages
 import NotFound from "@/pages/not-found";
-import Home from "@/pages/home";
 import Landing from "@/pages/landing";
 import Employers from "@/pages/employers";
 import JobSearch from "@/pages/job-search";
@@ -37,8 +40,18 @@ import CandidateInterview from "@/pages/candidate-interview";
 import VideoInterviews from "@/pages/video-interviews";
 import ExternalJobs from "@/pages/external-jobs";
 import Login from "@/pages/login";
+
+// New campaign engine pages
+import CampaignLogin from "@/pages/campaign-login";
+import CampaignDashboard from "@/pages/campaign-dashboard";
+import CampaignJobs from "@/pages/campaign-jobs";
+import CampaignCandidates from "@/pages/campaign-candidates";
+import CampaignWizard from "@/pages/campaign-wizard";
+
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
+
+// ============ ORIGINAL LAYOUTS ============
 
 function EmployerLayout({ children }: { children: React.ReactNode }) {
   const sidebarStyle = {
@@ -86,10 +99,32 @@ function SeekerLayout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function AdminLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="min-h-screen bg-background">
+      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-6">
+        <div className="flex items-center gap-2">
+          <Shield className="h-5 w-5 text-primary" />
+          <span className="font-semibold">Super Admin</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <a href="/app" className="text-sm text-muted-foreground hover:text-foreground">
+            Back to App
+          </a>
+          <ThemeToggle />
+        </div>
+      </header>
+      <main>{children}</main>
+    </div>
+  );
+}
+
+// ============ ORIGINAL ROUTE GUARDS ============
+
 function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile | null>({
     queryKey: ["/api/user/profile"],
     enabled: isAuthenticated,
@@ -124,7 +159,7 @@ function ProtectedEmployerRoute({ children }: { children: React.ReactNode }) {
 function ProtectedSeekerRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
-  
+
   const { data: profile, isLoading: profileLoading } = useQuery<UserProfile | null>({
     queryKey: ["/api/user/profile"],
     enabled: isAuthenticated,
@@ -175,26 +210,6 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
-function AdminLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <div className="min-h-screen bg-background">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-6">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <span className="font-semibold">Super Admin</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <a href="/app" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to App
-          </a>
-          <ThemeToggle />
-        </div>
-      </header>
-      <main>{children}</main>
-    </div>
-  );
-}
-
 function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
@@ -225,152 +240,267 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   return <AdminLayout>{children}</AdminLayout>;
 }
 
+// ============ NEW CAMPAIGN ENGINE LAYOUT ============
+
+function CampaignLayout({ children }: { children: React.ReactNode }) {
+  const { user, organizations, orgId, switchOrg, logout } = useCampaignAuth();
+
+  const currentOrg = organizations.find(o => o.orgId === orgId);
+
+  const { data: branding } = useQuery({
+    queryKey: ["/api/org/branding", orgId],
+    queryFn: async () => {
+      const token = localStorage.getItem("krew_token");
+      const res = await fetch("/api/org/branding", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "x-org-id": orgId || "",
+        },
+      });
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
+  return (
+    <div className="flex h-screen w-full">
+      <CampaignSidebar
+        user={{
+          name: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User",
+          email: user?.email || "",
+        }}
+        org={{
+          name: currentOrg?.orgName || branding?.name || "My Organization",
+          primaryColor: branding?.primaryColor || "#111111",
+          logoUrl: branding?.logoUrl,
+        }}
+        orgs={organizations.map(o => ({
+          id: o.orgId,
+          name: o.orgName,
+        }))}
+        onOrgSwitch={switchOrg}
+        onLogout={logout}
+      />
+      <div className="flex-1 ml-[220px] overflow-auto">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function ProtectedCampaignRoute({ children }: { children: React.ReactNode }) {
+  const [, setLocation] = useLocation();
+  const { isAuthenticated, isLoading } = useCampaignAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
+    setLocation("/campaign/login");
+    return null;
+  }
+
+  return <CampaignLayout>{children}</CampaignLayout>;
+}
+
+// ============ ROUTER ============
+
 function AppRouter() {
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/" component={Landing} />
-      
       <Route path="/login" component={Login} />
-      
       <Route path="/employers" component={Employers} />
-      
       <Route path="/jobs" component={JobSearch} />
-      
       <Route path="/gigs" component={GigBoard} />
-      
       <Route path="/gigs/join" component={GigJoin} />
-      
       <Route path="/video-interviews" component={VideoInterviews} />
-      
+
+      {/* Onboarding */}
       <Route path="/onboarding">
         <ProtectedRoute>
           <Onboarding />
         </ProtectedRoute>
       </Route>
-      
+
+      {/* Job Seeker routes */}
       <Route path="/seeker">
         <ProtectedSeekerRoute>
           <SeekerDashboard />
         </ProtectedSeekerRoute>
       </Route>
-      
       <Route path="/seeker/profile">
         <ProtectedSeekerRoute>
           <SeekerProfile />
         </ProtectedSeekerRoute>
       </Route>
-      
       <Route path="/seeker/applications">
         <ProtectedSeekerRoute>
           <SeekerDashboard />
         </ProtectedSeekerRoute>
       </Route>
-      
       <Route path="/seeker/saved">
         <ProtectedSeekerRoute>
           <SeekerSaved />
         </ProtectedSeekerRoute>
       </Route>
-      
       <Route path="/seeker/gigs">
         <ProtectedSeekerRoute>
           <SeekerGigs />
         </ProtectedSeekerRoute>
       </Route>
-      
       <Route path="/seeker/external-jobs">
         <ProtectedSeekerRoute>
           <ExternalJobs />
         </ProtectedSeekerRoute>
       </Route>
-      
+
+      {/* Employer routes (original) */}
       <Route path="/app">
         <ProtectedEmployerRoute>
           <Dashboard />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/locations">
         <ProtectedEmployerRoute>
           <Locations />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/jobs">
         <ProtectedEmployerRoute>
           <Jobs />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/jobs/new">
         <ProtectedEmployerRoute>
           <JobCreate />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/jobs/:id">
         <ProtectedEmployerRoute>
           <JobDetail />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/applicants">
         <ProtectedEmployerRoute>
           <Applicants />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/gigs">
         <ProtectedEmployerRoute>
           <Gigs />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/gigs/new">
         <ProtectedEmployerRoute>
           <GigCreate />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/gigs/:id">
         <ProtectedEmployerRoute>
           <GigDetail />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/interviews">
         <ProtectedEmployerRoute>
           <Interviews />
         </ProtectedEmployerRoute>
       </Route>
-      
       <Route path="/app/settings">
         <ProtectedEmployerRoute>
           <Settings />
         </ProtectedEmployerRoute>
       </Route>
-      
+
+      {/* Admin */}
       <Route path="/admin">
         <ProtectedAdminRoute>
           <AdminDashboard />
         </ProtectedAdminRoute>
       </Route>
-      
-      {/* Public interview route for candidates */}
+
+      {/* Public interview route */}
       <Route path="/interview/:token" component={CandidateInterview} />
-      
+
+      {/* ============ CAMPAIGN ENGINE ROUTES ============ */}
+      <Route path="/campaign/login" component={CampaignLogin} />
+
+      <Route path="/campaign">
+        <ProtectedCampaignRoute>
+          <CampaignDashboard />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/jobs">
+        <ProtectedCampaignRoute>
+          <CampaignJobs />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/jobs/new">
+        <ProtectedCampaignRoute>
+          <CampaignWizard />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/candidates">
+        <ProtectedCampaignRoute>
+          <CampaignCandidates />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/jobs/:id">
+        <ProtectedCampaignRoute>
+          <PlaceholderPage title="Job Detail" />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/team">
+        <ProtectedCampaignRoute>
+          <PlaceholderPage title="Team" />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/billing">
+        <ProtectedCampaignRoute>
+          <PlaceholderPage title="Billing" />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/settings">
+        <ProtectedCampaignRoute>
+          <PlaceholderPage title="Settings" />
+        </ProtectedCampaignRoute>
+      </Route>
+
+      {/* Public chatbot apply page */}
+      <Route path="/apply/:campaignId">
+        <PlaceholderPage title="Apply" />
+      </Route>
+
       <Route component={NotFound} />
     </Switch>
+  );
+}
+
+function PlaceholderPage({ title }: { title: string }) {
+  return (
+    <div className="p-6">
+      <h1 className="text-2xl font-bold mb-4">{title}</h1>
+      <p className="text-muted-foreground">This page is coming in a future sprint.</p>
+    </div>
   );
 }
 
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <AppRouter />
-      </TooltipProvider>
+      <CampaignAuthProvider>
+        <TooltipProvider>
+          <Toaster />
+          <AppRouter />
+        </TooltipProvider>
+      </CampaignAuthProvider>
     </QueryClientProvider>
   );
 }

@@ -2,11 +2,10 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUserClaims as getCustomUserClaims } from "./customAuth";
-import { registerObjectStorageRoutes, ObjectStorageService } from "./replit_integrations/object_storage";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
-import { getStripePublishableKey } from "./stripeClient";
+import { getStripePublishableKey } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
 
 // Helper to safely get user ID from session
@@ -78,10 +77,16 @@ export async function registerRoutes(
 ): Promise<Server> {
   // Setup custom auth
   await setupCustomAuth(app);
-  
-  // Setup object storage
-  registerObjectStorageRoutes(app);
-  const objectStorageService = new ObjectStorageService();
+
+  // Setup campaign engine routes (JWT-based)
+  const { default: campaignRouter } = await import("./campaignRoutes");
+  const { registerHandler, loginHandler, meHandler, requireAuth } = await import("./jwtAuth");
+  app.post("/api/v2/auth/register", registerHandler);
+  app.post("/api/v2/auth/login", loginHandler);
+  app.get("/api/v2/auth/me", requireAuth, meHandler);
+  app.use("/api", campaignRouter);
+
+  // TODO: Object storage routes will use Supabase Storage (replacing Replit object storage)
 
   // ============ TENANT ROUTES ============
 

@@ -1,10 +1,11 @@
 import { sql, relations } from "drizzle-orm";
-import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, index, pgEnum } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, boolean, timestamp, jsonb, index, pgEnum, decimal, date } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
 // Re-export auth models
 export * from "./models/auth";
+import { users } from "./models/auth";
 
 // ============ ENUMS ============
 
@@ -1216,3 +1217,229 @@ export const tenantUsageMetrics = pgTable("tenant_usage_metrics", {
 export const insertTenantUsageMetricsSchema = createInsertSchema(tenantUsageMetrics).omit({ id: true, createdAt: true });
 export type InsertTenantUsageMetrics = z.infer<typeof insertTenantUsageMetricsSchema>;
 export type TenantUsageMetrics = typeof tenantUsageMetrics.$inferSelect;
+
+// ============ CAMPAIGN ENGINE ENUMS ============
+
+export const orgPlanEnum = pgEnum("org_plan", ["starter", "growth", "pro"]);
+export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "active", "paused", "filled", "cancelled"]);
+export const employmentTypeEnum = pgEnum("employment_type", ["Full-time", "Part-time", "Seasonal", "Per Diem"]);
+export const payPeriodEnum = pgEnum("pay_period", ["hr", "year"]);
+export const adPlatformEnum = pgEnum("ad_platform", ["facebook", "instagram"]);
+export const abVariantEnum = pgEnum("ab_variant", ["A", "B"]);
+export const screeningQuestionTypeEnum = pgEnum("screening_question_type", ["yes_no", "multiple_choice", "short_answer"]);
+export const applicantStatusEnum = pgEnum("applicant_status", ["unreviewed", "shortlisted", "rejected", "interview_scheduled", "hired"]);
+export const orgMemberRoleEnum = pgEnum("org_member_role", ["owner", "recruiter", "hiring_manager"]);
+
+// ============ ORGANIZATIONS ============
+
+export const organizations = pgTable("organizations", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  name: text("name").notNull(),
+  plan: orgPlanEnum("plan").default("starter"),
+  stripeCustomerId: text("stripe_customer_id"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export const organizationsRelations = relations(organizations, ({ one, many }) => ({
+  branding: one(orgBranding),
+  campaigns: many(campaigns),
+  applicants: many(applicants),
+  members: many(orgMembers),
+}));
+
+export const insertOrganizationSchema = createInsertSchema(organizations).omit({ id: true, createdAt: true });
+export type InsertOrganization = z.infer<typeof insertOrganizationSchema>;
+export type Organization = typeof organizations.$inferSelect;
+
+// ============ ORG BRANDING ============
+
+export const orgBranding = pgTable("org_branding", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }).unique(),
+  name: text("name"),
+  website: text("website"),
+  logoUrl: text("logo_url"),
+  coverPhotoUrl: text("cover_photo_url"),
+  primaryColor: text("primary_color").default("#111111"),
+  accentColor: text("accent_color").default("#ffffff"),
+  glassdoorRating: decimal("glassdoor_rating", { precision: 2, scale: 1 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_org_branding_org").on(table.orgId),
+]);
+
+export const orgBrandingRelations = relations(orgBranding, ({ one }) => ({
+  organization: one(organizations, { fields: [orgBranding.orgId], references: [organizations.id] }),
+}));
+
+export const insertOrgBrandingSchema = createInsertSchema(orgBranding).omit({ id: true, updatedAt: true });
+export type InsertOrgBranding = z.infer<typeof insertOrgBrandingSchema>;
+export type OrgBranding = typeof orgBranding.$inferSelect;
+
+// ============ CAMPAIGNS ============
+
+export const campaigns = pgTable("campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  location: text("location"),
+  employmentType: employmentTypeEnum("employment_type"),
+  payMin: integer("pay_min"),
+  payMax: integer("pay_max"),
+  payPeriod: payPeriodEnum("pay_period").default("hr"),
+  description: text("description"),
+  requirements: text("requirements").array(),
+  benefits: text("benefits").array(),
+  sourceUrl: text("source_url"),
+  status: campaignStatusEnum("status").default("draft"),
+  dailyBudgetCents: integer("daily_budget_cents").default(3200),
+  totalSpentCents: integer("total_spent_cents").default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+  activatedAt: timestamp("activated_at", { withTimezone: true }),
+  filledAt: timestamp("filled_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_campaign_org").on(table.orgId),
+  index("idx_campaign_status").on(table.status),
+]);
+
+export const campaignsRelations = relations(campaigns, ({ one, many }) => ({
+  organization: one(organizations, { fields: [campaigns.orgId], references: [organizations.id] }),
+  adCreatives: many(adCreatives),
+  screeningQuestions: many(screeningQuestions),
+  applicants: many(applicants),
+  spend: many(campaignSpend),
+}));
+
+export const insertCampaignSchema = createInsertSchema(campaigns).omit({ id: true, createdAt: true, totalSpentCents: true });
+export type InsertCampaign = z.infer<typeof insertCampaignSchema>;
+export type Campaign = typeof campaigns.$inferSelect;
+
+// ============ AD CREATIVES ============
+
+export const adCreatives = pgTable("ad_creatives", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  headline: text("headline"),
+  subheadline: text("subheadline"),
+  bulletPoints: text("bullet_points").array(),
+  payDisplay: text("pay_display"),
+  benefitsDisplay: text("benefits_display").array(),
+  cta: text("cta").default("Apply Now"),
+  platform: adPlatformEnum("platform").default("facebook"),
+  abVariant: abVariantEnum("ab_variant").default("A"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_ad_creative_campaign").on(table.campaignId),
+]);
+
+export const adCreativesRelations = relations(adCreatives, ({ one }) => ({
+  campaign: one(campaigns, { fields: [adCreatives.campaignId], references: [campaigns.id] }),
+}));
+
+export const insertAdCreativeSchema = createInsertSchema(adCreatives).omit({ id: true, createdAt: true });
+export type InsertAdCreative = z.infer<typeof insertAdCreativeSchema>;
+export type AdCreative = typeof adCreatives.$inferSelect;
+
+// ============ SCREENING QUESTIONS ============
+
+export const screeningQuestions = pgTable("screening_questions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  question: text("question"),
+  type: screeningQuestionTypeEnum("type"),
+  options: text("options").array(),
+  disqualifyingAnswer: text("disqualifying_answer"),
+  sortOrder: integer("sort_order"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+}, (table) => [
+  index("idx_screening_campaign").on(table.campaignId),
+]);
+
+export const screeningQuestionsRelations = relations(screeningQuestions, ({ one }) => ({
+  campaign: one(campaigns, { fields: [screeningQuestions.campaignId], references: [campaigns.id] }),
+}));
+
+export const insertScreeningQuestionSchema = createInsertSchema(screeningQuestions).omit({ id: true, createdAt: true });
+export type InsertScreeningQuestion = z.infer<typeof insertScreeningQuestionSchema>;
+export type ScreeningQuestion = typeof screeningQuestions.$inferSelect;
+
+// ============ APPLICANTS (CAMPAIGN ENGINE) ============
+
+export const applicants = pgTable("applicants", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  email: text("email"),
+  phone: text("phone"),
+  location: text("location"),
+  screeningResponses: jsonb("screening_responses"),
+  passedScreening: boolean("passed_screening"),
+  disqualifiedReason: text("disqualified_reason"),
+  status: applicantStatusEnum("status").default("unreviewed"),
+  notes: text("notes"),
+  appliedAt: timestamp("applied_at", { withTimezone: true }).defaultNow(),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  interviewScheduledAt: timestamp("interview_scheduled_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_applicant_campaign").on(table.campaignId),
+  index("idx_applicant_org").on(table.orgId),
+  index("idx_applicant_status").on(table.status),
+]);
+
+export const applicantsRelations = relations(applicants, ({ one }) => ({
+  campaign: one(campaigns, { fields: [applicants.campaignId], references: [campaigns.id] }),
+  organization: one(organizations, { fields: [applicants.orgId], references: [organizations.id] }),
+}));
+
+export const insertApplicantSchema = createInsertSchema(applicants).omit({ id: true, appliedAt: true });
+export type InsertApplicant = z.infer<typeof insertApplicantSchema>;
+export type Applicant = typeof applicants.$inferSelect;
+
+// ============ CAMPAIGN SPEND ============
+
+export const campaignSpend = pgTable("campaign_spend", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  campaignId: varchar("campaign_id").notNull().references(() => campaigns.id, { onDelete: "cascade" }),
+  date: date("date"),
+  applicantsCount: integer("applicants_count").default(0),
+  spendCents: integer("spend_cents").default(0),
+  impressions: integer("impressions").default(0),
+  clicks: integer("clicks").default(0),
+}, (table) => [
+  index("idx_spend_campaign").on(table.campaignId),
+  index("idx_spend_date").on(table.date),
+]);
+
+export const campaignSpendRelations = relations(campaignSpend, ({ one }) => ({
+  campaign: one(campaigns, { fields: [campaignSpend.campaignId], references: [campaigns.id] }),
+}));
+
+export const insertCampaignSpendSchema = createInsertSchema(campaignSpend).omit({ id: true });
+export type InsertCampaignSpend = z.infer<typeof insertCampaignSpendSchema>;
+export type CampaignSpend = typeof campaignSpend.$inferSelect;
+
+// ============ ORG MEMBERS ============
+
+export const orgMembers = pgTable("org_members", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  orgId: varchar("org_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  role: orgMemberRoleEnum("role").default("recruiter"),
+  invitedAt: timestamp("invited_at", { withTimezone: true }).defaultNow(),
+  acceptedAt: timestamp("accepted_at", { withTimezone: true }),
+}, (table) => [
+  index("idx_org_member_org").on(table.orgId),
+  index("idx_org_member_user").on(table.userId),
+]);
+
+export const orgMembersRelations = relations(orgMembers, ({ one }) => ({
+  organization: one(organizations, { fields: [orgMembers.orgId], references: [organizations.id] }),
+  user: one(users, { fields: [orgMembers.userId], references: [users.id] }),
+}));
+
+export const insertOrgMemberSchema = createInsertSchema(orgMembers).omit({ id: true, invitedAt: true });
+export type InsertOrgMember = z.infer<typeof insertOrgMemberSchema>;
+export type OrgMember = typeof orgMembers.$inferSelect;
