@@ -1,3 +1,5 @@
+process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+import "dotenv/config";
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { serveStatic } from "./static";
@@ -13,7 +15,7 @@ console.log("=== Environment Check ===");
 console.log("NODE_ENV:", process.env.NODE_ENV || "NOT SET");
 console.log("DATABASE_URL:", process.env.DATABASE_URL ? "SET (" + process.env.DATABASE_URL.substring(0, 30) + "...)" : "NOT SET");
 console.log("SESSION_SECRET:", process.env.SESSION_SECRET ? "SET" : "NOT SET");
-console.log("PORT:", process.env.PORT || "NOT SET (defaulting to 5000)");
+console.log("PORT:", process.env.PORT || "NOT SET (defaulting to 3000)");
 console.log("=========================");
 
 declare module "http" {
@@ -125,11 +127,7 @@ app.use((req, res, next) => {
     await setupVite(httpServer, app);
   }
 
-  // ALWAYS serve the app on the port specified in the environment variable PORT
-  // Other ports are firewalled. Default to 5000 if not specified.
-  // this serves both the API and the client.
-  // It is the only port that is not firewalled.
-  const port = parseInt(process.env.PORT || "5000", 10);
+  const port = parseInt(process.env.PORT || "3000", 10);
   httpServer.listen(
     {
       port,
