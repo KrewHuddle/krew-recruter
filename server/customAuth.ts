@@ -96,9 +96,10 @@ export async function setupCustomAuth(app: Express) {
           lastName: newUser.lastName,
         },
       });
-    } catch (error) {
-      console.error("Registration error:", error);
-      res.status(500).json({ error: "Registration failed" });
+    } catch (error: any) {
+      console.error("Registration error:", error?.message || error);
+      console.error("Registration error stack:", error?.stack);
+      res.status(500).json({ error: "Registration failed", detail: error?.message });
     }
   });
 
@@ -147,9 +148,10 @@ export async function setupCustomAuth(app: Express) {
           profileImageUrl: user.profileImageUrl,
         },
       });
-    } catch (error) {
-      console.error("Login error:", error);
-      res.status(500).json({ error: "Login failed" });
+    } catch (error: any) {
+      console.error("Login error:", error?.message || error);
+      console.error("Login error stack:", error?.stack);
+      res.status(500).json({ error: "Login failed", detail: error?.message });
     }
   });
 
