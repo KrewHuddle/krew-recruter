@@ -51,6 +51,7 @@ import CampaignBilling from "@/pages/campaign-billing";
 import CampaignInterviews from "@/pages/campaign-interviews";
 import CampaignHelp from "@/pages/campaign-help";
 import CampaignSettings from "@/pages/campaign-settings";
+import CampaignTeam from "@/pages/campaign-team";
 
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
@@ -276,17 +277,16 @@ function CampaignLayout({ children }: { children: React.ReactNode }) {
         }}
         org={{
           name: currentOrg?.orgName || branding?.name || "My Organization",
-          primaryColor: branding?.primaryColor || "#111111",
           logoUrl: branding?.logoUrl,
         }}
         orgs={organizations.map(o => ({
           id: o.orgId,
           name: o.orgName,
         }))}
-        onOrgSwitch={switchOrg}
+        onOrgSwitch={(id: string) => switchOrg(id)}
         onLogout={logout}
       />
-      <div className="flex-1 ml-[220px] overflow-auto">
+      <div className="flex-1 ml-[220px] overflow-auto bg-background">
         {children}
       </div>
     </div>
@@ -473,12 +473,12 @@ function AppRouter() {
       </Route>
       <Route path="/campaign/team">
         <ProtectedCampaignRoute>
-          <PlaceholderPage title="Team" />
+          <CampaignTeam />
         </ProtectedCampaignRoute>
       </Route>
       <Route path="/campaign/billing">
         <ProtectedCampaignRoute>
-          <CampaignBilling />
+          <CampaignTeam defaultTab="billing" />
         </ProtectedCampaignRoute>
       </Route>
       <Route path="/campaign/settings">

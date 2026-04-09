@@ -8,7 +8,18 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useLocation } from "wouter";
-import { Download, Search, Users, X, ChevronLeft, Plus } from "lucide-react";
+import {
+  Download,
+  Search,
+  UserPlus,
+  ChevronLeft,
+  ChevronRight,
+  Plus,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+  Home,
+} from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 interface Applicant {
@@ -26,6 +37,23 @@ interface Applicant {
   appliedAt: string;
   reviewedAt: string | null;
   interviewScheduledAt: string | null;
+}
+
+function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
+  return (
+    <nav className="flex items-center gap-1.5 text-sm text-muted-foreground mb-4">
+      {items.map((item, i) => (
+        <span key={i} className="flex items-center gap-1.5">
+          {i > 0 && <ChevronRight className="h-3.5 w-3.5" />}
+          {item.href ? (
+            <a href={item.href} className="hover:text-foreground transition-colors">{item.label}</a>
+          ) : (
+            <span className={i === items.length - 1 ? "text-foreground" : ""}>{item.label}</span>
+          )}
+        </span>
+      ))}
+    </nav>
+  );
 }
 
 export default function CampaignCandidates() {
@@ -78,20 +106,16 @@ export default function CampaignCandidates() {
     rejected: applicants.filter(a => a.status === "rejected").length,
   };
 
-  const statusColors: Record<string, string> = {
-    unreviewed: "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300",
-    shortlisted: "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300",
-    rejected: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    interview_scheduled: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-    hired: "bg-yellow-100 text-yellow-700 dark:bg-yellow-900 dark:text-yellow-300",
-  };
-
+  // Empty state
   if (applicants.length === 0) {
     return (
       <div className="p-6">
+        <Breadcrumb items={[{ label: "Home", href: "/campaign" }, { label: "Candidates" }]} />
         <h1 className="text-2xl font-bold mb-6">Candidates</h1>
         <div className="flex flex-col items-center justify-center py-24 text-center">
-          <Users className="h-12 w-12 text-muted-foreground/30 mb-4" />
+          <div className="w-16 h-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+            <UserPlus className="h-8 w-8 text-primary" />
+          </div>
           <h3 className="text-lg font-medium mb-2">You don't have any candidates yet</h3>
           <p className="text-muted-foreground mb-6 max-w-md">
             Candidates will appear here after you start promoting your first job.
@@ -108,6 +132,8 @@ export default function CampaignCandidates() {
     <div className="flex h-full">
       {/* Main content */}
       <div className={`flex-1 p-6 ${selectedApplicant ? "hidden lg:block" : ""}`}>
+        <Breadcrumb items={[{ label: "Home", href: "/campaign" }, { label: "Candidates" }]} />
+
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-bold">Candidates</h1>
           <div className="flex gap-2">
@@ -120,8 +146,8 @@ export default function CampaignCandidates() {
                 onChange={e => setSearch(e.target.value)}
               />
             </div>
-            <Button variant="outline" size="icon">
-              <Download className="h-4 w-4" />
+            <Button variant="secondary">
+              <Download className="mr-2 h-4 w-4" /> Export
             </Button>
           </div>
         </div>
@@ -148,42 +174,69 @@ export default function CampaignCandidates() {
                     </tr>
                   </thead>
                   <tbody>
-                    {filtered.filter(a => a.status === tab).map(a => (
-                      <tr
-                        key={a.id}
-                        className="border-t hover:bg-muted/30 cursor-pointer"
-                        onClick={() => setSelectedApplicant(a)}
-                      >
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div className="w-8 h-8 rounded-full bg-muted flex items-center justify-center text-xs font-medium">
-                              {(a.firstName?.[0] || "").toUpperCase()}{(a.lastName?.[0] || "").toUpperCase()}
-                            </div>
-                            <span className="font-medium">{a.firstName} {a.lastName}</span>
-                          </div>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">{a.campaignTitle}</td>
-                        <td className="px-4 py-3 text-muted-foreground">{a.location || "-"}</td>
-                        <td className="px-4 py-3">
-                          <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${statusColors[a.status] || ""}`}>
-                            {a.status.replace("_", " ")}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3 text-muted-foreground">
-                          {formatDistanceToNow(new Date(a.appliedAt), { addSuffix: true })}
-                        </td>
-                        <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
-                          <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                            <Button variant="ghost" size="sm" onClick={() => updateMutation.mutate({ id: a.id, status: "shortlisted" })}>
-                              Shortlist
-                            </Button>
-                            <Button variant="ghost" size="sm" onClick={() => updateMutation.mutate({ id: a.id, status: "rejected" })}>
-                              Reject
-                            </Button>
-                          </div>
+                    {filtered.filter(a => a.status === tab).length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-4 py-12 text-center text-muted-foreground">
+                          No {tab} candidates
                         </td>
                       </tr>
-                    ))}
+                    ) : (
+                      filtered.filter(a => a.status === tab).map(a => (
+                        <tr
+                          key={a.id}
+                          className="border-t hover:bg-muted/30 cursor-pointer group"
+                          onClick={() => setSelectedApplicant(a)}
+                        >
+                          <td className="px-4 py-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">
+                                {(a.firstName?.[0] || "").toUpperCase()}{(a.lastName?.[0] || "").toUpperCase()}
+                              </div>
+                              <div>
+                                <span className="font-medium">{a.firstName} {a.lastName}</span>
+                                <p className="text-xs text-muted-foreground">{a.email}</p>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-4 py-3">{a.campaignTitle}</td>
+                          <td className="px-4 py-3 text-muted-foreground">{a.location || "-"}</td>
+                          <td className="px-4 py-3">
+                            <StatusBadge status={a.status} />
+                          </td>
+                          <td className="px-4 py-3 text-muted-foreground">
+                            {formatDistanceToNow(new Date(a.appliedAt), { addSuffix: true })}
+                          </td>
+                          <td className="px-4 py-3" onClick={e => e.stopPropagation()}>
+                            <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-green-600"
+                                onClick={() => updateMutation.mutate({ id: a.id, status: "shortlisted" })}
+                              >
+                                <ThumbsUp className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+                                onClick={() => updateMutation.mutate({ id: a.id, status: "rejected" })}
+                              >
+                                <ThumbsDown className="h-3.5 w-3.5" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-primary"
+                                onClick={() => setSelectedApplicant(a)}
+                              >
+                                <MessageSquare className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
                   </tbody>
                 </table>
               </div>
@@ -194,14 +247,14 @@ export default function CampaignCandidates() {
 
       {/* Side panel */}
       {selectedApplicant && (
-        <div className="w-full lg:w-[400px] border-l bg-background overflow-y-auto">
+        <div className="w-full lg:w-[400px] border-l bg-card overflow-y-auto">
           <div className="p-6">
             <Button variant="ghost" size="sm" className="mb-4" onClick={() => setSelectedApplicant(null)}>
               <ChevronLeft className="mr-1 h-4 w-4" /> Back
             </Button>
 
             <div className="flex items-center gap-4 mb-6">
-              <div className="w-14 h-14 rounded-full bg-muted flex items-center justify-center text-lg font-medium">
+              <div className="w-14 h-14 rounded-full bg-primary/10 flex items-center justify-center text-lg font-medium text-primary">
                 {(selectedApplicant.firstName?.[0] || "").toUpperCase()}
                 {(selectedApplicant.lastName?.[0] || "").toUpperCase()}
               </div>
@@ -231,31 +284,29 @@ export default function CampaignCandidates() {
               )}
             </div>
 
-            {/* Screening Answers */}
             {selectedApplicant.screeningResponses && (
               <>
-                <hr className="my-4" />
+                <hr className="my-4 border-border" />
                 <h3 className="font-semibold mb-3">Screening Answers</h3>
                 <div className="space-y-3 text-sm">
                   {Object.entries(selectedApplicant.screeningResponses as Record<string, any>).map(([question, answer]) => (
                     <div key={question}>
                       <p className="text-muted-foreground">Q: {question}</p>
-                      <p className="font-medium">A: {String(answer)} {answer === "Yes" ? "\u2713" : ""}</p>
+                      <p className="font-medium">A: {String(answer)}</p>
                     </div>
                   ))}
                 </div>
                 <div className="mt-3">
                   <span className="text-sm">Passed screening: </span>
-                  <span className="text-sm font-medium">
+                  <span className={`text-sm font-medium ${selectedApplicant.passedScreening ? "text-green-600" : "text-destructive"}`}>
                     {selectedApplicant.passedScreening ? "Yes" : "No"}
                   </span>
                 </div>
               </>
             )}
 
-            <hr className="my-4" />
+            <hr className="my-4 border-border" />
 
-            {/* Status */}
             <div className="mb-4">
               <Label className="mb-2 block">Status</Label>
               <Select
@@ -275,7 +326,6 @@ export default function CampaignCandidates() {
               </Select>
             </div>
 
-            {/* Notes */}
             <div className="mb-4">
               <Label className="mb-2 block">Notes</Label>
               <Textarea
@@ -294,5 +344,20 @@ export default function CampaignCandidates() {
         </div>
       )}
     </div>
+  );
+}
+
+function StatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    unreviewed: "bg-primary/10 text-primary",
+    shortlisted: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+    rejected: "bg-destructive/10 text-destructive",
+    interview_scheduled: "bg-accent text-accent-foreground",
+    hired: "bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400",
+  };
+  return (
+    <span className={`inline-flex px-2 py-0.5 rounded-full text-xs font-medium ${styles[status] || styles.unreviewed}`}>
+      {status === "unreviewed" ? "New" : status.replace("_", " ")}
+    </span>
   );
 }
