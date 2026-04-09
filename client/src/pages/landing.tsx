@@ -631,8 +631,8 @@ export default function Landing() {
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-about">About</a></li>
                 <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-contact">Contact</a></li>
-                <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-privacy">Privacy</a></li>
-                <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-terms">Terms</a></li>
+                <li><Link href="/privacy"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-privacy">Privacy Policy</span></Link></li>
+                <li><Link href="/terms"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-terms">Terms of Use</span></Link></li>
               </ul>
             </div>
           </div>
@@ -640,9 +640,15 @@ export default function Landing() {
             <div className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
               &copy; {new Date().getFullYear()} Krew Recruiter. All rights reserved.
             </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground" data-testid="text-footer-love">
-              <Heart className="h-4 w-4 text-primary" />
-              Built for people who love to serve
+            <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
+              <span className="flex items-center gap-2" data-testid="text-footer-love">
+                <Heart className="h-4 w-4 text-primary" />
+                Built for people who love to serve
+              </span>
+              <span>&middot;</span>
+              <Link href="/privacy" className="hover:text-foreground">Privacy Policy</Link>
+              <span>&middot;</span>
+              <Link href="/terms" className="hover:text-foreground">Terms of Use</Link>
             </div>
           </div>
         </div>

@@ -61,8 +61,13 @@ import CampaignTeam from "@/pages/campaign-team";
 import WorkerSignup from "@/pages/worker-signup";
 import WorkerOnboarding from "@/pages/worker-onboarding";
 
+// Legal pages
+import Privacy from "@/pages/privacy";
+import Terms from "@/pages/terms";
+
 import { Loader2, Shield } from "lucide-react";
 import { UpgradePromptListener } from "@/components/upgrade-prompt";
+import { CookieBanner } from "@/components/CookieBanner";
 import type { UserProfile } from "@shared/schema";
 
 // ============ ORIGINAL LAYOUTS ============
@@ -351,6 +356,8 @@ function AppRouter() {
       <Route path="/video-interviews" component={VideoInterviews} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/help" component={Help} />
+      <Route path="/privacy" component={Privacy} />
+      <Route path="/terms" component={Terms} />
 
       {/* Worker signup & onboarding (public entry, protected onboarding) */}
       <Route path="/workers/signup" component={WorkerSignup} />
@@ -613,6 +620,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <UpgradePromptListener />
+          <CookieBanner />
           <AppRouter />
         </TooltipProvider>
       </CampaignAuthProvider>
