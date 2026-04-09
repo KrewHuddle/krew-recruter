@@ -1557,3 +1557,36 @@ export const platformSettings = pgTable("platform_settings", {
 export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
+
+// ============ AGGREGATED JOBS ============
+
+export const aggregatedJobs = pgTable("aggregated_jobs", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  externalId: text("external_id").notNull().unique(),
+  source: text("source").notNull(),
+  title: text("title").notNull(),
+  company: text("company").notNull(),
+  location: text("location"),
+  city: text("city"),
+  state: text("state"),
+  country: text("country").default("US"),
+  description: text("description"),
+  applyUrl: text("apply_url"),
+  salary: text("salary"),
+  employmentType: text("employment_type"),
+  category: text("category"),
+  logoUrl: text("logo_url"),
+  remote: boolean("remote").default(false),
+  postedAt: timestamp("posted_at", { withTimezone: true }),
+  fetchedAt: timestamp("fetched_at", { withTimezone: true }).defaultNow(),
+  isActive: boolean("is_active").default(true),
+}, (table) => [
+  index("idx_agg_jobs_source").on(table.source),
+  index("idx_agg_jobs_city").on(table.city),
+  index("idx_agg_jobs_active").on(table.isActive),
+  index("idx_agg_jobs_external_id").on(table.externalId),
+]);
+
+export const insertAggregatedJobSchema = createInsertSchema(aggregatedJobs).omit({ id: true, fetchedAt: true });
+export type InsertAggregatedJob = z.infer<typeof insertAggregatedJobSchema>;
+export type AggregatedJobRecord = typeof aggregatedJobs.$inferSelect;

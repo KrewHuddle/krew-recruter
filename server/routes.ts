@@ -12,7 +12,7 @@ import { requirePlan } from "./middleware/requirePlan";
 import { db } from "./db";
 import {
   organizations, campaigns, jobs, applications, interviewInvites,
-  campaignSpend, paymentHistory,
+  campaignSpend, paymentHistory, aggregatedJobs,
 } from "@shared/schema";
 import { eq, desc, sql, sum, count, and } from "drizzle-orm";
 
@@ -4292,6 +4292,145 @@ export async function registerRoutes(
     } catch (error) {
       console.error("Error collecting invoices:", error);
       res.status(500).json({ error: "Failed to collect invoices" });
+    }
+  });
+
+  // ============ JOB AGGREGATION ============
+
+  // POST /api/admin/aggregation/run — trigger a full aggregation cycle
+  app.post("/api/admin/aggregation/run", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { runAggregation } = await import("./services/job-aggregator");
+      const { skipAiFilter, sources } = req.body || {};
+
+      const { jobs: aggregatedJobsList, stats } = await runAggregation({
+        skipAiFilter,
+        sources,
+      });
+
+      // Save to DB (upsert by externalId)
+      let saved = 0;
+      for (const job of aggregatedJobsList) {
+        try {
+          await db
+            .insert(aggregatedJobs)
+            .values({
+              externalId: job.externalId,
+              source: job.source,
+              title: job.title,
+              company: job.company,
+              location: job.location,
+              city: job.city,
+              state: job.state,
+              country: job.country,
+              description: job.description,
+              applyUrl: job.applyUrl,
+              salary: job.salary,
+              employmentType: job.employmentType,
+              category: job.category,
+              logoUrl: job.logoUrl,
+              remote: job.remote,
+              postedAt: job.postedAt,
+              isActive: true,
+            })
+            .onConflictDoUpdate({
+              target: aggregatedJobs.externalId,
+              set: {
+                title: job.title,
+                description: job.description,
+                salary: job.salary,
+                isActive: true,
+                fetchedAt: new Date(),
+              },
+            });
+          saved++;
+        } catch (err: any) {
+          // Skip duplicates silently
+          if (!err.message?.includes("duplicate")) {
+            console.error("[aggregation] Save error:", err.message);
+          }
+        }
+      }
+
+      stats.saved = saved;
+      res.json(stats);
+    } catch (error) {
+      console.error("Aggregation error:", error);
+      res.status(500).json({ error: "Aggregation failed" });
+    }
+  });
+
+  // GET /api/admin/aggregation/stats — aggregation stats
+  app.get("/api/admin/aggregation/stats", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const [totalResult] = await db
+        .select({ count: count() })
+        .from(aggregatedJobs);
+      const [activeResult] = await db
+        .select({ count: count() })
+        .from(aggregatedJobs)
+        .where(eq(aggregatedJobs.isActive, true));
+
+      const sourceCounts = await db
+        .select({ source: aggregatedJobs.source, count: count() })
+        .from(aggregatedJobs)
+        .where(eq(aggregatedJobs.isActive, true))
+        .groupBy(aggregatedJobs.source);
+
+      res.json({
+        total: totalResult?.count || 0,
+        active: activeResult?.count || 0,
+        bySource: Object.fromEntries(sourceCounts.map(s => [s.source, s.count])),
+      });
+    } catch (error) {
+      console.error("Aggregation stats error:", error);
+      res.status(500).json({ error: "Failed to fetch stats" });
+    }
+  });
+
+  // GET /api/jobs/public — public job feed for seekers (aggregated + internal)
+  app.get("/api/jobs/public", async (req, res) => {
+    try {
+      const { city, state, q, page = "1", limit = "20" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 50);
+      const offset = (pageNum - 1) * limitNum;
+
+      let query = db
+        .select()
+        .from(aggregatedJobs)
+        .where(eq(aggregatedJobs.isActive, true))
+        .orderBy(desc(aggregatedJobs.postedAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      const results = await query;
+
+      // Filter in JS for city/state/query (drizzle doesn't have ilike easily)
+      let filtered = results;
+      if (city) {
+        const cityLower = (city as string).toLowerCase();
+        filtered = filtered.filter(j => j.city?.toLowerCase().includes(cityLower));
+      }
+      if (state) {
+        const stateLower = (state as string).toLowerCase();
+        filtered = filtered.filter(j => j.state?.toLowerCase().includes(stateLower));
+      }
+      if (q) {
+        const qLower = (q as string).toLowerCase();
+        filtered = filtered.filter(
+          j => j.title?.toLowerCase().includes(qLower) || j.company?.toLowerCase().includes(qLower)
+        );
+      }
+
+      res.json({
+        jobs: filtered,
+        page: pageNum,
+        hasMore: results.length === limitNum,
+      });
+    } catch (error) {
+      console.error("Public jobs error:", error);
+      res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
 
