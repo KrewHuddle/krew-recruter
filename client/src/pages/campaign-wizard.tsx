@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent } from "@/components/ui/card";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
 import {
   Accordion,
   AccordionContent,
@@ -17,6 +19,7 @@ import {
 import {
   Link2, PenLine, ArrowRight, Loader2, Check, X, Plus,
   Rocket, ChevronLeft, TrendingUp, Target, Shield,
+  Upload, Facebook, Instagram, MapPin, Clock,
 } from "lucide-react";
 
 interface CampaignData {
@@ -40,9 +43,13 @@ interface AdCreative {
   payDisplay: string;
   benefitsDisplay: string[];
   cta: string;
+  adBodyText: string;
+  imageChoice: string;
+  customImageUrl: string;
+  platforms: { facebook: boolean; instagram: boolean; instagramStories: boolean };
 }
 
-const STEP_LABELS = ["Basic Info", "Review your Ad", "Set your Budget", "Post"];
+const STEP_LABELS = ["Job Details", "Ad Creative", "Audience & Budget", "Review & Launch"];
 
 const JOB_SUGGESTIONS = [
   "Line Cook", "Sous Chef", "Server", "Bartender", "Host/Hostess",
@@ -50,11 +57,34 @@ const JOB_SUGGESTIONS = [
   "Executive Chef", "GM", "Barback", "Food Runner", "Event Staff",
 ];
 
+const STOCK_IMAGES = [
+  { id: "bartender", label: "Bartender", emoji: "🍸" },
+  { id: "server", label: "Server", emoji: "🍽️" },
+  { id: "chef", label: "Chef", emoji: "👨‍🍳" },
+  { id: "line-cook", label: "Line Cook", emoji: "🔥" },
+  { id: "host", label: "Host", emoji: "🙋" },
+  { id: "dishwasher", label: "Dishwasher", emoji: "🫧" },
+];
+
+const BUDGET_OPTIONS = [
+  { amount: 5, reach: "~500-1,200 people/day" },
+  { amount: 10, reach: "~1,000-2,500 people/day" },
+  { amount: 25, reach: "~2,500-6,000 people/day" },
+  { amount: 50, reach: "~5,000-12,000 people/day" },
+];
+
+const DURATION_OPTIONS = [
+  { value: 7, label: "7 days" },
+  { value: 14, label: "14 days" },
+  { value: 30, label: "30 days" },
+  { value: 0, label: "Ongoing" },
+];
+
 export default function CampaignWizard() {
   const [, setLocation] = useLocation();
   const { apiFetch } = useCampaignAuth();
 
-  const [step, setStep] = useState(0); // 0 = choose method, 1a/1b = sub-steps, 2-4 = main steps
+  const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState<"choose" | "url" | "manual">("choose");
   const [isLoading, setIsLoading] = useState(false);
   const [loadingStatus, setLoadingStatus] = useState("");
@@ -69,22 +99,36 @@ export default function CampaignWizard() {
   const [creative, setCreative] = useState<AdCreative>({
     headline: "", subheadline: "", bulletPoints: [],
     payDisplay: "", benefitsDisplay: [], cta: "Apply Now",
+    adBodyText: "",
+    imageChoice: "server",
+    customImageUrl: "",
+    platforms: { facebook: true, instagram: true, instagramStories: false },
   });
 
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [url, setUrl] = useState("");
-  const [budgetType, setBudgetType] = useState<"recommended" | "custom">("recommended");
-  const [customBudget, setCustomBudget] = useState(32);
+  const [radius, setRadius] = useState(10);
+  const [dailyBudget, setDailyBudget] = useState(25);
+  const [customBudgetMode, setCustomBudgetMode] = useState(false);
+  const [customBudgetValue, setCustomBudgetValue] = useState(25);
+  const [duration, setDuration] = useState(14);
   const [isEditing, setIsEditing] = useState(false);
   const [newRequirement, setNewRequirement] = useState("");
   const [newBenefit, setNewBenefit] = useState("");
   const [launchSuccess, setLaunchSuccess] = useState(false);
 
-  // Branding (would come from context in production)
   const orgName = "Your Restaurant";
   const primaryColor = "#111111";
 
-  const dailyBudget = budgetType === "recommended" ? 32 : customBudget;
+  const effectiveBudget = customBudgetMode ? customBudgetValue : dailyBudget;
+  const totalEstSpend = duration > 0 ? effectiveBudget * duration : effectiveBudget * 30;
+
+  const generateAdBody = (c: CampaignData) => {
+    const pay = c.payMin && c.payMax
+      ? `$${c.payMin}-$${c.payMax}/${c.payPeriod === "year" ? "yr" : "hr"}`
+      : c.payMin ? `$${c.payMin}/${c.payPeriod === "year" ? "yr" : "hr"}` : "";
+    return `🍽️ ${orgName} is hiring a ${c.title}!\n${pay ? `✅ ${pay}  ` : ""}📍 ${c.location}\n🎥 Apply with a 60-sec video\nTap to apply 👇`;
+  };
 
   // ---- Step 1: URL Import ----
   const handleUrlImport = useCallback(async () => {
@@ -121,7 +165,7 @@ export default function CampaignWizard() {
 
       const data = await res.json();
       setCampaignId(data.id);
-      setCampaign({
+      const importedCampaign = {
         title: data.title || "",
         location: data.location || "",
         employmentType: data.employmentType || "Full-time",
@@ -132,7 +176,8 @@ export default function CampaignWizard() {
         requirements: data.requirements || [],
         benefits: data.benefits || [],
         sourceUrl: url,
-      });
+      };
+      setCampaign(importedCampaign);
 
       // Fetch the ad creative
       const campaignRes = await apiFetch(`/api/campaigns/${data.id}`);
@@ -140,14 +185,16 @@ export default function CampaignWizard() {
         const fullData = await campaignRes.json();
         if (fullData.adCreatives?.[0]) {
           const c = fullData.adCreatives[0];
-          setCreative({
+          setCreative(prev => ({
+            ...prev,
             headline: c.headline || `HIRING ${(data.title || "").toUpperCase()}`,
             subheadline: c.subheadline || `${data.location || ""} | ${data.employmentType || "Full-time"}`,
             bulletPoints: c.bulletPoints || data.requirements?.slice(0, 3) || [],
             payDisplay: c.payDisplay || "",
             benefitsDisplay: c.benefitsDisplay || data.benefits?.slice(0, 3) || [],
             cta: c.cta || "Apply Now",
-          });
+            adBodyText: generateAdBody(importedCampaign),
+          }));
         }
       }
 
@@ -196,17 +243,19 @@ export default function CampaignWizard() {
         const fullData = await campaignRes.json();
         if (fullData.adCreatives?.[0]) {
           const c = fullData.adCreatives[0];
-          setCreative({
+          setCreative(prev => ({
+            ...prev,
             headline: c.headline || `HIRING ${campaign.title.toUpperCase()}`,
             subheadline: c.subheadline || `${campaign.location} | ${campaign.employmentType}`,
             bulletPoints: c.bulletPoints || campaign.requirements.slice(0, 3),
             payDisplay: c.payDisplay || "",
             benefitsDisplay: c.benefitsDisplay || campaign.benefits.slice(0, 3),
             cta: c.cta || "Apply Now",
-          });
+            adBodyText: generateAdBody(campaign),
+          }));
         } else {
-          // Fallback creative
-          setCreative({
+          setCreative(prev => ({
+            ...prev,
             headline: `HIRING ${campaign.title.toUpperCase()}`,
             subheadline: `${campaign.location} | ${campaign.employmentType}`,
             bulletPoints: campaign.requirements.slice(0, 3),
@@ -215,7 +264,8 @@ export default function CampaignWizard() {
               : "Competitive Pay",
             benefitsDisplay: campaign.benefits.slice(0, 3),
             cta: "Apply Now",
-          });
+            adBodyText: generateAdBody(campaign),
+          }));
         }
       }
 
@@ -228,7 +278,7 @@ export default function CampaignWizard() {
   }, [campaign, apiFetch]);
 
   // ---- Step 4: Launch ----
-  const handleLaunch = useCallback(async () => {
+  const handleLaunch = useCallback(async (asDraft = false) => {
     if (!campaignId) return;
     setIsLoading(true);
 
@@ -236,16 +286,32 @@ export default function CampaignWizard() {
       // Update budget
       await apiFetch(`/api/campaigns/${campaignId}/budget`, {
         method: "PATCH",
-        body: JSON.stringify({ dailyBudgetCents: dailyBudget * 100 }),
+        body: JSON.stringify({ dailyBudgetCents: effectiveBudget * 100 }),
       });
 
-      // Activate campaign
-      const res = await apiFetch(`/api/campaigns/${campaignId}/status`, {
+      // Update creative if edited
+      await apiFetch(`/api/campaigns/${campaignId}/creative`, {
         method: "PATCH",
-        body: JSON.stringify({ status: "active" }),
+        body: JSON.stringify({
+          headline: creative.headline,
+          subheadline: creative.subheadline,
+          bulletPoints: creative.bulletPoints,
+          payDisplay: creative.payDisplay,
+          benefitsDisplay: creative.benefitsDisplay,
+          platforms: creative.platforms,
+          imageChoice: creative.imageChoice,
+          radius,
+          duration,
+        }),
       });
 
-      if (!res.ok) throw new Error("Failed to launch campaign");
+      if (!asDraft) {
+        const res = await apiFetch(`/api/campaigns/${campaignId}/status`, {
+          method: "PATCH",
+          body: JSON.stringify({ status: "active" }),
+        });
+        if (!res.ok) throw new Error("Failed to launch campaign");
+      }
 
       setLaunchSuccess(true);
     } catch (error: any) {
@@ -253,7 +319,7 @@ export default function CampaignWizard() {
     } finally {
       setIsLoading(false);
     }
-  }, [campaignId, dailyBudget, apiFetch]);
+  }, [campaignId, effectiveBudget, creative, radius, duration, apiFetch]);
 
   // ---- Progress Bar ----
   const currentMainStep = step === 0 || step === 1 ? 0 : step - 1;
@@ -295,7 +361,7 @@ export default function CampaignWizard() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <ProgressBar />
 
-      {/* STEP 1: Choose Method */}
+      {/* ==================== STEP 1: Choose Method ==================== */}
       {step === 0 && subStep === "choose" && (
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl font-bold mb-2">How would you like to set up your job?</h2>
@@ -304,7 +370,7 @@ export default function CampaignWizard() {
           <div className="space-y-4">
             <Card
               className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-              onClick={() => { setSubStep("url"); }}
+              onClick={() => setSubStep("url")}
             >
               <CardContent className="flex items-center justify-between p-6">
                 <div className="flex items-start gap-4">
@@ -329,7 +395,7 @@ export default function CampaignWizard() {
 
             <Card
               className="cursor-pointer hover:border-primary/50 hover:shadow-md transition-all group"
-              onClick={() => { setSubStep("manual"); }}
+              onClick={() => setSubStep("manual")}
             >
               <CardContent className="flex items-center justify-between p-6">
                 <div className="flex items-start gap-4">
@@ -350,7 +416,7 @@ export default function CampaignWizard() {
         </div>
       )}
 
-      {/* STEP 1B: URL Import */}
+      {/* ==================== STEP 1B: URL Import ==================== */}
       {step === 0 && subStep === "url" && (
         <div className="max-w-xl mx-auto">
           {isLoading ? (
@@ -381,11 +447,7 @@ export default function CampaignWizard() {
                 className="mb-4"
               />
 
-              <Button
-                onClick={handleUrlImport}
-                disabled={!url.trim()}
-                className="w-full mb-6"
-              >
+              <Button onClick={handleUrlImport} disabled={!url.trim()} className="w-full mb-6">
                 Continue <ArrowRight className="ml-2 h-4 w-4" />
               </Button>
 
@@ -403,7 +465,7 @@ export default function CampaignWizard() {
         </div>
       )}
 
-      {/* STEP 1C: Manual Entry */}
+      {/* ==================== STEP 1C: Manual Entry ==================== */}
       {step === 0 && subStep === "manual" && (
         <div className="max-w-xl mx-auto">
           <h2 className="text-2xl font-bold mb-2">Tell us about the role</h2>
@@ -443,13 +505,13 @@ export default function CampaignWizard() {
             </div>
 
             <div>
-              <Label>Employment Type</Label>
+              <Label>Job Type</Label>
               <RadioGroup
                 value={campaign.employmentType}
                 onValueChange={v => setCampaign(c => ({ ...c, employmentType: v }))}
                 className="flex flex-wrap gap-4 mt-2"
               >
-                {["Full-time", "Part-time", "Seasonal", "Per Diem"].map(t => (
+                {["Full-time", "Part-time", "Gig Shift", "Seasonal"].map(t => (
                   <div key={t} className="flex items-center space-x-2">
                     <RadioGroupItem value={t} id={t} />
                     <Label htmlFor={t} className="font-normal">{t}</Label>
@@ -459,7 +521,7 @@ export default function CampaignWizard() {
             </div>
 
             <div>
-              <Label>Pay Range</Label>
+              <Label>Pay Rate</Label>
               <div className="flex items-center gap-2 mt-2">
                 <span className="text-muted-foreground">$</span>
                 <Input
@@ -603,33 +665,150 @@ export default function CampaignWizard() {
         </div>
       )}
 
-      {/* STEP 2: Review Ad */}
+      {/* ==================== STEP 2: Ad Creative ==================== */}
       {step === 2 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Left: Live Preview */}
           <div>
-            <AdPreviewCard
-              orgName={orgName}
-              primaryColor={primaryColor}
-              headline={creative.headline}
-              subheadline={creative.subheadline}
-              bulletPoints={creative.bulletPoints}
-              payDisplay={creative.payDisplay}
-              benefitsDisplay={creative.benefitsDisplay}
-              cta={creative.cta}
-            />
-            <p className="text-xs text-muted-foreground text-center mt-3">
-              This is a sample ad. We'll test multiple versions to find the best performers.
-            </p>
+            <div className="sticky top-8">
+              {/* Facebook Feed Mockup */}
+              <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+                <div className="bg-[#1877F2] px-4 py-2 flex items-center gap-2">
+                  <Facebook className="h-4 w-4 text-white" />
+                  <span className="text-white text-xs font-medium">Facebook Feed Preview</span>
+                </div>
+                <div className="p-3">
+                  <AdPreviewCard
+                    orgName={orgName}
+                    primaryColor={primaryColor}
+                    headline={creative.headline}
+                    subheadline={creative.subheadline}
+                    bulletPoints={creative.bulletPoints}
+                    payDisplay={creative.payDisplay}
+                    benefitsDisplay={creative.benefitsDisplay}
+                    cta={creative.cta}
+                  />
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground text-center mt-3">
+                We'll test multiple versions to find the best performers.
+              </p>
+            </div>
           </div>
 
+          {/* Right: Controls */}
           <div>
             {!isEditing ? (
               <>
-                <h2 className="text-2xl font-bold mb-2">How does this look?</h2>
+                <h2 className="text-2xl font-bold mb-2">Your Ad Creative</h2>
                 <p className="text-muted-foreground mb-6">
-                  Review your ad and make any changes before setting your budget.
+                  Review your ad, choose an image, and select platforms.
                 </p>
 
+                {/* Ad Body Text */}
+                <div className="mb-6">
+                  <Label>Ad Body Text</Label>
+                  <Textarea
+                    value={creative.adBodyText}
+                    onChange={e => setCreative(c => ({ ...c, adBodyText: e.target.value }))}
+                    rows={4}
+                    className="mt-2 text-sm"
+                  />
+                </div>
+
+                {/* Image Selection */}
+                <div className="mb-6">
+                  <Label>Ad Image</Label>
+                  <p className="text-xs text-muted-foreground mb-3">
+                    Choose a stock image or upload your own
+                  </p>
+                  <div className="grid grid-cols-3 gap-2 mb-3">
+                    {STOCK_IMAGES.map(img => (
+                      <button
+                        key={img.id}
+                        onClick={() => setCreative(c => ({ ...c, imageChoice: img.id, customImageUrl: "" }))}
+                        className={`relative h-20 rounded-lg border-2 flex flex-col items-center justify-center gap-1 transition-all ${
+                          creative.imageChoice === img.id && !creative.customImageUrl
+                            ? "border-primary bg-primary/5"
+                            : "border-muted hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        <span className="text-2xl">{img.emoji}</span>
+                        <span className="text-xs font-medium">{img.label}</span>
+                        {creative.imageChoice === img.id && !creative.customImageUrl && (
+                          <div className="absolute top-1 right-1">
+                            <Check className="h-3.5 w-3.5 text-primary" />
+                          </div>
+                        )}
+                      </button>
+                    ))}
+                  </div>
+                  <label>
+                    <Button variant="outline" size="sm" asChild>
+                      <span className="cursor-pointer">
+                        <Upload className="mr-2 h-3.5 w-3.5" /> Upload Custom Image
+                      </span>
+                    </Button>
+                    <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) {
+                        const reader = new FileReader();
+                        reader.onload = () => {
+                          setCreative(c => ({ ...c, customImageUrl: reader.result as string, imageChoice: "custom" }));
+                        };
+                        reader.readAsDataURL(file);
+                      }
+                    }} />
+                  </label>
+                  {creative.customImageUrl && (
+                    <div className="mt-2 flex items-center gap-2">
+                      <img src={creative.customImageUrl} alt="Custom" className="h-12 w-12 rounded object-cover" />
+                      <span className="text-xs text-muted-foreground">Custom image selected</span>
+                      <Button variant="ghost" size="sm" onClick={() => setCreative(c => ({ ...c, customImageUrl: "", imageChoice: "server" }))}>
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Platform Toggles */}
+                <div className="mb-6">
+                  <Label>Platforms</Label>
+                  <div className="space-y-3 mt-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Facebook className="h-4 w-4 text-[#1877F2]" />
+                        <span className="text-sm">Facebook</span>
+                      </div>
+                      <Switch
+                        checked={creative.platforms.facebook}
+                        onCheckedChange={v => setCreative(c => ({ ...c, platforms: { ...c.platforms, facebook: v } }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Instagram className="h-4 w-4 text-[#E4405F]" />
+                        <span className="text-sm">Instagram Feed</span>
+                      </div>
+                      <Switch
+                        checked={creative.platforms.instagram}
+                        onCheckedChange={v => setCreative(c => ({ ...c, platforms: { ...c.platforms, instagram: v } }))}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Instagram className="h-4 w-4 text-[#E4405F]" />
+                        <span className="text-sm">Instagram Stories</span>
+                      </div>
+                      <Switch
+                        checked={creative.platforms.instagramStories}
+                        onCheckedChange={v => setCreative(c => ({ ...c, platforms: { ...c.platforms, instagramStories: v } }))}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Value props */}
                 <div className="space-y-4 mb-8">
                   <div className="flex items-start gap-3">
                     <div className="p-2 rounded-lg bg-green-50 dark:bg-green-950">
@@ -671,7 +850,7 @@ export default function CampaignWizard() {
                     Looks good, continue <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                   <Button variant="outline" onClick={() => setIsEditing(true)} className="w-full">
-                    Make changes
+                    Edit headline & details
                   </Button>
                   <button
                     onClick={() => { setStep(0); setSubStep("choose"); }}
@@ -738,7 +917,6 @@ export default function CampaignWizard() {
                     </Button>
                     <Button
                       onClick={async () => {
-                        // Save creative changes to API
                         if (campaignId) {
                           await apiFetch(`/api/campaigns/${campaignId}/creative`, {
                             method: "PATCH",
@@ -765,70 +943,167 @@ export default function CampaignWizard() {
         </div>
       )}
 
-      {/* STEP 3: Budget */}
+      {/* ==================== STEP 3: Audience & Budget ==================== */}
       {step === 3 && (
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div>
-            <h2 className="text-2xl font-bold mb-2">Set your budget</h2>
+            <h2 className="text-2xl font-bold mb-2">Audience & Budget</h2>
             <p className="text-muted-foreground mb-6">
-              Choose how much to spend daily on promoting your job.
+              Set your targeting radius, daily budget, and campaign duration.
             </p>
 
-            <div className="space-y-4">
-              <Card
-                className={`cursor-pointer transition-all ${budgetType === "recommended" ? "border-primary ring-1 ring-primary" : "hover:border-muted-foreground/30"}`}
-                onClick={() => setBudgetType("recommended")}
-              >
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-1">Recommended Budget</h3>
-                  <p className="text-3xl font-bold">$32 <span className="text-base font-normal text-muted-foreground">/ day</span></p>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Your budget decides how many candidates see your job ad. A higher budget means more visibility and more candidates applying.
-                  </p>
-                </CardContent>
-              </Card>
+            {/* Location Radius */}
+            <div className="mb-8">
+              <Label className="mb-3 block">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Targeting Radius
+                </div>
+              </Label>
+              <p className="text-sm text-muted-foreground mb-4">
+                Show your ad to people within <strong>{radius} miles</strong> of {campaign.location || "your location"}
+              </p>
+
+              {/* Map Preview */}
+              <div className="relative h-48 rounded-lg border bg-muted/30 mb-4 overflow-hidden flex items-center justify-center">
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div
+                    className="rounded-full border-2 border-primary/40 bg-primary/10 transition-all duration-300"
+                    style={{
+                      width: `${Math.min(90, radius * 3.5)}%`,
+                      height: `${Math.min(90, radius * 3.5)}%`,
+                    }}
+                  />
+                  <div className="absolute w-3 h-3 rounded-full bg-primary" />
+                </div>
+                <div className="absolute bottom-2 left-2 text-xs bg-background/80 backdrop-blur px-2 py-1 rounded">
+                  <MapPin className="h-3 w-3 inline mr-1" />
+                  {campaign.location || "Location"}
+                </div>
+                <div className="absolute bottom-2 right-2 text-xs bg-background/80 backdrop-blur px-2 py-1 rounded">
+                  {radius} mi radius
+                </div>
+              </div>
+
+              <div className="flex items-center gap-4">
+                <Slider
+                  value={[radius]}
+                  onValueChange={([v]) => setRadius(v)}
+                  min={5}
+                  max={50}
+                  step={5}
+                  className="flex-1"
+                />
+              </div>
+              <div className="flex justify-between text-xs text-muted-foreground mt-1">
+                <span>5 mi</span>
+                <span>10 mi</span>
+                <span>25 mi</span>
+                <span>50 mi</span>
+              </div>
+            </div>
+
+            {/* Daily Budget */}
+            <div className="mb-8">
+              <Label className="mb-3 block">Daily Budget</Label>
+              <div className="grid grid-cols-2 gap-2 mb-3">
+                {BUDGET_OPTIONS.map(opt => (
+                  <Card
+                    key={opt.amount}
+                    className={`cursor-pointer transition-all ${
+                      !customBudgetMode && dailyBudget === opt.amount
+                        ? "border-primary ring-1 ring-primary"
+                        : "hover:border-muted-foreground/30"
+                    }`}
+                    onClick={() => {
+                      setCustomBudgetMode(false);
+                      setDailyBudget(opt.amount);
+                    }}
+                  >
+                    <CardContent className="p-4">
+                      <p className="text-lg font-bold">${opt.amount}<span className="text-sm font-normal text-muted-foreground">/day</span></p>
+                      <p className="text-xs text-muted-foreground">{opt.reach}</p>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
 
               <Card
-                className={`cursor-pointer transition-all ${budgetType === "custom" ? "border-primary ring-1 ring-primary" : "hover:border-muted-foreground/30"}`}
-                onClick={() => setBudgetType("custom")}
+                className={`cursor-pointer transition-all ${
+                  customBudgetMode ? "border-primary ring-1 ring-primary" : "hover:border-muted-foreground/30"
+                }`}
+                onClick={() => setCustomBudgetMode(true)}
               >
-                <CardContent className="p-6">
-                  <h3 className="font-semibold mb-1">Custom Budget</h3>
-                  {budgetType === "custom" ? (
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-lg">$</span>
-                      <Input
-                        type="number"
-                        min={10}
-                        max={200}
-                        value={customBudget}
-                        onChange={e => setCustomBudget(Math.min(200, Math.max(10, parseInt(e.target.value) || 10)))}
-                        className="w-24 text-lg"
-                        onClick={e => e.stopPropagation()}
-                      />
-                      <span className="text-muted-foreground">/ day</span>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground mt-1">Set a custom daily budget (min $10, max $200)</p>
-                  )}
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Your budget decides how many candidates see your job ad.
-                  </p>
+                <CardContent className="p-4">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Custom Budget</span>
+                    {customBudgetMode && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">$</span>
+                        <Input
+                          type="number"
+                          min={5}
+                          max={200}
+                          value={customBudgetValue}
+                          onChange={e => setCustomBudgetValue(Math.min(200, Math.max(5, parseInt(e.target.value) || 5)))}
+                          className="w-20"
+                          onClick={e => e.stopPropagation()}
+                        />
+                        <span className="text-muted-foreground text-sm">/day</span>
+                      </div>
+                    )}
+                  </div>
                 </CardContent>
               </Card>
             </div>
 
-            <Button onClick={() => setStep(4)} className="w-full mt-6" size="lg">
-              Proceed to checkout <ArrowRight className="ml-2 h-4 w-4" />
+            {/* Campaign Duration */}
+            <div className="mb-8">
+              <Label className="mb-3 block">
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Campaign Duration
+                </div>
+              </Label>
+              <div className="flex gap-2">
+                {DURATION_OPTIONS.map(opt => (
+                  <Button
+                    key={opt.value}
+                    variant={duration === opt.value ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setDuration(opt.value)}
+                  >
+                    {opt.label}
+                  </Button>
+                ))}
+              </div>
+            </div>
+
+            {/* Total Estimated Spend */}
+            <Card className="mb-6 bg-muted/30">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-muted-foreground">Total estimated spend</span>
+                  <span className="text-lg font-bold">
+                    ${totalEstSpend}
+                    {duration === 0 && <span className="text-sm font-normal text-muted-foreground">/mo</span>}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  ${effectiveBudget}/day {duration > 0 ? `x ${duration} days` : "(ongoing, billed monthly)"}. Pause or cancel at any time.
+                </p>
+              </CardContent>
+            </Card>
+
+            <Button onClick={() => setStep(4)} className="w-full" size="lg">
+              Review & Launch <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
-            <p className="text-xs text-muted-foreground text-center mt-2">
-              You can pause or cancel at any time
-            </p>
-            <Button variant="ghost" className="mt-2" onClick={() => setStep(2)}>
-              <ChevronLeft className="mr-2 h-4 w-4" /> Back to review
+            <Button variant="ghost" className="w-full mt-2" onClick={() => setStep(2)}>
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back to ad creative
             </Button>
           </div>
 
+          {/* Right: FAQ */}
           <div>
             <Accordion type="single" collapsible defaultValue="spend">
               <AccordionItem value="spend">
@@ -836,7 +1111,7 @@ export default function CampaignWizard() {
                   How much should I spend?
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
-                  $32/day is our recommended starting budget for most restaurant roles. This ensures a steady candidate flow. You can pause or adjust at any time.
+                  $25/day is a great starting budget for most restaurant roles. This typically generates 5-15 applications per day. For urgent hires or competitive markets, try $50/day.
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="paying">
@@ -853,6 +1128,14 @@ export default function CampaignWizard() {
                 </AccordionTrigger>
                 <AccordionContent className="text-sm text-muted-foreground">
                   Most restaurants see their first applicants within 24-48 hours of launching a campaign.
+                </AccordionContent>
+              </AccordionItem>
+              <AccordionItem value="radius">
+                <AccordionTrigger className="text-sm font-semibold uppercase tracking-wide">
+                  What radius should I choose?
+                </AccordionTrigger>
+                <AccordionContent className="text-sm text-muted-foreground">
+                  10-15 miles works best for urban areas. For suburban or rural locations, try 25-50 miles. A wider radius means more reach but potentially longer commutes for candidates.
                 </AccordionContent>
               </AccordionItem>
               <AccordionItem value="charged">
@@ -876,45 +1159,85 @@ export default function CampaignWizard() {
         </div>
       )}
 
-      {/* STEP 4: Checkout */}
+      {/* ==================== STEP 4: Review & Launch ==================== */}
       {step === 4 && (
-        <div className="max-w-lg mx-auto">
-          <h2 className="text-2xl font-bold mb-6">Checkout and Post</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div>
+            <h2 className="text-2xl font-bold mb-6">Review & Launch</h2>
 
-          <Card className="mb-6">
-            <CardContent className="p-6 space-y-3">
-              <h3 className="font-semibold mb-3">Review your campaign</h3>
-              <div className="grid grid-cols-2 gap-y-3 text-sm">
-                <span className="text-muted-foreground">Job:</span>
-                <span className="font-medium">{campaign.title} - {campaign.location}</span>
-                <span className="text-muted-foreground">Employment:</span>
-                <span>{campaign.employmentType}</span>
-                <span className="text-muted-foreground">Pay:</span>
-                <span>{creative.payDisplay || "Not specified"}</span>
-                <span className="text-muted-foreground">Daily Budget:</span>
-                <span className="font-medium">${dailyBudget}/day</span>
-                <span className="text-muted-foreground">Est. weekly:</span>
-                <span>${dailyBudget * 7}</span>
-              </div>
-            </CardContent>
-          </Card>
+            <Card className="mb-6">
+              <CardContent className="p-6 space-y-3">
+                <h3 className="font-semibold mb-3">Campaign Summary</h3>
+                <div className="grid grid-cols-2 gap-y-3 text-sm">
+                  <span className="text-muted-foreground">Job:</span>
+                  <span className="font-medium">{campaign.title}</span>
+                  <span className="text-muted-foreground">Location:</span>
+                  <span>{campaign.location}</span>
+                  <span className="text-muted-foreground">Type:</span>
+                  <span>{campaign.employmentType}</span>
+                  <span className="text-muted-foreground">Pay:</span>
+                  <span>{creative.payDisplay || "Not specified"}</span>
+                  <span className="text-muted-foreground">Targeting:</span>
+                  <span>{radius} mile radius</span>
+                  <span className="text-muted-foreground">Platforms:</span>
+                  <span>
+                    {[
+                      creative.platforms.facebook && "Facebook",
+                      creative.platforms.instagram && "Instagram",
+                      creative.platforms.instagramStories && "Stories",
+                    ].filter(Boolean).join(", ")}
+                  </span>
+                  <span className="text-muted-foreground">Daily Budget:</span>
+                  <span className="font-medium">${effectiveBudget}/day</span>
+                  <span className="text-muted-foreground">Duration:</span>
+                  <span>{duration > 0 ? `${duration} days` : "Ongoing"}</span>
+                  <span className="text-muted-foreground">Est. Total:</span>
+                  <span className="font-medium">${totalEstSpend}{duration === 0 ? "/mo" : ""}</span>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Button
-            onClick={handleLaunch}
-            disabled={isLoading}
-            className="w-full"
-            size="lg"
-          >
-            {isLoading ? (
-              <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Launching...</>
-            ) : (
-              <><Rocket className="mr-2 h-4 w-4" /> Launch Campaign</>
-            )}
-          </Button>
+            <Button
+              onClick={() => handleLaunch(false)}
+              disabled={isLoading}
+              className="w-full"
+              size="lg"
+            >
+              {isLoading ? (
+                <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Launching...</>
+              ) : (
+                <><Rocket className="mr-2 h-4 w-4" /> Launch Campaign</>
+              )}
+            </Button>
 
-          <Button variant="ghost" className="w-full mt-3" onClick={() => setStep(3)}>
-            <ChevronLeft className="mr-2 h-4 w-4" /> Back to budget
-          </Button>
+            <Button
+              variant="outline"
+              onClick={() => handleLaunch(true)}
+              disabled={isLoading}
+              className="w-full mt-3"
+            >
+              Save as Draft
+            </Button>
+
+            <Button variant="ghost" className="w-full mt-2" onClick={() => setStep(3)}>
+              <ChevronLeft className="mr-2 h-4 w-4" /> Back to budget
+            </Button>
+          </div>
+
+          {/* Right: Ad Preview */}
+          <div>
+            <p className="text-sm font-medium mb-3">Ad Preview</p>
+            <AdPreviewCard
+              orgName={orgName}
+              primaryColor={primaryColor}
+              headline={creative.headline}
+              subheadline={creative.subheadline}
+              bulletPoints={creative.bulletPoints}
+              payDisplay={creative.payDisplay}
+              benefitsDisplay={creative.benefitsDisplay}
+              cta={creative.cta}
+            />
+          </div>
         </div>
       )}
     </div>

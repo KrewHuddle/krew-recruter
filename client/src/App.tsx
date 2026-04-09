@@ -47,6 +47,10 @@ import CampaignDashboard from "@/pages/campaign-dashboard";
 import CampaignJobs from "@/pages/campaign-jobs";
 import CampaignCandidates from "@/pages/campaign-candidates";
 import CampaignWizard from "@/pages/campaign-wizard";
+import CampaignBilling from "@/pages/campaign-billing";
+import CampaignInterviews from "@/pages/campaign-interviews";
+import CampaignHelp from "@/pages/campaign-help";
+import CampaignSettings from "@/pages/campaign-settings";
 
 import { Loader2, Shield } from "lucide-react";
 import type { UserProfile } from "@shared/schema";
@@ -452,6 +456,16 @@ function AppRouter() {
           <CampaignCandidates />
         </ProtectedCampaignRoute>
       </Route>
+      <Route path="/campaign/interviews">
+        <ProtectedCampaignRoute>
+          <CampaignInterviews />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/help">
+        <ProtectedCampaignRoute>
+          <CampaignHelp />
+        </ProtectedCampaignRoute>
+      </Route>
       <Route path="/campaign/jobs/:id">
         <ProtectedCampaignRoute>
           <PlaceholderPage title="Job Detail" />
@@ -464,12 +478,12 @@ function AppRouter() {
       </Route>
       <Route path="/campaign/billing">
         <ProtectedCampaignRoute>
-          <PlaceholderPage title="Billing" />
+          <CampaignBilling />
         </ProtectedCampaignRoute>
       </Route>
       <Route path="/campaign/settings">
         <ProtectedCampaignRoute>
-          <PlaceholderPage title="Settings" />
+          <CampaignSettings />
         </ProtectedCampaignRoute>
       </Route>
 

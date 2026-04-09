@@ -10,6 +10,8 @@ import {
   Settings,
   LogOut,
   ChevronDown,
+  Video,
+  HelpCircle,
 } from "lucide-react";
 
 interface OrgInfo {
@@ -36,8 +38,10 @@ const navItems = [
   { title: "Dashboard", href: "/campaign", icon: LayoutDashboard },
   { title: "Jobs", href: "/campaign/jobs", icon: Briefcase },
   { title: "Candidates", href: "/campaign/candidates", icon: Users },
+  { title: "Video Interviews", href: "/campaign/interviews", icon: Video },
   { title: "Team", href: "/campaign/team", icon: UserPlus },
   { title: "Billing", href: "/campaign/billing", icon: CreditCard },
+  { title: "Help", href: "/campaign/help", icon: HelpCircle },
 ];
 
 export function CampaignSidebar({
