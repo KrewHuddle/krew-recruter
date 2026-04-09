@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
+import { CustomizeAdModal } from "@/components/CustomizeAdModal";
 
 interface CampaignData {
   id?: string;
@@ -102,6 +103,7 @@ export default function CampaignWizard() {
   const [budgetType, setBudgetType] = useState<"recommended" | "custom">("recommended");
   const [customBudget, setCustomBudget] = useState(32);
   const [isEditing, setIsEditing] = useState(false);
+  const [customizeModalOpen, setCustomizeModalOpen] = useState(false);
   const [newRequirement, setNewRequirement] = useState("");
   const [launchSuccess, setLaunchSuccess] = useState(false);
   const [adImageSrc, setAdImageSrc] = useState<string | null>(null);
@@ -260,6 +262,35 @@ export default function CampaignWizard() {
       setIsLoading(false);
     }
   }, [campaign, apiFetch, toast, generatePreviewImage]);
+
+  // ---- Regenerate ad with instructions ----
+  const handleRegenerateAd = useCallback(async (instructions: string) => {
+    if (!campaignId) return;
+    try {
+      const res = await apiFetch(`/api/campaigns/${campaignId}/regenerate`, {
+        method: "POST",
+        body: JSON.stringify({ instructions }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.creative) {
+          setCreative({
+            headline: data.creative.headline || creative.headline,
+            subheadline: data.creative.subheadline || creative.subheadline,
+            bulletPoints: data.creative.bullet_points || creative.bulletPoints,
+            payDisplay: data.creative.pay_display || creative.payDisplay,
+            benefitsDisplay: data.creative.benefits_display || creative.benefitsDisplay,
+            cta: data.creative.cta || creative.cta,
+          });
+          toast({ title: "Ad updated!", description: "Your ad has been regenerated with your changes." });
+          // Regenerate preview image with new creative
+          setTimeout(() => generatePreviewImage(), 100);
+        }
+      }
+    } catch {
+      toast({ title: "Regeneration failed", description: "Please try again.", variant: "destructive" });
+    }
+  }, [campaignId, apiFetch, creative, toast, generatePreviewImage]);
 
   // ---- Launch ----
   const handleLaunch = useCallback(async () => {
@@ -687,7 +718,7 @@ export default function CampaignWizard() {
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => setIsEditing(true)}
+                    onClick={() => setCustomizeModalOpen(true)}
                   >
                     <Image className="mr-1 h-3.5 w-3.5" /> Customize
                   </Button>
@@ -721,6 +752,22 @@ export default function CampaignWizard() {
               This is a sample ad. We'll test multiple versions to find the best performers.
             </p>
           </div>
+
+          {/* Customize Ad Modal */}
+          <CustomizeAdModal
+            isOpen={customizeModalOpen}
+            onClose={() => setCustomizeModalOpen(false)}
+            currentAd={{
+              headline: creative.headline,
+              jobTitle: campaign.title,
+              location: campaign.location,
+              pay: creative.payDisplay,
+              requirements: creative.bulletPoints,
+              benefits: creative.benefitsDisplay,
+              companyName: campaign.companyName || orgName,
+            }}
+            onRegenerate={handleRegenerateAd}
+          />
 
           {/* Right: Actions */}
           <div>
@@ -759,7 +806,7 @@ export default function CampaignWizard() {
                   <Button onClick={() => setStep(3)} className="w-full" size="lg">
                     Looks good, continue <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
-                  <Button variant="outline" onClick={() => setIsEditing(true)} className="w-full">
+                  <Button variant="outline" onClick={() => setCustomizeModalOpen(true)} className="w-full">
                     Make changes
                   </Button>
                   <button onClick={() => { setStep(0); setSubStep("choose"); }}

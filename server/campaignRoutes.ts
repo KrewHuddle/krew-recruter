@@ -394,11 +394,12 @@ router.patch("/campaigns/:id/creative", requireAuth, requireOrg, async (req: Req
   }
 });
 
-// POST /api/campaigns/:id/regenerate — regenerate ad creative
+// POST /api/campaigns/:id/regenerate — regenerate ad creative with optional instructions
 router.post("/campaigns/:id/regenerate", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
     const { id } = req.params;
+    const { instructions } = req.body;
 
     const [campaign] = await db.select().from(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId)));
@@ -412,8 +413,8 @@ router.post("/campaigns/:id/regenerate", requireAuth, requireOrg, async (req: Re
       .set({ isActive: false })
       .where(eq(adCreatives.campaignId, id));
 
-    // Generate new creative
-    const adData = await generateAdCreative(campaign);
+    // Generate new creative (with optional customization instructions)
+    const adData = await generateAdCreative(campaign, instructions);
     if (!adData) {
       return res.status(500).json({ error: "Failed to generate ad creative" });
     }
@@ -428,7 +429,7 @@ router.post("/campaigns/:id/regenerate", requireAuth, requireOrg, async (req: Re
       cta: adData.cta || "Apply Now",
     }).returning();
 
-    res.json(creative);
+    res.json({ creative: adData, saved: creative });
   } catch (error) {
     console.error("Regenerate creative error:", error);
     res.status(500).json({ error: "Failed to regenerate ad creative" });
@@ -982,7 +983,7 @@ ${cleanText}`,
   }
 }
 
-async function generateAdCreative(campaign: any): Promise<any> {
+async function generateAdCreative(campaign: any, instructions?: string): Promise<any> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
     console.error("ANTHROPIC_API_KEY not set, returning default creative");
@@ -1047,7 +1048,7 @@ Return JSON in this exact format:
   ]
 }
 
-Generate 4-5 screening questions relevant to the ${campaign.title} role. For kitchen roles: experience, weekend availability, certifications. For FOH roles: customer service, alcohol certifications. For management: team size, P&L experience.`,
+Generate 4-5 screening questions relevant to the ${campaign.title} role. For kitchen roles: experience, weekend availability, certifications. For FOH roles: customer service, alcohol certifications. For management: team size, P&L experience.${instructions ? `\n\nIMPORTANT — The employer wants these specific changes:\n${instructions}` : ""}`,
         }],
       }),
     });
@@ -1056,7 +1057,8 @@ Generate 4-5 screening questions relevant to the ${campaign.title} role. For kit
     const text = data.content?.[0]?.text;
     if (!text) return null;
 
-    return JSON.parse(text);
+    const jsonStr = text.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+    return JSON.parse(jsonStr);
   } catch (error) {
     console.error("Claude ad generation error:", error);
     return null;
