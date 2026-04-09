@@ -4048,11 +4048,10 @@ export async function registerRoutes(
   // Preview ad image (returns base64 PNG)
   app.post(
     "/api/campaign/preview-image",
-    isAuthenticated,
-    requireTenant,
+    requireAuth,
     async (req, res) => {
       try {
-        const tenantId = (req as any).tenantId as string;
+        const tenantId = req.orgId || (req as any).tenantId || getTenantIdFromCookie(req);
         const { jobId, format, ...overrides } = req.body;
 
         let imageInput: { title: string; company: string; location: string; pay: string; requirements: string[]; benefits: string[]; logoUrl?: string; primaryColor?: string; accentColor?: string };
@@ -4104,11 +4103,10 @@ export async function registerRoutes(
   // Generate and save ad image
   app.post(
     "/api/campaign/generate-image",
-    isAuthenticated,
-    requireTenant,
+    requireAuth,
     async (req, res) => {
       try {
-        const tenantId = (req as any).tenantId as string;
+        const tenantId = req.orgId || (req as any).tenantId || getTenantIdFromCookie(req);
         const { campaignId, format } = req.body;
 
         if (!campaignId) {

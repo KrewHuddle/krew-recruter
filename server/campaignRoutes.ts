@@ -8,6 +8,9 @@ import {
 } from "@shared/schema";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import { requireAuth, requireOrg } from "./jwtAuth";
+import multer from "multer";
+import path from "path";
+import fs from "fs/promises";
 
 const router = Router();
 
@@ -61,6 +64,10 @@ router.post("/campaigns", requireAuth, requireOrg, async (req: Request, res: Res
     if (!title) {
       return res.status(400).json({ error: "Job title is required" });
     }
+
+    // Fetch org branding for logo/colors
+    const [branding] = await db.select().from(orgBranding)
+      .where(eq(orgBranding.orgId, orgId));
 
     const [campaign] = await db.insert(campaigns).values({
       orgId,
@@ -620,6 +627,162 @@ router.patch("/org/branding", requireAuth, requireOrg, async (req: Request, res:
   } catch (error) {
     console.error("Update branding error:", error);
     res.status(500).json({ error: "Failed to update branding" });
+  }
+});
+
+// PUT /api/org/branding (alias for PATCH — client sends PUT)
+router.put("/org/branding", requireAuth, requireOrg, async (req: Request, res: Response) => {
+  try {
+    const orgId = req.orgId!;
+    const { name, website, logoUrl, coverUrl, coverPhotoUrl, primaryColor, accentColor, glassdoorRating } = req.body;
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (website !== undefined) updates.website = website;
+    if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+    if (coverUrl !== undefined) updates.coverPhotoUrl = coverUrl;
+    if (coverPhotoUrl !== undefined) updates.coverPhotoUrl = coverPhotoUrl;
+    if (primaryColor !== undefined) updates.primaryColor = primaryColor;
+    if (accentColor !== undefined) updates.accentColor = accentColor;
+    if (glassdoorRating !== undefined) updates.glassdoorRating = glassdoorRating;
+
+    const [existing] = await db.select().from(orgBranding)
+      .where(eq(orgBranding.orgId, orgId));
+
+    let result;
+    if (existing) {
+      [result] = await db.update(orgBranding)
+        .set(updates)
+        .where(eq(orgBranding.orgId, orgId))
+        .returning();
+    } else {
+      [result] = await db.insert(orgBranding).values({
+        orgId,
+        ...updates,
+      }).returning();
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Update branding error:", error);
+    res.status(500).json({ error: "Failed to update branding" });
+  }
+});
+
+// PUT /api/org/settings (alias used by campaign-settings page)
+router.put("/org/settings", requireAuth, requireOrg, async (req: Request, res: Response) => {
+  try {
+    const orgId = req.orgId!;
+    const { name, primaryColor, logoUrl } = req.body;
+
+    const updates: Record<string, any> = { updatedAt: new Date() };
+    if (name !== undefined) updates.name = name;
+    if (primaryColor !== undefined) updates.primaryColor = primaryColor;
+    if (logoUrl !== undefined) updates.logoUrl = logoUrl;
+
+    const [existing] = await db.select().from(orgBranding)
+      .where(eq(orgBranding.orgId, orgId));
+
+    let result;
+    if (existing) {
+      [result] = await db.update(orgBranding)
+        .set(updates)
+        .where(eq(orgBranding.orgId, orgId))
+        .returning();
+    } else {
+      [result] = await db.insert(orgBranding).values({
+        orgId,
+        ...updates,
+      }).returning();
+    }
+
+    res.json(result);
+  } catch (error) {
+    console.error("Update settings error:", error);
+    res.status(500).json({ error: "Failed to update settings" });
+  }
+});
+
+// ============ ORG FILE UPLOADS ============
+
+const logoUpload = multer({
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Only JPG, PNG, GIF, and WebP images are allowed"));
+    }
+  },
+  storage: multer.memoryStorage(),
+});
+
+// POST /api/org/logo — upload org logo
+router.post("/org/logo", requireAuth, requireOrg, logoUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const orgId = req.orgId!;
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const ext = path.extname(file.originalname) || ".png";
+    const filename = `${orgId}-logo-${Date.now()}${ext}`;
+    const uploadsDir = path.join(process.cwd(), "uploads", "org-logos");
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
+
+    const url = `/uploads/org-logos/${filename}`;
+
+    // Save to branding record
+    const [existing] = await db.select().from(orgBranding)
+      .where(eq(orgBranding.orgId, orgId));
+
+    if (existing) {
+      await db.update(orgBranding)
+        .set({ logoUrl: url, updatedAt: new Date() })
+        .where(eq(orgBranding.orgId, orgId));
+    } else {
+      await db.insert(orgBranding).values({ orgId, logoUrl: url });
+    }
+
+    res.json({ url });
+  } catch (error: any) {
+    console.error("Logo upload error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload logo" });
+  }
+});
+
+// POST /api/org/cover — upload org cover photo
+router.post("/org/cover", requireAuth, requireOrg, logoUpload.single("file"), async (req: Request, res: Response) => {
+  try {
+    const orgId = req.orgId!;
+    const file = (req as any).file;
+    if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+    const ext = path.extname(file.originalname) || ".png";
+    const filename = `${orgId}-cover-${Date.now()}${ext}`;
+    const uploadsDir = path.join(process.cwd(), "uploads", "org-covers");
+    await fs.mkdir(uploadsDir, { recursive: true });
+    await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
+
+    const url = `/uploads/org-covers/${filename}`;
+
+    // Save to branding record
+    const [existing] = await db.select().from(orgBranding)
+      .where(eq(orgBranding.orgId, orgId));
+
+    if (existing) {
+      await db.update(orgBranding)
+        .set({ coverPhotoUrl: url, updatedAt: new Date() })
+        .where(eq(orgBranding.orgId, orgId));
+    } else {
+      await db.insert(orgBranding).values({ orgId, coverPhotoUrl: url });
+    }
+
+    res.json({ url });
+  } catch (error: any) {
+    console.error("Cover upload error:", error);
+    res.status(500).json({ error: error.message || "Failed to upload cover" });
   }
 });
 

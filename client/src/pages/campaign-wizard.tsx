@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { useCampaignAuth } from "@/lib/campaign-auth";
 import { AdPreviewCard } from "@/components/ad-preview-card";
 import { Button } from "@/components/ui/button";
@@ -68,6 +69,17 @@ export default function CampaignWizard() {
   const currentOrg = organizations.find(o => o.orgId === orgId);
   const orgName = currentOrg?.orgName || "Your Restaurant";
 
+  // Fetch org branding for logo/colors in ad previews
+  const { data: branding } = useQuery({
+    queryKey: ["/api/org/branding", orgId],
+    queryFn: async () => {
+      const res = await apiFetch("/api/org/branding");
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!orgId,
+  });
+
   const [step, setStep] = useState(0);
   const [subStep, setSubStep] = useState<"choose" | "url" | "manual">("choose");
   const [isLoading, setIsLoading] = useState(false);
@@ -100,24 +112,32 @@ export default function CampaignWizard() {
   const generatePreviewImage = useCallback(async () => {
     setImageLoading(true);
     try {
-      const res = await apiRequest("POST", "/api/campaign/preview-image", {
-        title: campaign.title,
-        company: campaign.companyName || orgName,
-        location: campaign.location,
-        pay: creative.payDisplay,
-        requirements: creative.bulletPoints,
-        benefits: creative.benefitsDisplay,
+      const res = await apiFetch("/api/campaign/preview-image", {
+        method: "POST",
+        body: JSON.stringify({
+          title: campaign.title,
+          company: campaign.companyName || orgName,
+          location: campaign.location,
+          pay: creative.payDisplay,
+          requirements: creative.bulletPoints,
+          benefits: creative.benefitsDisplay,
+          logoUrl: branding?.logoUrl || undefined,
+          primaryColor: branding?.primaryColor || undefined,
+          accentColor: branding?.accentColor || undefined,
+        }),
       });
-      const data = await res.json();
-      if (data.image) {
-        setAdImageSrc(data.image);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.image) {
+          setAdImageSrc(data.image);
+        }
       }
     } catch {
       // Fall back to HTML preview if image generation fails
     } finally {
       setImageLoading(false);
     }
-  }, [campaign, creative, orgName]);
+  }, [campaign, creative, orgName, branding, apiFetch]);
 
   // ---- URL Import ----
   const handleUrlImport = useCallback(async () => {
@@ -587,9 +607,56 @@ export default function CampaignWizard() {
 
   // ============ STEP 2: Review your Ad (full page) ============
   if (step === 2) {
+    const showLogoPrompt = !branding?.logoUrl && !localStorage.getItem("krew_logo_prompt_shown");
+
     return (
       <div className="max-w-5xl mx-auto px-6 py-8">
         <Stepper />
+
+        {/* Logo upload prompt for first-time users */}
+        {showLogoPrompt && (
+          <Card className="mb-6 border-primary/20 bg-primary/5">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary font-bold">
+                  {(campaign.companyName || orgName).charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <p className="text-sm font-medium">Add your restaurant logo</p>
+                  <p className="text-xs text-muted-foreground">Your logo appears in every job ad and helps candidates recognize your brand.</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <label>
+                  <Button size="sm" asChild>
+                    <span className="cursor-pointer">Upload Logo</span>
+                  </Button>
+                  <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const formData = new FormData();
+                    formData.append("file", file);
+                    try {
+                      const res = await apiFetch("/api/org/logo", { method: "POST", headers: {}, body: formData });
+                      if (res.ok) {
+                        const data = await res.json();
+                        localStorage.setItem("krew_logo_prompt_shown", "1");
+                        toast({ title: "Logo uploaded!", description: "Your logo will appear in ad previews." });
+                      }
+                    } catch {}
+                  }} />
+                </label>
+                <Button variant="ghost" size="sm" onClick={() => {
+                  localStorage.setItem("krew_logo_prompt_shown", "1");
+                  // Force re-render
+                  setStep(2);
+                }}>
+                  Skip
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-8">
           {/* Left: Ad Preview (Generated Image or Fallback) */}

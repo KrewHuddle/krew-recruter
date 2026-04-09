@@ -59,10 +59,11 @@ function buildFeedHtml(job: AdImageInput): string {
     )
     .join("");
 
+  const companyInitial = (job.company || "K").charAt(0).toUpperCase();
   const logoSection = job.logoUrl
     ? `<img src="${escapeHtml(job.logoUrl)}" style="width:160px;height:160px;border-radius:20px;object-fit:contain;background:rgba(255,255,255,0.05);box-shadow:0 8px 32px rgba(0,0,0,0.4);" />`
-    : `<div style="width:160px;height:160px;border-radius:20px;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-        <span style="font-size:64px;">🍽️</span>
+    : `<div style="width:160px;height:160px;border-radius:20px;background:${accent};display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+        <span style="font-size:72px;font-weight:900;color:white;font-family:'Inter',sans-serif;">${companyInitial}</span>
       </div>`;
 
   return `<!DOCTYPE html>
@@ -180,10 +181,11 @@ function buildSquareHtml(job: AdImageInput): string {
     )
     .join("");
 
+  const squareInitial = (job.company || "K").charAt(0).toUpperCase();
   const logoSection = job.logoUrl
     ? `<img src="${escapeHtml(job.logoUrl)}" style="width:120px;height:120px;border-radius:16px;object-fit:contain;background:rgba(255,255,255,0.05);box-shadow:0 8px 32px rgba(0,0,0,0.4);" />`
-    : `<div style="width:120px;height:120px;border-radius:16px;background:rgba(255,255,255,0.05);display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
-        <span style="font-size:48px;">🍽️</span>
+    : `<div style="width:120px;height:120px;border-radius:16px;background:${accent};display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+        <span style="font-size:56px;font-weight:900;color:white;font-family:'Inter',sans-serif;">${squareInitial}</span>
       </div>`;
 
   return `<!DOCTYPE html>
