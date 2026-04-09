@@ -5,9 +5,10 @@ import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUser
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
-import { getStripePublishableKey } from "./stripeUtils";
+import { getStripePublishableKey, getStripeClient } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
 import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
+import { requirePlan } from "./middleware/requirePlan";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -81,10 +82,17 @@ export async function registerRoutes(
 
   // Setup campaign engine routes (JWT-based)
   const { default: campaignRouter } = await import("./campaignRoutes");
-  const { registerHandler, loginHandler, meHandler, requireAuth } = await import("./jwtAuth");
+  const { registerHandler, loginHandler, meHandler, logoutHandler, requireAuth } = await import("./jwtAuth");
   app.post("/api/v2/auth/register", registerHandler);
   app.post("/api/v2/auth/login", loginHandler);
   app.get("/api/v2/auth/me", requireAuth, meHandler);
+
+  // Aliases so frontend can use /api/auth/* uniformly
+  app.post("/api/auth/register", registerHandler);
+  app.post("/api/auth/login", loginHandler);
+  app.get("/api/auth/me", requireAuth, meHandler);
+  app.post("/api/auth/logout", logoutHandler);
+
   app.use("/api", campaignRouter);
 
   // TODO: Object storage routes will use Supabase Storage (replacing Replit object storage)
@@ -221,6 +229,7 @@ export async function registerRoutes(
     "/api/locations",
     isAuthenticated,
     requireTenant,
+    requirePlan("STARTER", "PRO", "ENTERPRISE"),
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {
@@ -1276,6 +1285,7 @@ export async function registerRoutes(
     "/api/interviews/templates",
     isAuthenticated,
     requireTenant,
+    requirePlan("PRO", "ENTERPRISE"),
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {
@@ -2784,6 +2794,41 @@ export async function registerRoutes(
     }
   });
 
+  // Invoice history
+  app.get("/api/billing/invoices", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+      const billing = await storage.getTenantBilling(tenantId);
+
+      if (!billing?.stripeCustomerId) {
+        return res.json({ invoices: [] });
+      }
+
+      const stripe = getStripeClient();
+      const invoices = await stripe.invoices.list({
+        customer: billing.stripeCustomerId,
+        limit: 24,
+        status: "paid",
+      });
+
+      const formatted = invoices.data.map(inv => ({
+        id: inv.id,
+        date: new Date(inv.created * 1000).toISOString(),
+        amount: inv.amount_paid / 100,
+        currency: inv.currency.toUpperCase(),
+        status: inv.status,
+        description: inv.lines.data[0]?.description || "Subscription",
+        downloadUrl: inv.hosted_invoice_url,
+        pdfUrl: inv.invoice_pdf,
+      }));
+
+      res.json({ invoices: formatted });
+    } catch (error) {
+      console.error("Error fetching invoices:", error);
+      res.status(500).json({ error: "Failed to fetch invoices" });
+    }
+  });
+
   // ============ WORKER PAYOUT ROUTES ============
 
   // Get worker payout account status
@@ -3398,7 +3443,7 @@ export async function registerRoutes(
   const talentDb = (await import("./db")).db;
 
   // Search talent pool
-  app.get("/api/talent/search", isAuthenticated, requireTenant, async (req, res) => {
+  app.get("/api/talent/search", isAuthenticated, requireTenant, requirePlan("PRO", "ENTERPRISE"), async (req, res) => {
     try {
       const {
         q, city, state, radius = "25", jobTitle,
@@ -3664,6 +3709,7 @@ export async function registerRoutes(
     "/api/meta/campaign",
     isAuthenticated,
     requireTenant,
+    requirePlan("PRO", "ENTERPRISE"),
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {

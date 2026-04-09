@@ -58,6 +58,7 @@ import CampaignSettings from "@/pages/campaign-settings";
 import CampaignTeam from "@/pages/campaign-team";
 
 import { Loader2, Shield } from "lucide-react";
+import { UpgradePromptListener } from "@/components/upgrade-prompt";
 import type { UserProfile } from "@shared/schema";
 
 // ============ ORIGINAL LAYOUTS ============
@@ -585,6 +586,7 @@ function App() {
       <CampaignAuthProvider>
         <TooltipProvider>
           <Toaster />
+          <UpgradePromptListener />
           <AppRouter />
         </TooltipProvider>
       </CampaignAuthProvider>

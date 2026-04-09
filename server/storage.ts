@@ -110,6 +110,9 @@ import {
   type InsertResponseComment,
   responseRatings,
   responseComments,
+  paymentHistory,
+  type PaymentHistory,
+  type InsertPaymentHistory,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, lte, isNull } from "drizzle-orm";
@@ -287,6 +290,10 @@ export interface IStorage {
   getTenantBilling(tenantId: string): Promise<TenantBilling | undefined>;
   createTenantBilling(data: InsertTenantBilling): Promise<TenantBilling>;
   updateTenantBilling(tenantId: string, data: Partial<InsertTenantBilling>): Promise<TenantBilling | undefined>;
+  updateTenantBillingByStripeCustomer(customerId: string, data: Partial<InsertTenantBilling>): Promise<TenantBilling | undefined>;
+  getTenantByStripeCustomer(customerId: string): Promise<Tenant | undefined>;
+  updateTenantPlanByStripeCustomer(customerId: string, planType: string): Promise<void>;
+  createPaymentHistory(data: InsertPaymentHistory): Promise<PaymentHistory>;
 
   // Worker Payout Accounts
   getWorkerPayoutAccount(userId: string): Promise<WorkerPayoutAccount | undefined>;
@@ -1212,6 +1219,34 @@ export class DatabaseStorage implements IStorage {
       .where(eq(tenantBilling.tenantId, tenantId))
       .returning();
     return billing || undefined;
+  }
+
+  async updateTenantBillingByStripeCustomer(customerId: string, data: Partial<InsertTenantBilling>): Promise<TenantBilling | undefined> {
+    const [billing] = await db
+      .update(tenantBilling)
+      .set({ ...data, updatedAt: new Date() })
+      .where(eq(tenantBilling.stripeCustomerId, customerId))
+      .returning();
+    return billing || undefined;
+  }
+
+  async getTenantByStripeCustomer(customerId: string): Promise<Tenant | undefined> {
+    const [billing] = await db.select().from(tenantBilling).where(eq(tenantBilling.stripeCustomerId, customerId));
+    if (!billing) return undefined;
+    const [tenant] = await db.select().from(tenants).where(eq(tenants.id, billing.tenantId));
+    return tenant || undefined;
+  }
+
+  async updateTenantPlanByStripeCustomer(customerId: string, planType: string): Promise<void> {
+    const tenant = await this.getTenantByStripeCustomer(customerId);
+    if (tenant) {
+      await db.update(tenants).set({ planType: planType as any, updatedAt: new Date() }).where(eq(tenants.id, tenant.id));
+    }
+  }
+
+  async createPaymentHistory(data: InsertPaymentHistory): Promise<PaymentHistory> {
+    const [payment] = await db.insert(paymentHistory).values(data).returning();
+    return payment;
   }
 
   // Worker Payout Accounts

@@ -3,6 +3,23 @@ import { QueryClient, QueryFunction } from "@tanstack/react-query";
 async function throwIfResNotOk(res: Response) {
   if (!res.ok) {
     const text = (await res.text()) || res.statusText;
+
+    // Check for plan upgrade required (403 with UPGRADE_REQUIRED code)
+    if (res.status === 403) {
+      try {
+        const parsed = JSON.parse(text);
+        if (parsed.code === "UPGRADE_REQUIRED") {
+          window.dispatchEvent(
+            new CustomEvent("upgrade-required", {
+              detail: { feature: parsed.message, plan: parsed.requiredPlans?.[0] },
+            }),
+          );
+        }
+      } catch {
+        // Not JSON, fall through
+      }
+    }
+
     throw new Error(`${res.status}: ${text}`);
   }
 }

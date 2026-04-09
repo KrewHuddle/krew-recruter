@@ -9,7 +9,7 @@ import { users } from "./models/auth";
 
 // ============ ENUMS ============
 
-export const planTypeEnum = pgEnum("plan_type", ["FREE", "PRO", "ENTERPRISE"]);
+export const planTypeEnum = pgEnum("plan_type", ["FREE", "STARTER", "PRO", "ENTERPRISE"]);
 export const memberRoleEnum = pgEnum("member_role", ["OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER", "REVIEWER", "VIEWER"]);
 export const jobStatusEnum = pgEnum("job_status", ["DRAFT", "PUBLISHED", "CLOSED"]);
 export const jobTypeEnum = pgEnum("job_type", ["FULL_TIME", "PART_TIME"]);

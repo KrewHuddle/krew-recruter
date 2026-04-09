@@ -230,3 +230,16 @@ export async function meHandler(req: Request, res: Response) {
     res.status(500).json({ error: "Failed to fetch user" });
   }
 }
+
+// POST /api/auth/logout — clear session (JWT is stateless, but session may exist)
+export function logoutHandler(req: Request, res: Response) {
+  const session = req.session as any;
+  if (session?.destroy) {
+    session.destroy(() => {
+      res.clearCookie("connect.sid");
+      res.json({ success: true });
+    });
+  } else {
+    res.json({ success: true });
+  }
+}
