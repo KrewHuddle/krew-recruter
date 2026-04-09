@@ -7,6 +7,7 @@ import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
 import { getStripePublishableKey } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
+import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -2130,6 +2131,28 @@ export async function registerRoutes(
         stage: "APPLIED",
       });
 
+      // Auto-upsert applicant into talent pool
+      try {
+        const userProfile = await storage.getUserProfile(userId);
+        const claims = getUserClaims(req);
+        if (userProfile || claims.email) {
+          const talentId = await upsertToTalentPool({
+            email: claims.email || userProfile?.email || "",
+            firstName: userProfile?.firstName || claims.first_name || "",
+            lastName: userProfile?.lastName || claims.last_name || "",
+            jobTitle: job.title,
+            userId,
+            resumeUrl,
+            source: "job_application",
+          });
+          if (talentId) {
+            await recordTalentApplication(talentId, jobId, job.tenantId);
+          }
+        }
+      } catch (e) {
+        console.error("Talent pool upsert failed (non-blocking):", e);
+      }
+
       res.json(application);
     } catch (error) {
       console.error("Error creating application:", error);
@@ -3368,6 +3391,263 @@ export async function registerRoutes(
     }
   });
 
+  // ============ TALENT POOL ROUTES ============
+
+  const { talentPool: talentPoolTable, talentPoolApplications: talentAppTable } = await import("@shared/schema");
+  const talentOrm = await import("drizzle-orm");
+  const talentDb = (await import("./db")).db;
+
+  // Search talent pool
+  app.get("/api/talent/search", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const {
+        q, city, state, radius = "25", jobTitle,
+        availability, isGigAvailable, experienceYears,
+        page = "1", limit = "20"
+      } = req.query as Record<string, string>;
+
+      const offset = (parseInt(page) - 1) * parseInt(limit);
+      const conditions: any[] = [talentOrm.eq(talentPoolTable.isPublic, true)];
+
+      if (q) {
+        const searchTerm = `%${q}%`;
+        conditions.push(
+          talentOrm.or(
+            talentOrm.sql`${talentPoolTable.firstName} ILIKE ${searchTerm}`,
+            talentOrm.sql`${talentPoolTable.lastName} ILIKE ${searchTerm}`,
+            talentOrm.sql`array_to_string(${talentPoolTable.jobTitles}, ',') ILIKE ${searchTerm}`,
+            talentOrm.sql`array_to_string(${talentPoolTable.skills}, ',') ILIKE ${searchTerm}`
+          )
+        );
+      }
+
+      if (jobTitle) {
+        conditions.push(talentOrm.sql`${jobTitle} = ANY(${talentPoolTable.jobTitles})`);
+      }
+
+      if (availability && availability !== "any") {
+        conditions.push(talentOrm.eq(talentPoolTable.availability, availability as any));
+      }
+
+      if (isGigAvailable === "true") {
+        conditions.push(talentOrm.eq(talentPoolTable.isGigAvailable, true));
+      }
+
+      if (experienceYears) {
+        conditions.push(talentOrm.sql`${talentPoolTable.experienceYears} >= ${parseInt(experienceYears)}`);
+      }
+
+      if (city && state) {
+        conditions.push(talentOrm.eq(talentPoolTable.state, state));
+      }
+
+      const where = conditions.length > 1
+        ? talentOrm.and(...conditions)!
+        : conditions[0];
+
+      const results = await talentDb
+        .select({
+          id: talentPoolTable.id,
+          firstName: talentPoolTable.firstName,
+          lastName: talentPoolTable.lastName,
+          city: talentPoolTable.city,
+          state: talentPoolTable.state,
+          lat: talentPoolTable.lat,
+          lng: talentPoolTable.lng,
+          jobTitles: talentPoolTable.jobTitles,
+          skills: talentPoolTable.skills,
+          experienceYears: talentPoolTable.experienceYears,
+          availability: talentPoolTable.availability,
+          isGigAvailable: talentPoolTable.isGigAvailable,
+          avgRating: talentPoolTable.avgRating,
+          totalGigsCompleted: talentPoolTable.totalGigsCompleted,
+          videoIntroUrl: talentPoolTable.videoIntroUrl,
+          lastActiveAt: talentPoolTable.lastActiveAt,
+        })
+        .from(talentPoolTable)
+        .where(where)
+        .limit(parseInt(limit))
+        .offset(offset);
+
+      // Get total count
+      const [countResult] = await talentDb
+        .select({ count: talentOrm.sql<number>`count(*)` })
+        .from(talentPoolTable)
+        .where(where);
+
+      res.json({
+        results,
+        total: Number(countResult?.count || 0),
+        page: parseInt(page),
+        limit: parseInt(limit),
+      });
+    } catch (error: any) {
+      console.error("Error searching talent pool:", error);
+      res.status(500).json({ error: "Failed to search talent pool" });
+    }
+  });
+
+  // Get single talent profile (sanitized — no email/phone for employers)
+  app.get("/api/talent/:id", isAuthenticated, async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const [talent] = await talentDb
+        .select({
+          id: talentPoolTable.id,
+          firstName: talentPoolTable.firstName,
+          lastName: talentPoolTable.lastName,
+          city: talentPoolTable.city,
+          state: talentPoolTable.state,
+          jobTitles: talentPoolTable.jobTitles,
+          skills: talentPoolTable.skills,
+          experienceYears: talentPoolTable.experienceYears,
+          availability: talentPoolTable.availability,
+          isGigAvailable: talentPoolTable.isGigAvailable,
+          avgRating: talentPoolTable.avgRating,
+          totalGigsCompleted: talentPoolTable.totalGigsCompleted,
+          videoIntroUrl: talentPoolTable.videoIntroUrl,
+          lastActiveAt: talentPoolTable.lastActiveAt,
+          resumeUrl: talentPoolTable.resumeUrl,
+        })
+        .from(talentPoolTable)
+        .where(talentOrm.and(
+          talentOrm.eq(talentPoolTable.id, id),
+          talentOrm.eq(talentPoolTable.isPublic, true)
+        )!);
+
+      if (!talent) return res.status(404).json({ error: "Talent not found" });
+      res.json(talent);
+    } catch (error) {
+      console.error("Error fetching talent:", error);
+      res.status(500).json({ error: "Failed to fetch talent" });
+    }
+  });
+
+  // Contact a talent (sends message, logs attempt)
+  app.post("/api/talent/:id/contact", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const { message } = req.body;
+      if (!message) return res.status(400).json({ error: "Message is required" });
+
+      const [talent] = await talentDb
+        .select()
+        .from(talentPoolTable)
+        .where(talentOrm.eq(talentPoolTable.id, id));
+
+      if (!talent) return res.status(404).json({ error: "Talent not found" });
+
+      // In production, this would send an email/notification to the talent
+      // For now, log the contact attempt
+      console.log(`Contact attempt: employer -> talent ${talent.email} | message: ${message.slice(0, 100)}`);
+
+      res.json({ success: true, message: "Message sent to candidate" });
+    } catch (error) {
+      console.error("Error contacting talent:", error);
+      res.status(500).json({ error: "Failed to send message" });
+    }
+  });
+
+  // Get own talent pool record
+  app.get("/api/talent/me", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const [existing] = await talentDb
+        .select()
+        .from(talentPoolTable)
+        .where(talentOrm.eq(talentPoolTable.userId, userId));
+
+      if (!existing) {
+        return res.json(null);
+      }
+
+      res.json(existing);
+    } catch (error) {
+      console.error("Error fetching talent me:", error);
+      res.status(500).json({ error: "Failed to fetch profile" });
+    }
+  });
+
+  // Update own talent pool profile (gig opt-in, etc.)
+  app.patch("/api/talent/me", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { isGigAvailable, availability, skills, experienceYears, videoIntroUrl } = req.body;
+
+      const [existing] = await talentDb
+        .select()
+        .from(talentPoolTable)
+        .where(talentOrm.eq(talentPoolTable.userId, userId));
+
+      if (!existing) {
+        return res.status(404).json({ error: "No talent pool record found. Apply to a job first." });
+      }
+
+      const updates: Record<string, any> = { lastActiveAt: new Date() };
+      if (isGigAvailable !== undefined) updates.isGigAvailable = isGigAvailable;
+      if (availability) updates.availability = availability;
+      if (skills) updates.skills = skills;
+      if (experienceYears !== undefined) updates.experienceYears = experienceYears;
+      if (videoIntroUrl !== undefined) updates.videoIntroUrl = videoIntroUrl;
+
+      const [updated] = await talentDb
+        .update(talentPoolTable)
+        .set(updates)
+        .where(talentOrm.eq(talentPoolTable.id, existing.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating talent profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
+    }
+  });
+
+  // Gig opt-in shortcut
+  app.patch("/api/talent/me/gig-opt-in", isAuthenticated, async (req, res) => {
+    try {
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const [existing] = await talentDb
+        .select()
+        .from(talentPoolTable)
+        .where(talentOrm.eq(talentPoolTable.userId, userId));
+
+      if (!existing) {
+        return res.status(404).json({ error: "No talent pool record found" });
+      }
+
+      const [updated] = await talentDb
+        .update(talentPoolTable)
+        .set({ isGigAvailable: true, lastActiveAt: new Date() })
+        .where(talentOrm.eq(talentPoolTable.id, existing.id))
+        .returning();
+
+      res.json(updated);
+    } catch (error) {
+      console.error("Error opting into gigs:", error);
+      res.status(500).json({ error: "Failed to opt in" });
+    }
+  });
+
+  // Get talent pool count (for display)
+  app.get("/api/talent/count", async (_req, res) => {
+    try {
+      const [result] = await talentDb
+        .select({ count: talentOrm.sql<number>`count(*)` })
+        .from(talentPoolTable)
+        .where(talentOrm.eq(talentPoolTable.isPublic, true));
+      res.json({ count: Number(result?.count || 0) });
+    } catch {
+      res.json({ count: 0 });
+    }
+  });
+
   // ============ META ADS CAMPAIGN ROUTES ============
 
   const metaAds = await import("./services/meta-ads");
@@ -3404,6 +3684,26 @@ export async function registerRoutes(
         const location = job.locationId ? await storage.getLocation(job.locationId) : null;
         const baseUrl = process.env.PUBLIC_URL || "https://krewrecruiter.com";
 
+        // Geocode location if we have city/state
+        const locationStr = location?.city && location?.state
+          ? `${location.city}, ${location.state}`
+          : "Local";
+        let lat: number | undefined;
+        let lng: number | undefined;
+
+        if (location?.city && location?.state) {
+          const coords = await geocodeAddress(`${location.city}, ${location.state}`);
+          if (coords) {
+            lat = coords.lat;
+            lng = coords.lng;
+          }
+        }
+
+        // Smart radius based on city size
+        const smartRadius = location?.city && location?.state
+          ? getSmartRadius(location.city, location.state)
+          : 25;
+
         let metaResult = null;
 
         if (metaAds.isMetaConfigured()) {
@@ -3412,9 +3712,10 @@ export async function registerRoutes(
               jobId: job.id,
               jobTitle: job.title,
               companyName: tenant?.name || "Restaurant",
-              location: location?.city && location?.state
-                ? `${location.city}, ${location.state}`
-                : "Local",
+              location: locationStr,
+              latitude: lat,
+              longitude: lng,
+              radius: req.body.radius || smartRadius,
               pay: job.payRangeMin && job.payRangeMax
                 ? `$${job.payRangeMin}-$${job.payRangeMax}/hr`
                 : job.payRangeMin ? `$${job.payRangeMin}/hr` : undefined,

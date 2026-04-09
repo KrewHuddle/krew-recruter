@@ -80,6 +80,7 @@ export interface MetaJobInput {
   location: string;
   latitude?: number;
   longitude?: number;
+  radius?: number; // miles — overrides smart default if provided
   pay?: string;
   description?: string;
   applyUrl: string;
@@ -131,12 +132,14 @@ export async function createJobCampaign(
   };
 
   if (job.latitude && job.longitude) {
+    // Use provided radius or smart default (caller should set this)
+    const adRadius = job.radius || 25;
     targeting.geo_locations = {
       custom_locations: [
         {
           latitude: job.latitude,
           longitude: job.longitude,
-          radius: 25,
+          radius: adRadius,
           distance_unit: "mile",
         },
       ],

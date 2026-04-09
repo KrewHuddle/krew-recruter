@@ -34,6 +34,7 @@ import {
   LogOut,
   Shield,
   CreditCard,
+  Search,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/lib/tenant-context";
@@ -45,6 +46,7 @@ const mainNavItems = [
   { title: "Locations", url: "/app/locations", icon: MapPin },
   { title: "Jobs", url: "/app/jobs", icon: Briefcase },
   { title: "Applicants", url: "/app/applicants", icon: Users },
+  { title: "Talent Pool", url: "/app/talent", icon: Search },
 ];
 
 const gigsNavItems = [

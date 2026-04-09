@@ -1421,6 +1421,72 @@ export const insertCampaignSpendSchema = createInsertSchema(campaignSpend).omit(
 export type InsertCampaignSpend = z.infer<typeof insertCampaignSpendSchema>;
 export type CampaignSpend = typeof campaignSpend.$inferSelect;
 
+// ============ TALENT POOL ============
+
+export const talentSourceEnum = pgEnum("talent_source", ["job_application", "direct_signup", "gig_application"]);
+export const talentAvailabilityEnum = pgEnum("talent_availability", ["full-time", "part-time", "gig", "any"]);
+
+export const talentPool = pgTable("talent_pool", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  email: text("email").notNull().unique(),
+  phone: text("phone"),
+  city: text("city"),
+  state: text("state"),
+  lat: decimal("lat"),
+  lng: decimal("lng"),
+  jobTitles: text("job_titles").array().default(sql`'{}'::text[]`),
+  skills: text("skills").array().default(sql`'{}'::text[]`),
+  experienceYears: integer("experience_years"),
+  availability: talentAvailabilityEnum("availability").default("any"),
+  isPublic: boolean("is_public").default(true),
+  isGigAvailable: boolean("is_gig_available").default(false),
+  resumeUrl: text("resume_url"),
+  videoIntroUrl: text("video_intro_url"),
+  avgRating: decimal("avg_rating"),
+  totalGigsCompleted: integer("total_gigs_completed").default(0),
+  lastActiveAt: timestamp("last_active_at").defaultNow(),
+  createdAt: timestamp("created_at").defaultNow(),
+  source: talentSourceEnum("source").default("job_application"),
+}, (table) => [
+  index("idx_talent_pool_email").on(table.email),
+  index("idx_talent_pool_user").on(table.userId),
+  index("idx_talent_pool_city_state").on(table.city, table.state),
+  index("idx_talent_pool_gig_available").on(table.isGigAvailable),
+]);
+
+export const talentPoolRelations = relations(talentPool, ({ one, many }) => ({
+  user: one(users, { fields: [talentPool.userId], references: [users.id] }),
+}));
+
+export const insertTalentPoolSchema = createInsertSchema(talentPool).omit({ id: true, createdAt: true, lastActiveAt: true });
+export type InsertTalentPool = z.infer<typeof insertTalentPoolSchema>;
+export type TalentPool = typeof talentPool.$inferSelect;
+
+export const talentPoolApplications = pgTable("talent_pool_applications", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  talentId: varchar("talent_id").notNull().references(() => talentPool.id, { onDelete: "cascade" }),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  orgId: varchar("org_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  appliedAt: timestamp("applied_at").defaultNow(),
+  status: applicationStageEnum("status").default("APPLIED"),
+}, (table) => [
+  index("idx_talent_app_talent").on(table.talentId),
+  index("idx_talent_app_job").on(table.jobId),
+]);
+
+export const talentPoolApplicationsRelations = relations(talentPoolApplications, ({ one }) => ({
+  talent: one(talentPool, { fields: [talentPoolApplications.talentId], references: [talentPool.id] }),
+  job: one(jobs, { fields: [talentPoolApplications.jobId], references: [jobs.id] }),
+  org: one(tenants, { fields: [talentPoolApplications.orgId], references: [tenants.id] }),
+}));
+
+export const insertTalentPoolApplicationSchema = createInsertSchema(talentPoolApplications).omit({ id: true, appliedAt: true });
+export type InsertTalentPoolApplication = z.infer<typeof insertTalentPoolApplicationSchema>;
+export type TalentPoolApplication = typeof talentPoolApplications.$inferSelect;
+
 // ============ JOB AD CAMPAIGNS (Meta Ads) ============
 
 export const jobAdCampaignStatusEnum = pgEnum("job_ad_campaign_status", ["draft", "active", "paused", "deleted"]);

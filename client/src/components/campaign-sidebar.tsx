@@ -13,6 +13,7 @@ import {
   Video,
   HelpCircle,
   MoreHorizontal,
+  Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -40,6 +41,7 @@ const navItems = [
   { title: "Dashboard", href: "/campaign", icon: LayoutDashboard },
   { title: "Jobs", href: "/campaign/jobs", icon: Briefcase },
   { title: "Candidates", href: "/campaign/candidates", icon: Users },
+  { title: "Talent Pool", href: "/campaign/talent", icon: Search },
   { title: "Video Interviews", href: "/campaign/interviews", icon: Video },
   { title: "Team", href: "/campaign/team", icon: UserPlus },
   { title: "Billing", href: "/campaign/billing", icon: CreditCard },

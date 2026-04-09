@@ -1,13 +1,15 @@
+import { useState } from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
 import { useAuth } from "@/hooks/use-auth";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
-import { apiRequest } from "@/lib/queryClient";
+import { apiRequest, queryClient } from "@/lib/queryClient";
 import {
   Briefcase,
   Clock,
@@ -67,6 +69,22 @@ export default function SeekerDashboard() {
 
   const { data: payoutAccount, isLoading: payoutLoading } = useQuery<PayoutAccount | null>({
     queryKey: ["/api/worker/payout-account"],
+  });
+
+  // Gig availability
+  const { data: talentMe } = useQuery<{ isGigAvailable: boolean } | null>({
+    queryKey: ["/api/talent/me"],
+    retry: false,
+  });
+
+  const gigToggleMutation = useMutation({
+    mutationFn: async (isGigAvailable: boolean) => {
+      return apiRequest("PATCH", "/api/talent/me", { isGigAvailable });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/talent/me"] });
+      toast({ title: "Gig availability updated" });
+    },
   });
 
   const onboardMutation = useMutation({
@@ -181,6 +199,34 @@ export default function SeekerDashboard() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Gig Availability Toggle */}
+      {talentMe !== undefined && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardContent className="py-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
+                  <Clock className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <p className="font-medium">I'm available for gig shifts</p>
+                  <p className="text-sm text-muted-foreground">
+                    {talentMe?.isGigAvailable
+                      ? "Restaurants near you can find you for last-minute shifts"
+                      : "Toggle on to get notified about gig opportunities near you"}
+                  </p>
+                </div>
+              </div>
+              <Switch
+                checked={talentMe?.isGigAvailable || false}
+                onCheckedChange={(checked) => gigToggleMutation.mutate(checked)}
+                disabled={gigToggleMutation.isPending}
+              />
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2 space-y-6">

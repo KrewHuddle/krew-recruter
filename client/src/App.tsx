@@ -43,6 +43,7 @@ import Login from "@/pages/login";
 import Billing from "@/pages/billing";
 import Pricing from "@/pages/pricing";
 import Help from "@/pages/help";
+import TalentSearch from "@/pages/talent-search";
 
 // New campaign engine pages
 import CampaignLogin from "@/pages/campaign-login";
@@ -422,6 +423,11 @@ function AppRouter() {
           <Interviews />
         </ProtectedEmployerRoute>
       </Route>
+      <Route path="/app/talent">
+        <ProtectedEmployerRoute>
+          <TalentSearch />
+        </ProtectedEmployerRoute>
+      </Route>
       <Route path="/app/billing">
         <ProtectedEmployerRoute>
           <Billing />
@@ -479,6 +485,11 @@ function AppRouter() {
       <Route path="/campaign/help">
         <ProtectedCampaignRoute>
           <CampaignHelp />
+        </ProtectedCampaignRoute>
+      </Route>
+      <Route path="/campaign/talent">
+        <ProtectedCampaignRoute>
+          <TalentSearch />
         </ProtectedCampaignRoute>
       </Route>
       <Route path="/campaign/jobs/:id">
