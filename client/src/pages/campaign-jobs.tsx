@@ -10,8 +10,9 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function CampaignJobs() {
   const { apiFetch } = useCampaignAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
+  const basePath = location.startsWith("/app/campaigns") ? "/app/campaigns" : "/campaign";
 
   const { data: campaigns = [] } = useQuery({
     queryKey: ["/api/campaigns"],
@@ -45,7 +46,7 @@ export default function CampaignJobs() {
     <div className="p-6">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-2xl font-bold">Jobs</h1>
-        <Button onClick={() => setLocation("/campaign/jobs/new")}>
+        <Button onClick={() => setLocation(`${basePath}/jobs/new`)}>
           <Plus className="mr-2 h-4 w-4" /> New Job
         </Button>
       </div>

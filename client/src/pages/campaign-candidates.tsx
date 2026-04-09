@@ -58,10 +58,11 @@ function Breadcrumb({ items }: { items: { label: string; href?: string }[] }) {
 
 export default function CampaignCandidates() {
   const { apiFetch } = useCampaignAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
   const [selectedApplicant, setSelectedApplicant] = useState<Applicant | null>(null);
+  const basePath = location.startsWith("/app/campaigns") ? "/app/campaigns" : "/campaign";
 
   const { data: applicants = [] } = useQuery<Applicant[]>({
     queryKey: ["/api/applicants"],
@@ -120,7 +121,7 @@ export default function CampaignCandidates() {
           <p className="text-muted-foreground mb-6 max-w-md">
             Candidates will appear here after you start promoting your first job.
           </p>
-          <Button onClick={() => setLocation("/campaign/jobs/new")}>
+          <Button onClick={() => setLocation(`${basePath}/jobs/new`)}>
             <Plus className="mr-2 h-4 w-4" /> New Job
           </Button>
         </div>

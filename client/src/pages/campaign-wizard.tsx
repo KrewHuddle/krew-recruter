@@ -60,8 +60,9 @@ const BENEFIT_OPTIONS = [
 ];
 
 export default function CampaignWizard() {
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const { apiFetch, organizations, orgId } = useCampaignAuth();
+  const basePath = location.startsWith("/app/campaigns") ? "/app/campaigns" : "/campaign";
   const { toast } = useToast();
 
   const currentOrg = organizations.find(o => o.orgId === orgId);
@@ -330,7 +331,7 @@ export default function CampaignWizard() {
           <p className="text-muted-foreground mb-8">
             Candidates will start appearing in your dashboard as they apply.
           </p>
-          <Button onClick={() => setLocation("/campaign")} size="lg">
+          <Button onClick={() => setLocation(basePath)} size="lg">
             View Dashboard <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>

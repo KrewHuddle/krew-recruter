@@ -34,25 +34,37 @@ function signToken(payload: JwtPayload): string {
 }
 
 // Middleware: verify JWT and attach user to request
+// Falls back to session auth so campaign routes work from the main dashboard
 export function requireAuth(req: Request, res: Response, next: NextFunction) {
+  // Try JWT first
   const authHeader = req.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
-    return res.status(401).json({ error: "Missing authorization token" });
+  if (authHeader?.startsWith("Bearer ")) {
+    try {
+      const token = authHeader.slice(7);
+      const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
+      req.user = decoded;
+      return next();
+    } catch {
+      // JWT invalid — fall through to session check
+    }
   }
 
-  try {
-    const token = authHeader.slice(7);
-    const decoded = jwt.verify(token, getJwtSecret()) as JwtPayload;
-    req.user = decoded;
-    next();
-  } catch {
-    return res.status(401).json({ error: "Invalid or expired token" });
+  // Fall back to session auth
+  const session = req.session as any;
+  if (session?.userId) {
+    req.user = {
+      userId: session.userId,
+      email: session.email || "",
+    };
+    return next();
   }
+
+  return res.status(401).json({ error: "Missing authorization token" });
 }
 
-// Middleware: require org context (from header or JWT)
+// Middleware: require org context (from header, JWT, or tenantId cookie)
 export function requireOrg(req: Request, res: Response, next: NextFunction) {
-  const orgId = req.headers["x-org-id"] as string || req.user?.orgId;
+  const orgId = req.headers["x-org-id"] as string || req.user?.orgId || req.cookies?.tenantId;
   if (!orgId) {
     return res.status(400).json({ error: "Organization context required" });
   }

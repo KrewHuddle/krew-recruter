@@ -28,9 +28,10 @@ import { formatDistanceToNow } from "date-fns";
 
 export default function CampaignDashboard() {
   const { apiFetch, organizations, orgId } = useCampaignAuth();
-  const [, setLocation] = useLocation();
+  const [location, setLocation] = useLocation();
   const [period, setPeriod] = useState("all");
   const queryClient = useQueryClient();
+  const basePath = location.startsWith("/app/campaigns") ? "/app/campaigns" : "/campaign";
 
   const currentOrg = organizations.find(o => o.orgId === orgId);
   const orgName = currentOrg?.orgName || "My Organization";
@@ -97,7 +98,7 @@ export default function CampaignDashboard() {
               Create a job ad and start reaching qualified hospitality candidates on
               Facebook and Instagram in minutes.
             </p>
-            <Button onClick={() => setLocation("/campaign/jobs/new")} size="lg">
+            <Button onClick={() => setLocation(`${basePath}/jobs/new`)} size="lg">
               <Plus className="mr-2 h-4 w-4" /> Create Campaign
             </Button>
           </div>
@@ -127,7 +128,7 @@ export default function CampaignDashboard() {
               <SelectItem value="all">All Time</SelectItem>
             </SelectContent>
           </Select>
-          <Button onClick={() => setLocation("/campaign/jobs/new")}>
+          <Button onClick={() => setLocation(`${basePath}/jobs/new`)}>
             <Plus className="mr-2 h-4 w-4" /> Create Campaign
           </Button>
         </div>
@@ -219,7 +220,7 @@ export default function CampaignDashboard() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between">
               <CardTitle className="text-base">Active Campaigns</CardTitle>
-              <Button variant="ghost" size="sm" onClick={() => setLocation("/campaign/jobs")}>
+              <Button variant="ghost" size="sm" onClick={() => setLocation(`${basePath}/jobs`)}>
                 View all jobs <ArrowRight className="ml-1 h-3 w-3" />
               </Button>
             </div>
@@ -291,7 +292,7 @@ export default function CampaignDashboard() {
         <CardHeader className="pb-2">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base">Recent Candidates</CardTitle>
-            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setLocation("/campaign/candidates")}>
+            <Button variant="ghost" size="sm" className="text-primary" onClick={() => setLocation(`${basePath}/candidates`)}>
               View all candidates <ArrowRight className="ml-1 h-3 w-3" />
             </Button>
           </div>

@@ -37,6 +37,12 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 const TOKEN_KEY = "krew_token";
 const ORG_KEY = "krew_org_id";
 
+// Helper to read tenantId from cookie (set by main app's TenantProvider)
+function getTenantIdFromCookie(): string | null {
+  const match = document.cookie.split("; ").find(row => row.startsWith("tenantId="));
+  return match?.split("=")[1] || null;
+}
+
 export function CampaignAuthProvider({ children }: { children: ReactNode }) {
   const [, setLocation] = useLocation();
   const [state, setState] = useState<AuthState>({
@@ -48,9 +54,11 @@ export function CampaignAuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: false,
   });
 
+  // apiFetch: uses JWT if available, otherwise falls back to session cookies.
+  // The server's requireAuth/requireOrg accept both auth methods.
   const apiFetch = useCallback(async (url: string, options: RequestInit = {}) => {
     const token = localStorage.getItem(TOKEN_KEY);
-    const orgId = localStorage.getItem(ORG_KEY);
+    const orgId = localStorage.getItem(ORG_KEY) || getTenantIdFromCookie();
 
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
@@ -64,47 +72,96 @@ export function CampaignAuthProvider({ children }: { children: ReactNode }) {
       headers["x-org-id"] = orgId;
     }
 
-    return fetch(url, { ...options, headers });
+    // Always include credentials so session cookies are sent as fallback
+    return fetch(url, { ...options, headers, credentials: "include" });
   }, []);
 
-  // Load user on mount if token exists
+  // Load user on mount — try JWT first, then fall back to session auth
   useEffect(() => {
     const token = localStorage.getItem(TOKEN_KEY);
-    if (!token) {
-      setState(s => ({ ...s, isLoading: false }));
-      return;
+
+    if (token) {
+      // JWT path: validate token with /api/v2/auth/me
+      apiFetch("/api/v2/auth/me")
+        .then(res => {
+          if (!res.ok) throw new Error("Unauthorized");
+          return res.json();
+        })
+        .then(data => {
+          const orgId = localStorage.getItem(ORG_KEY) || data.organizations?.[0]?.orgId || null;
+          if (orgId) localStorage.setItem(ORG_KEY, orgId);
+
+          setState({
+            token,
+            user: data.user,
+            orgId,
+            organizations: data.organizations || [],
+            isLoading: false,
+            isAuthenticated: true,
+          });
+        })
+        .catch(() => {
+          localStorage.removeItem(TOKEN_KEY);
+          localStorage.removeItem(ORG_KEY);
+          // JWT invalid — try session fallback
+          trySessionAuth();
+        });
+    } else {
+      // No JWT — try session auth
+      trySessionAuth();
     }
 
-    apiFetch("/api/v2/auth/me")
-      .then(res => {
-        if (!res.ok) throw new Error("Unauthorized");
-        return res.json();
-      })
-      .then(data => {
-        const orgId = localStorage.getItem(ORG_KEY) || data.organizations?.[0]?.orgId || null;
-        if (orgId) localStorage.setItem(ORG_KEY, orgId);
+    function trySessionAuth() {
+      fetch("/api/auth/user", { credentials: "include" })
+        .then(res => {
+          if (!res.ok) throw new Error("Not authenticated");
+          return res.json();
+        })
+        .then(sessionUser => {
+          if (!sessionUser || !sessionUser.id) throw new Error("No session");
 
-        setState({
-          token,
-          user: data.user,
-          orgId,
-          organizations: data.organizations || [],
-          isLoading: false,
-          isAuthenticated: true,
+          // User is session-authenticated — bridge into campaign auth
+          const tenantId = getTenantIdFromCookie();
+
+          // Try to load org memberships from the tenant API
+          return fetch("/api/tenants/memberships", { credentials: "include" })
+            .then(res => res.ok ? res.json() : [])
+            .then((memberships: any[]) => {
+              const orgs: OrgMembership[] = memberships.map((m: any) => ({
+                orgId: m.tenantId,
+                role: m.role,
+                orgName: m.tenant?.name || "Organization",
+              }));
+
+              const orgId = tenantId || orgs[0]?.orgId || null;
+
+              setState({
+                token: null,
+                user: {
+                  id: sessionUser.id,
+                  email: sessionUser.email || "",
+                  firstName: sessionUser.firstName,
+                  lastName: sessionUser.lastName,
+                  profileImageUrl: sessionUser.profileImageUrl,
+                },
+                orgId,
+                organizations: orgs,
+                isLoading: false,
+                isAuthenticated: true,
+              });
+            });
+        })
+        .catch(() => {
+          setState({
+            token: null,
+            user: null,
+            orgId: null,
+            organizations: [],
+            isLoading: false,
+            isAuthenticated: false,
+          });
         });
-      })
-      .catch(() => {
-        localStorage.removeItem(TOKEN_KEY);
-        localStorage.removeItem(ORG_KEY);
-        setState({
-          token: null,
-          user: null,
-          orgId: null,
-          organizations: [],
-          isLoading: false,
-          isAuthenticated: false,
-        });
-      });
+    }
   }, [apiFetch]);
 
   const login = async (email: string, password: string) => {
