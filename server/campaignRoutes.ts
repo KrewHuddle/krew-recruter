@@ -134,13 +134,12 @@ router.post("/campaigns/import-url", requireAuth, requireOrg, async (req: Reques
       return res.status(400).json({ error: "Failed to fetch the URL. Please check the link and try again." });
     }
 
-    // Truncate HTML to avoid exceeding token limits
-    const truncatedHtml = html.substring(0, 30000);
+    console.log("[import-url] Fetched HTML:", html.length, "chars from", url);
 
     // Extract job data via Claude
-    const extractedData = await extractJobFromHtml(truncatedHtml);
+    const extractedData = await extractJobFromHtml(html);
     if (!extractedData) {
-      return res.status(400).json({ error: "Could not extract job details from the page" });
+      return res.status(400).json({ error: "Could not extract job details from that page. Try a direct job listing URL (not a search page)." });
     }
 
     // Create campaign from extracted data
@@ -736,14 +735,34 @@ router.post("/apply/:campaignId", async (req: Request, res: Response) => {
 
 // ============ AI HELPERS ============
 
+function stripHtmlToText(html: string): string {
+  // Remove script, style, nav, footer, header tags and their content
+  let text = html
+    .replace(/<script[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[\s\S]*?<\/style>/gi, "")
+    .replace(/<nav[\s\S]*?<\/nav>/gi, "")
+    .replace(/<footer[\s\S]*?<\/footer>/gi, "")
+    .replace(/<header[\s\S]*?<\/header>/gi, "");
+  // Replace tags with spaces, collapse whitespace
+  text = text.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+  return text.substring(0, 8000);
+}
+
 async function extractJobFromHtml(html: string): Promise<any> {
   const apiKey = process.env.ANTHROPIC_API_KEY;
   if (!apiKey) {
-    console.error("ANTHROPIC_API_KEY not set");
+    console.error("[import-url] ANTHROPIC_API_KEY not set");
+    return null;
+  }
+
+  const cleanText = stripHtmlToText(html);
+  if (cleanText.length < 50) {
+    console.error("[import-url] Page text too short after stripping:", cleanText.length);
     return null;
   }
 
   try {
+    console.log("[import-url] Calling Claude API with", cleanText.length, "chars of text");
     const response = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
       headers: {
@@ -753,11 +772,11 @@ async function extractJobFromHtml(html: string): Promise<any> {
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
-        max_tokens: 1000,
-        system: `You are a job posting parser. Extract structured data from raw HTML and return ONLY valid JSON. Never include markdown, backticks, or explanation.`,
+        max_tokens: 1500,
+        system: `You are a job posting parser. Extract structured data from job posting text and return ONLY valid JSON. No markdown, no backticks, no explanation — just the JSON object.`,
         messages: [{
           role: "user",
-          content: `Extract job details from this HTML and return as JSON with these exact keys:
+          content: `Extract job details from this text and return as JSON with these exact keys:
 {
   "title": string,
   "location": string,
@@ -765,23 +784,37 @@ async function extractJobFromHtml(html: string): Promise<any> {
   "pay_min": number or null,
   "pay_max": number or null,
   "pay_period": "hr" or "year",
-  "description": string,
+  "description": string (2-3 sentences),
   "requirements": string[] (max 5),
   "benefits": string[] (max 5)
 }
 
-HTML: ${html}`,
+Text from job posting page:
+${cleanText}`,
         }],
       }),
     });
 
+    if (!response.ok) {
+      const errBody = await response.text();
+      console.error("[import-url] Claude API error:", response.status, errBody);
+      return null;
+    }
+
     const data = await response.json();
     const text = data.content?.[0]?.text;
-    if (!text) return null;
+    if (!text) {
+      console.error("[import-url] No text in Claude response:", JSON.stringify(data).substring(0, 300));
+      return null;
+    }
 
-    return JSON.parse(text);
+    // Strip markdown code fences if present
+    const jsonStr = text.replace(/```json?\s*/g, "").replace(/```\s*/g, "").trim();
+    console.log("[import-url] Claude returned:", jsonStr.substring(0, 200));
+
+    return JSON.parse(jsonStr);
   } catch (error) {
-    console.error("Claude extraction error:", error);
+    console.error("[import-url] Claude extraction error:", error);
     return null;
   }
 }
