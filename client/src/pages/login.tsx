@@ -12,6 +12,40 @@ import logoImage from "@assets/3_1768835575859.png";
 
 type AuthMode = "login" | "register";
 
+/**
+ * After login, determine the right dashboard based on user type:
+ * - Super admin → /admin
+ * - Job seeker → /seeker
+ * - Employer → /campaign (or /app)
+ * - No profile → /onboarding
+ */
+async function getLoginRedirect(token?: string): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+
+  // 1. Check super admin
+  try {
+    const adminRes = await fetch("/api/admin/check", { credentials: "include", headers });
+    if (adminRes.ok) {
+      const { isSuperAdmin } = await adminRes.json();
+      if (isSuperAdmin) return "/admin";
+    }
+  } catch {}
+
+  // 2. Check user profile type
+  try {
+    const profileRes = await fetch("/api/user/profile", { credentials: "include", headers });
+    if (profileRes.ok) {
+      const profile = await profileRes.json();
+      if (profile?.userType === "JOB_SEEKER") return "/seeker";
+      if (profile?.userType === "EMPLOYER") return "/campaign";
+    }
+  } catch {}
+
+  // 3. No profile yet — needs onboarding
+  return "/onboarding";
+}
+
 export default function Login() {
   const [, setLocation] = useLocation();
   const [mode, setMode] = useState<AuthMode>("login");
@@ -40,24 +74,13 @@ export default function Login() {
     onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome back!", description: "You've successfully signed in." });
-      // Check if super admin — redirect to admin portal
-      try {
-        const token = data?.token;
-        const headers: Record<string, string> = {};
-        if (token) {
-          localStorage.setItem("krew_token", token);
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        const checkRes = await fetch("/api/admin/check", { credentials: "include", headers });
-        if (checkRes.ok) {
-          const { isSuperAdmin } = await checkRes.json();
-          if (isSuperAdmin) {
-            setLocation("/admin");
-            return;
-          }
-        }
-      } catch {}
-      setLocation("/app");
+
+      const token = data?.token;
+      if (token) localStorage.setItem("krew_token", token);
+
+      // Determine where to redirect based on user type
+      const destination = await getLoginRedirect(token);
+      setLocation(destination);
     },
     onError: (error: Error) => {
       toast({ title: "Login failed", description: error.message, variant: "destructive" });
@@ -81,23 +104,12 @@ export default function Login() {
     onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Account created!", description: "Welcome to Krew Recruiter." });
-      try {
-        const token = data?.token;
-        const headers: Record<string, string> = {};
-        if (token) {
-          localStorage.setItem("krew_token", token);
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        const checkRes = await fetch("/api/admin/check", { credentials: "include", headers });
-        if (checkRes.ok) {
-          const { isSuperAdmin } = await checkRes.json();
-          if (isSuperAdmin) {
-            setLocation("/admin");
-            return;
-          }
-        }
-      } catch {}
-      setLocation("/app");
+
+      const token = data?.token;
+      if (token) localStorage.setItem("krew_token", token);
+
+      // New registrations go to onboarding
+      setLocation("/onboarding");
     },
     onError: (error: Error) => {
       toast({ title: "Registration failed", description: error.message, variant: "destructive" });
