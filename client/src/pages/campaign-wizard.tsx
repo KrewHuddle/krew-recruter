@@ -17,9 +17,10 @@ import {
 import {
   Link2, PenLine, ArrowRight, Loader2, Check, X, Plus,
   Rocket, ChevronLeft, ChevronRight, TrendingUp, Target, Shield,
-  Globe, CreditCard, CheckCircle,
+  Globe, CreditCard, CheckCircle, RefreshCw, Image,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { apiRequest } from "@/lib/queryClient";
 
 interface CampaignData {
   id?: string;
@@ -90,8 +91,32 @@ export default function CampaignWizard() {
   const [isEditing, setIsEditing] = useState(false);
   const [newRequirement, setNewRequirement] = useState("");
   const [launchSuccess, setLaunchSuccess] = useState(false);
+  const [adImageSrc, setAdImageSrc] = useState<string | null>(null);
+  const [imageLoading, setImageLoading] = useState(false);
 
   const dailyBudget = budgetType === "recommended" ? 32 : customBudget;
+
+  const generatePreviewImage = useCallback(async () => {
+    setImageLoading(true);
+    try {
+      const res = await apiRequest("POST", "/api/campaign/preview-image", {
+        title: campaign.title,
+        company: campaign.companyName || orgName,
+        location: campaign.location,
+        pay: creative.payDisplay,
+        requirements: creative.bulletPoints,
+        benefits: creative.benefitsDisplay,
+      });
+      const data = await res.json();
+      if (data.image) {
+        setAdImageSrc(data.image);
+      }
+    } catch {
+      // Fall back to HTML preview if image generation fails
+    } finally {
+      setImageLoading(false);
+    }
+  }, [campaign, creative, orgName]);
 
   // ---- URL Import ----
   const handleUrlImport = useCallback(async () => {
@@ -158,13 +183,15 @@ export default function CampaignWizard() {
 
       setLoadingPercent(100);
       setStep(2);
+      // Generate preview image in background
+      setTimeout(() => generatePreviewImage(), 100);
     } catch (error: any) {
       toast({ title: "Import failed", description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
       clearInterval(interval);
     }
-  }, [url, apiFetch, campaign, toast]);
+  }, [url, apiFetch, campaign, toast, generatePreviewImage]);
 
   // ---- Manual creation ----
   const handleManualSubmit = useCallback(async () => {
@@ -205,12 +232,13 @@ export default function CampaignWizard() {
         });
       }
       setStep(2);
+      setTimeout(() => generatePreviewImage(), 100);
     } catch (error: any) {
       toast({ title: "Error", description: error.message, variant: "destructive" });
     } finally {
       setIsLoading(false);
     }
-  }, [campaign, apiFetch, toast]);
+  }, [campaign, apiFetch, toast, generatePreviewImage]);
 
   // ---- Launch ----
   const handleLaunch = useCallback(async () => {
@@ -563,18 +591,64 @@ export default function CampaignWizard() {
         <Stepper />
 
         <div className="grid grid-cols-1 lg:grid-cols-[55%_45%] gap-8">
-          {/* Left: Ad Preview */}
+          {/* Left: Ad Preview (Generated Image or Fallback) */}
           <div>
-            <AdPreviewCard
-              orgName={campaign.companyName || orgName}
-              primaryColor="hsl(280, 70%, 52%)"
-              headline={creative.headline}
-              subheadline={creative.subheadline}
-              bulletPoints={creative.bulletPoints}
-              payDisplay={creative.payDisplay}
-              benefitsDisplay={creative.benefitsDisplay}
-              cta={creative.cta}
-            />
+            {imageLoading ? (
+              <div className="aspect-[1200/628] rounded-lg bg-muted/50 flex items-center justify-center">
+                <div className="text-center">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">Generating ad image...</p>
+                </div>
+              </div>
+            ) : adImageSrc ? (
+              <div>
+                <img
+                  src={adImageSrc}
+                  alt="Ad Preview"
+                  className="w-full rounded-lg shadow-lg"
+                />
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generatePreviewImage()}
+                    disabled={imageLoading}
+                  >
+                    <RefreshCw className="mr-1 h-3.5 w-3.5" /> Regenerate
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setIsEditing(true)}
+                  >
+                    <Image className="mr-1 h-3.5 w-3.5" /> Customize
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div>
+                <AdPreviewCard
+                  orgName={campaign.companyName || orgName}
+                  primaryColor="hsl(280, 70%, 52%)"
+                  headline={creative.headline}
+                  subheadline={creative.subheadline}
+                  bulletPoints={creative.bulletPoints}
+                  payDisplay={creative.payDisplay}
+                  benefitsDisplay={creative.benefitsDisplay}
+                  cta={creative.cta}
+                />
+                <div className="flex items-center justify-center gap-2 mt-3">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => generatePreviewImage()}
+                    disabled={imageLoading}
+                  >
+                    <Image className="mr-1 h-3.5 w-3.5" /> Generate Image
+                  </Button>
+                </div>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground text-center mt-3">
               This is a sample ad. We'll test multiple versions to find the best performers.
             </p>

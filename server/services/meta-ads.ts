@@ -260,6 +260,41 @@ export async function getCampaignStats(
 }
 
 /**
+ * Uploads an ad image to Meta and returns the image_hash.
+ * Used when creating ad creatives with custom generated images.
+ */
+export async function uploadAdImage(
+  imageBuffer: Buffer
+): Promise<string> {
+  const { accessToken, adAccountId } = getConfig();
+
+  const formData = new FormData();
+  formData.append("filename", new Blob([imageBuffer], { type: "image/png" }), "ad-image.png");
+  formData.append("access_token", accessToken);
+
+  const res = await fetch(
+    `${META_BASE_URL}/${adAccountId}/adimages`,
+    { method: "POST", body: formData }
+  );
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error(`Meta image upload error: ${data?.error?.message || "Unknown error"}`);
+  }
+
+  // Response format: { images: { "ad-image.png": { hash: "..." } } }
+  const images = data?.images;
+  if (images) {
+    const firstKey = Object.keys(images)[0];
+    if (firstKey && images[firstKey].hash) {
+      return images[firstKey].hash;
+    }
+  }
+
+  throw new Error("Failed to get image hash from Meta upload response");
+}
+
+/**
  * Checks if Meta API credentials are configured.
  */
 export function isMetaConfigured(): boolean {

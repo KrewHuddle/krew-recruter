@@ -3643,5 +3643,126 @@ export async function registerRoutes(
     res.json({ configured: metaAds.isMetaConfigured() });
   });
 
+  // ============ AD IMAGE GENERATION ============
+
+  const adImageGen = await import("./services/ad-image-generator");
+  const fs = await import("fs/promises");
+  const path = await import("path");
+
+  // Preview ad image (returns base64 PNG)
+  app.post(
+    "/api/campaign/preview-image",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const { jobId, format, ...overrides } = req.body;
+
+        let imageInput: { title: string; company: string; location: string; pay: string; requirements: string[]; benefits: string[]; logoUrl?: string; primaryColor?: string; accentColor?: string };
+
+        if (jobId) {
+          const job = await storage.getJob(jobId);
+          if (!job || job.tenantId !== tenantId) {
+            return res.status(404).json({ error: "Job not found" });
+          }
+          const tenant = await storage.getTenant(tenantId);
+          const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+
+          imageInput = {
+            title: overrides.title || job.title,
+            company: overrides.company || tenant?.name || "Restaurant",
+            location: overrides.location || (location?.city && location?.state ? `${location.city}, ${location.state}` : "Local"),
+            pay: overrides.pay || (job.payRangeMin && job.payRangeMax ? `$${job.payRangeMin} - $${job.payRangeMax} / HR` : ""),
+            requirements: overrides.requirements || [],
+            benefits: overrides.benefits || [],
+            logoUrl: overrides.logoUrl,
+            primaryColor: overrides.primaryColor,
+            accentColor: overrides.accentColor,
+          };
+        } else {
+          imageInput = {
+            title: overrides.title || "Job Title",
+            company: overrides.company || "Company",
+            location: overrides.location || "City, State",
+            pay: overrides.pay || "",
+            requirements: overrides.requirements || [],
+            benefits: overrides.benefits || [],
+            logoUrl: overrides.logoUrl,
+            primaryColor: overrides.primaryColor,
+            accentColor: overrides.accentColor,
+          };
+        }
+
+        const buffer = await adImageGen.generateAdImage(imageInput, format || "feed");
+        const base64 = buffer.toString("base64");
+
+        res.json({ image: `data:image/png;base64,${base64}`, format: format || "feed" });
+      } catch (error: any) {
+        console.error("Error generating preview image:", error);
+        res.status(500).json({ error: error.message || "Failed to generate image" });
+      }
+    }
+  );
+
+  // Generate and save ad image
+  app.post(
+    "/api/campaign/generate-image",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const { campaignId, format } = req.body;
+
+        if (!campaignId) {
+          return res.status(400).json({ error: "campaignId is required" });
+        }
+
+        const [campaign] = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(and(eq(jobAdCampaigns.id, campaignId), eq(jobAdCampaigns.tenantId, tenantId))!);
+
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        const job = await storage.getJob(campaign.jobId);
+        if (!job) {
+          return res.status(404).json({ error: "Job not found" });
+        }
+
+        const tenant = await storage.getTenant(tenantId);
+        const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+
+        const imageInput = {
+          title: job.title,
+          company: tenant?.name || "Restaurant",
+          location: location?.city && location?.state ? `${location.city}, ${location.state}` : "Local",
+          pay: job.payRangeMin && job.payRangeMax ? `$${job.payRangeMin} - $${job.payRangeMax} / HR` : "",
+          requirements: [] as string[],
+          benefits: [] as string[],
+        };
+
+        const buffer = await adImageGen.generateAdImage(imageInput, format || "feed");
+
+        // Save to uploads directory
+        const uploadsDir = path.join(process.cwd(), "uploads", "ad-images");
+        await fs.mkdir(uploadsDir, { recursive: true });
+        const filename = `${campaignId}.png`;
+        const filepath = path.join(uploadsDir, filename);
+        await fs.writeFile(filepath, buffer);
+
+        const imageUrl = `/uploads/ad-images/${filename}`;
+
+        res.json({ imageUrl, size: buffer.length });
+      } catch (error: any) {
+        console.error("Error generating ad image:", error);
+        res.status(500).json({ error: error.message || "Failed to generate image" });
+      }
+    }
+  );
+
   return httpServer;
 }
