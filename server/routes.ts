@@ -2538,7 +2538,28 @@ export async function registerRoutes(
 
   // Middleware to require super admin
   async function requireSuperAdmin(req: Request, res: Response, next: NextFunction) {
-    const userId = getUserId(req);
+    // Try session auth first
+    let userId = getUserId(req);
+
+    // Fall back to JWT
+    if (!userId) {
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        try {
+          const jwt = await import("jsonwebtoken");
+          const token = authHeader.slice(7);
+          const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "krew-jwt-secret") as any;
+          userId = decoded.userId;
+        } catch {}
+      }
+    }
+
+    // Fall back to session
+    if (!userId) {
+      const session = req.session as any;
+      userId = session?.userId;
+    }
+
     if (!userId) {
       return res.status(401).json({ error: "Unauthorized" });
     }
@@ -2552,16 +2573,38 @@ export async function registerRoutes(
   }
 
   // Check if current user is super admin
-  app.get("/api/admin/check", isAuthenticated, async (req, res) => {
+  // Accept both session auth and JWT for admin check
+  app.get("/api/admin/check", async (req, res) => {
     try {
-      const userId = getUserId(req);
-      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      // Try session auth first
+      let userId = getUserId(req);
+
+      // Fall back to JWT
+      if (!userId) {
+        const authHeader = req.headers.authorization;
+        if (authHeader?.startsWith("Bearer ")) {
+          try {
+            const jwt = await import("jsonwebtoken");
+            const token = authHeader.slice(7);
+            const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "krew-jwt-secret") as any;
+            userId = decoded.userId;
+          } catch {}
+        }
+      }
+
+      // Fall back to cookie-based org auth
+      if (!userId) {
+        const session = req.session as any;
+        userId = session?.userId;
+      }
+
+      if (!userId) return res.json({ isSuperAdmin: false });
 
       const userProfile = await storage.getUserProfile(userId);
       res.json({ isSuperAdmin: checkIsSuperAdmin(userProfile) });
     } catch (error) {
       console.error("Error checking admin status:", error);
-      res.status(500).json({ error: "Failed to check admin status" });
+      res.json({ isSuperAdmin: false });
     }
   });
 

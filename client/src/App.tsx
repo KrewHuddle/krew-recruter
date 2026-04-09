@@ -228,9 +228,21 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
   const [, setLocation] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
 
+  // Check admin status with both session cookie and JWT token
   const { data: adminCheck, isLoading: adminLoading } = useQuery<{ isSuperAdmin: boolean }>({
     queryKey: ["/api/admin/check"],
-    enabled: isAuthenticated,
+    queryFn: async () => {
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem("krew_token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch("/api/admin/check", {
+        credentials: "include",
+        headers,
+      });
+      if (!res.ok) return { isSuperAdmin: false };
+      return res.json();
+    },
+    enabled: isAuthenticated || !!localStorage.getItem("krew_token"),
   });
 
   if (isLoading || adminLoading) {
@@ -241,13 +253,15 @@ function ProtectedAdminRoute({ children }: { children: React.ReactNode }) {
     );
   }
 
-  if (!isAuthenticated) {
+  const hasToken = !!localStorage.getItem("krew_token");
+
+  if (!isAuthenticated && !hasToken) {
     window.location.href = "/login";
     return null;
   }
 
   if (!adminCheck?.isSuperAdmin) {
-    setLocation("/app");
+    setLocation("/campaign");
     return null;
   }
 

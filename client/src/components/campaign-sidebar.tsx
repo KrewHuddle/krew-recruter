@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { Link, useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard,
   Briefcase,
@@ -14,6 +15,7 @@ import {
   HelpCircle,
   MoreHorizontal,
   Search,
+  Shield,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
@@ -58,6 +60,18 @@ export function CampaignSidebar({
   const [location] = useLocation();
   const [orgDropdownOpen, setOrgDropdownOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  const { data: adminCheck } = useQuery<{ isSuperAdmin: boolean }>({
+    queryKey: ["/api/admin/check"],
+    queryFn: async () => {
+      const headers: Record<string, string> = {};
+      const token = localStorage.getItem("krew_token");
+      if (token) headers["Authorization"] = `Bearer ${token}`;
+      const res = await fetch("/api/admin/check", { credentials: "include", headers });
+      if (!res.ok) return { isSuperAdmin: false };
+      return res.json();
+    },
+  });
   const orgDropdownRef = useRef<HTMLDivElement>(null);
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -215,6 +229,16 @@ export function CampaignSidebar({
 
         {userMenuOpen && (
           <div className="absolute bottom-full left-3 right-3 mb-1 rounded-md py-1 shadow-lg bg-popover border border-popover-border z-[60]">
+            {adminCheck?.isSuperAdmin && (
+              <a
+                href="/admin"
+                onClick={() => setUserMenuOpen(false)}
+                className="flex items-center gap-2 px-3 py-2 text-sm text-primary font-medium hover:bg-accent transition-colors"
+              >
+                <Shield className="h-4 w-4" />
+                Admin Portal
+              </a>
+            )}
             <Link
               href="/campaign/settings"
               onClick={() => setUserMenuOpen(false)}
