@@ -1421,6 +1421,39 @@ export const insertCampaignSpendSchema = createInsertSchema(campaignSpend).omit(
 export type InsertCampaignSpend = z.infer<typeof insertCampaignSpendSchema>;
 export type CampaignSpend = typeof campaignSpend.$inferSelect;
 
+// ============ JOB AD CAMPAIGNS (Meta Ads) ============
+
+export const jobAdCampaignStatusEnum = pgEnum("job_ad_campaign_status", ["draft", "active", "paused", "deleted"]);
+
+export const jobAdCampaigns = pgTable("job_ad_campaigns", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  jobId: varchar("job_id").notNull().references(() => jobs.id, { onDelete: "cascade" }),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  metaCampaignId: text("meta_campaign_id"),
+  metaAdSetId: text("meta_ad_set_id"),
+  metaAdId: text("meta_ad_id"),
+  metaCreativeId: text("meta_creative_id"),
+  status: jobAdCampaignStatusEnum("status").notNull().default("draft"),
+  dailyBudgetUSD: integer("daily_budget_usd").notNull().default(10),
+  totalSpendCents: integer("total_spend_cents").notNull().default(0),
+  impressions: integer("impressions").notNull().default(0),
+  clicks: integer("clicks").notNull().default(0),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("idx_job_ad_campaign_job").on(table.jobId),
+  index("idx_job_ad_campaign_tenant").on(table.tenantId),
+]);
+
+export const jobAdCampaignsRelations = relations(jobAdCampaigns, ({ one }) => ({
+  job: one(jobs, { fields: [jobAdCampaigns.jobId], references: [jobs.id] }),
+  tenant: one(tenants, { fields: [jobAdCampaigns.tenantId], references: [tenants.id] }),
+}));
+
+export const insertJobAdCampaignSchema = createInsertSchema(jobAdCampaigns).omit({ id: true, createdAt: true, updatedAt: true });
+export type InsertJobAdCampaign = z.infer<typeof insertJobAdCampaignSchema>;
+export type JobAdCampaign = typeof jobAdCampaigns.$inferSelect;
+
 // ============ ORG MEMBERS ============
 
 export const orgMembers = pgTable("org_members", {

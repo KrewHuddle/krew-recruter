@@ -1,0 +1,271 @@
+/**
+ * Meta Marketing API Service
+ *
+ * Handles all Meta (Facebook/Instagram) ad campaign operations.
+ * Flow: Campaign -> Ad Set -> Ad Creative -> Ad
+ *
+ * Requires env vars:
+ *   META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN,
+ *   META_AD_ACCOUNT_ID, META_PAGE_ID
+ */
+
+const META_API_VERSION = "v19.0";
+const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
+
+function getConfig() {
+  const accessToken = process.env.META_ACCESS_TOKEN;
+  const adAccountId = process.env.META_AD_ACCOUNT_ID;
+  const pageId = process.env.META_PAGE_ID;
+
+  if (!accessToken || !adAccountId || !pageId) {
+    throw new Error(
+      "Meta API not configured. Set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, and META_PAGE_ID env vars."
+    );
+  }
+
+  return { accessToken, adAccountId, pageId };
+}
+
+async function metaApiCall(
+  endpoint: string,
+  method: "GET" | "POST" | "DELETE" = "GET",
+  body?: Record<string, any>
+): Promise<any> {
+  const { accessToken } = getConfig();
+
+  const url = endpoint.startsWith("http")
+    ? endpoint
+    : `${META_BASE_URL}${endpoint}`;
+
+  const options: RequestInit = {
+    method,
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json",
+    },
+  };
+
+  if (body && method !== "GET") {
+    options.body = JSON.stringify(body);
+  }
+
+  const res = await fetch(url, options);
+  const data = await res.json();
+
+  if (!res.ok) {
+    const errorMsg =
+      data?.error?.message || data?.error?.error_user_msg || "Meta API error";
+    const errorCode = data?.error?.code || res.status;
+    throw new Error(`Meta API error (${errorCode}): ${errorMsg}`);
+  }
+
+  return data;
+}
+
+// ============ Hospitality Interest Targeting ============
+
+const HOSPITALITY_INTERESTS = [
+  { id: "6003107902433", name: "Food and drink" },
+  { id: "6003409935506", name: "Restaurants" },
+  { id: "6003384497938", name: "Cooking" },
+  { id: "6003020834693", name: "Hospitality" },
+];
+
+// ============ Public API ============
+
+export interface MetaJobInput {
+  jobId: string;
+  jobTitle: string;
+  companyName: string;
+  location: string;
+  latitude?: number;
+  longitude?: number;
+  pay?: string;
+  description?: string;
+  applyUrl: string;
+}
+
+export interface MetaCampaignResult {
+  metaCampaignId: string;
+  metaAdSetId: string;
+  metaCreativeId: string;
+  metaAdId: string;
+}
+
+export interface MetaCampaignStats {
+  impressions: number;
+  clicks: number;
+  spendCents: number;
+  cpc: number;
+}
+
+/**
+ * Creates a full Meta ad campaign for a job posting.
+ * Makes 4 sequential API calls: Campaign -> Ad Set -> Creative -> Ad.
+ * All created in PAUSED status — call activateCampaign() to go live.
+ */
+export async function createJobCampaign(
+  job: MetaJobInput,
+  dailyBudgetUSD: number
+): Promise<MetaCampaignResult> {
+  const { adAccountId, pageId } = getConfig();
+  const budgetCents = Math.round(dailyBudgetUSD * 100);
+
+  // 1. Create Campaign
+  const campaign = await metaApiCall(
+    `/${adAccountId}/campaigns`,
+    "POST",
+    {
+      name: `Krew - ${job.jobTitle} at ${job.companyName}`,
+      objective: "OUTCOME_TRAFFIC",
+      status: "PAUSED",
+      special_ad_categories: ["EMPLOYMENT"],
+    }
+  );
+
+  const metaCampaignId = campaign.id;
+
+  // 2. Create Ad Set with location + interest targeting
+  const targeting: Record<string, any> = {
+    interests: HOSPITALITY_INTERESTS,
+  };
+
+  if (job.latitude && job.longitude) {
+    targeting.geo_locations = {
+      custom_locations: [
+        {
+          latitude: job.latitude,
+          longitude: job.longitude,
+          radius: 25,
+          distance_unit: "mile",
+        },
+      ],
+    };
+  } else if (job.location) {
+    // Fallback: target by city name
+    targeting.geo_locations = {
+      cities: [{ key: job.location }],
+    };
+  }
+
+  const adSet = await metaApiCall(
+    `/${adAccountId}/adsets`,
+    "POST",
+    {
+      name: `${job.jobTitle} AdSet`,
+      campaign_id: metaCampaignId,
+      daily_budget: budgetCents,
+      billing_event: "IMPRESSIONS",
+      optimization_goal: "LINK_CLICKS",
+      bid_strategy: "LOWEST_COST_WITHOUT_CAP",
+      targeting,
+      start_time: new Date().toISOString(),
+      status: "PAUSED",
+    }
+  );
+
+  const metaAdSetId = adSet.id;
+
+  // 3. Create Ad Creative
+  const payLine = job.pay ? `\n\n✅ ${job.pay}` : "";
+  const message = `🍽️ ${job.companyName} is hiring a ${job.jobTitle}!${payLine}\n📍 ${job.location}\n🎥 Apply with a 60-sec video interview\n\nTap to apply now 👇`;
+
+  const creative = await metaApiCall(
+    `/${adAccountId}/adcreatives`,
+    "POST",
+    {
+      name: `${job.jobTitle} Creative`,
+      object_story_spec: {
+        page_id: pageId,
+        link_data: {
+          link: job.applyUrl,
+          message,
+          name: `Now Hiring: ${job.jobTitle}`,
+          description: `Join ${job.companyName}. Apply in minutes.`,
+          call_to_action: {
+            type: "APPLY_NOW",
+            value: { link: job.applyUrl },
+          },
+        },
+      },
+    }
+  );
+
+  const metaCreativeId = creative.id;
+
+  // 4. Create Ad
+  const ad = await metaApiCall(
+    `/${adAccountId}/ads`,
+    "POST",
+    {
+      name: `${job.jobTitle} Ad`,
+      adset_id: metaAdSetId,
+      creative: { creative_id: metaCreativeId },
+      status: "PAUSED",
+    }
+  );
+
+  const metaAdId = ad.id;
+
+  return { metaCampaignId, metaAdSetId, metaCreativeId, metaAdId };
+}
+
+/**
+ * Activates a paused campaign (sets campaign + ad set + ad to ACTIVE).
+ */
+export async function activateCampaign(metaCampaignId: string): Promise<void> {
+  await metaApiCall(`/${metaCampaignId}`, "POST", { status: "ACTIVE" });
+}
+
+/**
+ * Pauses an active campaign.
+ */
+export async function pauseCampaign(metaCampaignId: string): Promise<void> {
+  await metaApiCall(`/${metaCampaignId}`, "POST", { status: "PAUSED" });
+}
+
+/**
+ * Deletes a campaign (sets status to DELETED in Meta).
+ */
+export async function deleteCampaign(metaCampaignId: string): Promise<void> {
+  await metaApiCall(`/${metaCampaignId}`, "DELETE");
+}
+
+/**
+ * Fetches campaign performance stats from Meta Insights API.
+ */
+export async function getCampaignStats(
+  metaCampaignId: string
+): Promise<MetaCampaignStats> {
+  try {
+    const data = await metaApiCall(
+      `/${metaCampaignId}/insights?fields=impressions,clicks,spend,cpc&date_preset=lifetime`
+    );
+
+    const insight = data?.data?.[0];
+    if (!insight) {
+      return { impressions: 0, clicks: 0, spendCents: 0, cpc: 0 };
+    }
+
+    return {
+      impressions: parseInt(insight.impressions || "0", 10),
+      clicks: parseInt(insight.clicks || "0", 10),
+      spendCents: Math.round(parseFloat(insight.spend || "0") * 100),
+      cpc: parseFloat(insight.cpc || "0"),
+    };
+  } catch {
+    // If insights aren't available yet (new campaign), return zeros
+    return { impressions: 0, clicks: 0, spendCents: 0, cpc: 0 };
+  }
+}
+
+/**
+ * Checks if Meta API credentials are configured.
+ */
+export function isMetaConfigured(): boolean {
+  return !!(
+    process.env.META_ACCESS_TOKEN &&
+    process.env.META_AD_ACCOUNT_ID &&
+    process.env.META_PAGE_ID
+  );
+}

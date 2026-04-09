@@ -3368,5 +3368,280 @@ export async function registerRoutes(
     }
   });
 
+  // ============ META ADS CAMPAIGN ROUTES ============
+
+  const metaAds = await import("./services/meta-ads");
+  const { jobAdCampaigns } = await import("@shared/schema");
+  const { eq, and } = await import("drizzle-orm");
+  const { db } = await import("./db");
+
+  // Helper to safely extract string param from Express 5 params
+  const paramStr = (val: string | string[]): string =>
+    Array.isArray(val) ? val[0] : val;
+
+  // Create a Meta ad campaign for a job
+  app.post(
+    "/api/meta/campaign",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId;
+        const { jobId, dailyBudgetUSD } = req.body;
+
+        if (!jobId || !dailyBudgetUSD) {
+          return res.status(400).json({ error: "jobId and dailyBudgetUSD are required" });
+        }
+
+        // Fetch the job
+        const job = await storage.getJob(jobId);
+        if (!job || job.tenantId !== tenantId) {
+          return res.status(404).json({ error: "Job not found" });
+        }
+
+        const tenant = await storage.getTenant(tenantId);
+        const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+        const baseUrl = process.env.PUBLIC_URL || "https://krewrecruiter.com";
+
+        let metaResult = null;
+
+        if (metaAds.isMetaConfigured()) {
+          metaResult = await metaAds.createJobCampaign(
+            {
+              jobId: job.id,
+              jobTitle: job.title,
+              companyName: tenant?.name || "Restaurant",
+              location: location?.city && location?.state
+                ? `${location.city}, ${location.state}`
+                : "Local",
+              pay: job.payRangeMin && job.payRangeMax
+                ? `$${job.payRangeMin}-$${job.payRangeMax}/hr`
+                : job.payRangeMin ? `$${job.payRangeMin}/hr` : undefined,
+              applyUrl: `${baseUrl}/jobs/${job.id}`,
+            },
+            dailyBudgetUSD
+          );
+        }
+
+        // Save to database
+        const [campaign] = await db
+          .insert(jobAdCampaigns)
+          .values({
+            jobId,
+            tenantId,
+            metaCampaignId: metaResult?.metaCampaignId || null,
+            metaAdSetId: metaResult?.metaAdSetId || null,
+            metaAdId: metaResult?.metaAdId || null,
+            metaCreativeId: metaResult?.metaCreativeId || null,
+            status: metaResult ? "paused" : "draft",
+            dailyBudgetUSD,
+          })
+          .returning();
+
+        res.json(campaign);
+      } catch (error: any) {
+        console.error("Error creating Meta campaign:", error);
+        res.status(500).json({ error: error.message || "Failed to create campaign" });
+      }
+    }
+  );
+
+  // Activate a Meta campaign
+  app.post(
+    "/api/meta/campaign/:id/activate",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const id = paramStr(req.params.id);
+
+        const [campaign] = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
+
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+          await metaAds.activateCampaign(campaign.metaCampaignId);
+        }
+
+        const [updated] = await db
+          .update(jobAdCampaigns)
+          .set({ status: "active" as const, updatedAt: new Date() })
+          .where(eq(jobAdCampaigns.id, id))
+          .returning();
+
+        res.json(updated);
+      } catch (error: any) {
+        console.error("Error activating campaign:", error);
+        res.status(500).json({ error: error.message || "Failed to activate campaign" });
+      }
+    }
+  );
+
+  // Pause a Meta campaign
+  app.post(
+    "/api/meta/campaign/:id/pause",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const id = paramStr(req.params.id);
+
+        const [campaign] = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
+
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+          await metaAds.pauseCampaign(campaign.metaCampaignId);
+        }
+
+        const [updated] = await db
+          .update(jobAdCampaigns)
+          .set({ status: "paused" as const, updatedAt: new Date() })
+          .where(eq(jobAdCampaigns.id, id))
+          .returning();
+
+        res.json(updated);
+      } catch (error: any) {
+        console.error("Error pausing campaign:", error);
+        res.status(500).json({ error: error.message || "Failed to pause campaign" });
+      }
+    }
+  );
+
+  // Delete a Meta campaign
+  app.delete(
+    "/api/meta/campaign/:id",
+    isAuthenticated,
+    requireTenant,
+    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const id = paramStr(req.params.id);
+
+        const [campaign] = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
+
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+          await metaAds.deleteCampaign(campaign.metaCampaignId);
+        }
+
+        const [updated] = await db
+          .update(jobAdCampaigns)
+          .set({ status: "deleted" as const, updatedAt: new Date() })
+          .where(eq(jobAdCampaigns.id, id))
+          .returning();
+
+        res.json(updated);
+      } catch (error: any) {
+        console.error("Error deleting campaign:", error);
+        res.status(500).json({ error: error.message || "Failed to delete campaign" });
+      }
+    }
+  );
+
+  // Get campaign stats (fetches from Meta + updates db)
+  app.get(
+    "/api/meta/campaign/:id/stats",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const id = paramStr(req.params.id);
+
+        const [campaign] = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
+
+        if (!campaign) {
+          return res.status(404).json({ error: "Campaign not found" });
+        }
+
+        let stats = {
+          impressions: campaign.impressions,
+          clicks: campaign.clicks,
+          spendCents: campaign.totalSpendCents,
+          cpc: campaign.clicks > 0 ? campaign.totalSpendCents / campaign.clicks / 100 : 0,
+        };
+
+        // Fetch live stats from Meta if configured
+        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+          stats = await metaAds.getCampaignStats(campaign.metaCampaignId);
+
+          // Persist latest stats
+          await db
+            .update(jobAdCampaigns)
+            .set({
+              impressions: stats.impressions,
+              clicks: stats.clicks,
+              totalSpendCents: stats.spendCents,
+              updatedAt: new Date(),
+            })
+            .where(eq(jobAdCampaigns.id, id));
+        }
+
+        res.json({ ...campaign, ...stats });
+      } catch (error: any) {
+        console.error("Error getting campaign stats:", error);
+        res.status(500).json({ error: error.message || "Failed to get stats" });
+      }
+    }
+  );
+
+  // List all campaigns for a job (or all for tenant)
+  app.get(
+    "/api/meta/campaigns",
+    isAuthenticated,
+    requireTenant,
+    async (req, res) => {
+      try {
+        const tenantId = (req as any).tenantId as string;
+        const jobId = req.query.jobId as string | undefined;
+
+        const conditions = jobId
+          ? and(eq(jobAdCampaigns.tenantId, tenantId), eq(jobAdCampaigns.jobId, jobId))!
+          : eq(jobAdCampaigns.tenantId, tenantId);
+
+        const campaigns = await db
+          .select()
+          .from(jobAdCampaigns)
+          .where(conditions);
+
+        res.json(campaigns);
+      } catch (error: any) {
+        console.error("Error listing campaigns:", error);
+        res.status(500).json({ error: "Failed to list campaigns" });
+      }
+    }
+  );
+
+  // Check if Meta API is configured
+  app.get("/api/meta/status", isAuthenticated, (_req, res) => {
+    res.json({ configured: metaAds.isMetaConfigured() });
+  });
+
   return httpServer;
 }

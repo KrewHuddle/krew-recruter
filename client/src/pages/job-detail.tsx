@@ -26,6 +26,7 @@ import {
   Play,
   Trash2,
 } from "lucide-react";
+import { JobAdBooster } from "@/components/JobAdBooster";
 import type { Job, Location, Application, JobDistributionChannel, IntegrationConnection } from "@shared/schema";
 
 type JobWithDetails = Job & {
@@ -250,6 +251,11 @@ export default function JobDetail() {
               )}
             </CardContent>
           </Card>
+
+          {/* Meta Ad Booster */}
+          {job.status === "PUBLISHED" && (
+            <JobAdBooster job={job} tenantName={currentTenant?.name} />
+          )}
 
           <Card>
             <CardHeader>

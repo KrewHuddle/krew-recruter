@@ -16,6 +16,11 @@ import {
   Calendar,
   Video,
   CheckCircle2,
+  Zap,
+  Eye,
+  MousePointerClick,
+  DollarSign,
+  Pause,
 } from "lucide-react";
 import type { Job, Application, GigPost, Location } from "@shared/schema";
 
@@ -56,6 +61,11 @@ export default function Dashboard() {
     (GigPost & { location?: Location })[]
   >({
     queryKey: ["/api/gigs"],
+    enabled: !!currentTenant,
+  });
+
+  const { data: adCampaigns = [] } = useQuery<any[]>({
+    queryKey: ["/api/meta/campaigns"],
     enabled: !!currentTenant,
   });
 
@@ -401,6 +411,78 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       </div>
+      {/* Ad Campaigns Section */}
+      {adCampaigns.filter((c: any) => c.status !== "deleted").length > 0 && (
+        <Card>
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Zap className="h-5 w-5 text-primary" />
+                Ad Campaigns
+              </CardTitle>
+              <Link href="/app/jobs">
+                <Button variant="ghost" size="sm" className="gap-1">
+                  View Jobs <ArrowRight className="h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-3 gap-4 mb-4">
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <Eye className="h-3.5 w-3.5" />
+                  <span className="text-xs">Impressions</span>
+                </div>
+                <p className="text-xl font-bold">
+                  {adCampaigns.reduce((sum: number, c: any) => sum + (c.impressions || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <MousePointerClick className="h-3.5 w-3.5" />
+                  <span className="text-xs">Clicks</span>
+                </div>
+                <p className="text-xl font-bold">
+                  {adCampaigns.reduce((sum: number, c: any) => sum + (c.clicks || 0), 0).toLocaleString()}
+                </p>
+              </div>
+              <div className="text-center p-3 rounded-lg bg-muted/50">
+                <div className="flex items-center justify-center gap-1 text-muted-foreground mb-1">
+                  <DollarSign className="h-3.5 w-3.5" />
+                  <span className="text-xs">Total Spend</span>
+                </div>
+                <p className="text-xl font-bold">
+                  ${(adCampaigns.reduce((sum: number, c: any) => sum + (c.totalSpendCents || 0), 0) / 100).toFixed(2)}
+                </p>
+              </div>
+            </div>
+            <div className="space-y-2">
+              {adCampaigns
+                .filter((c: any) => c.status !== "deleted")
+                .slice(0, 5)
+                .map((c: any) => (
+                  <div key={c.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                    <div className="flex items-center gap-2">
+                      <Badge
+                        variant={c.status === "active" ? "default" : "secondary"}
+                        className="text-xs"
+                      >
+                        {c.status === "active" ? "Live" : c.status}
+                      </Badge>
+                      <span className="text-sm font-medium">Job #{c.jobId?.slice(0, 8)}</span>
+                    </div>
+                    <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                      <span>{(c.impressions || 0).toLocaleString()} impressions</span>
+                      <span>{c.clicks || 0} clicks</span>
+                      <span>${c.dailyBudgetUSD}/day</span>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

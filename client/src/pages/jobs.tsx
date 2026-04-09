@@ -46,6 +46,14 @@ import {
 } from "lucide-react";
 import { useState, useRef } from "react";
 import { useLocation } from "wouter";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { JobAdBooster } from "@/components/JobAdBooster";
+import { Zap } from "lucide-react";
 import type { Job, Location as LocationType, SponsoredCampaign, JobDistributionChannel } from "@shared/schema";
 
 type ExternalJob = {
@@ -202,6 +210,9 @@ export default function Jobs() {
   const [parseWarning, setParseWarning] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Boost sheet state
+  const [boostJob, setBoostJob] = useState<any>(null);
+
   // External job board state
   const [externalJobsDialogOpen, setExternalJobsDialogOpen] = useState(false);
   const [externalSearch, setExternalSearch] = useState("");
@@ -773,6 +784,21 @@ export default function Jobs() {
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
+                      {job.status === "PUBLISHED" && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="gap-1 text-xs"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setBoostJob(job);
+                          }}
+                        >
+                          <Zap className="h-3 w-3" />
+                          Boost
+                        </Button>
+                      )}
                       <Badge
                         variant={
                           job.status === "PUBLISHED"
@@ -815,6 +841,19 @@ export default function Jobs() {
           </CardContent>
         </Card>
       )}
+      {/* Boost Sheet */}
+      <Sheet open={!!boostJob} onOpenChange={(open) => { if (!open) setBoostJob(null); }}>
+        <SheetContent side="right" className="sm:max-w-md w-full">
+          <SheetHeader>
+            <SheetTitle>Boost Job</SheetTitle>
+          </SheetHeader>
+          <div className="mt-4">
+            {boostJob && (
+              <JobAdBooster job={boostJob} tenantName={currentTenant?.name} />
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
