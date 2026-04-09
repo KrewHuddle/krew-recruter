@@ -179,6 +179,13 @@ export async function loginHandler(req: Request, res: Response) {
       orgId: membership?.orgId,
     });
 
+    // Also set session for session-based auth compatibility
+    const session = req.session as any;
+    session.userId = user.id;
+    session.email = user.email;
+    session.firstName = user.firstName;
+    session.lastName = user.lastName;
+
     res.json({
       token,
       user: {

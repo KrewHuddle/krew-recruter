@@ -37,9 +37,26 @@ export default function Login() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Welcome back!", description: "You've successfully signed in." });
+      // Check if super admin — redirect to admin portal
+      try {
+        const token = data?.token;
+        const headers: Record<string, string> = {};
+        if (token) {
+          localStorage.setItem("krew_token", token);
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        const checkRes = await fetch("/api/admin/check", { credentials: "include", headers });
+        if (checkRes.ok) {
+          const { isSuperAdmin } = await checkRes.json();
+          if (isSuperAdmin) {
+            setLocation("/admin");
+            return;
+          }
+        }
+      } catch {}
       setLocation("/app");
     },
     onError: (error: Error) => {
@@ -61,9 +78,25 @@ export default function Login() {
       }
       return res.json();
     },
-    onSuccess: () => {
+    onSuccess: async (data: any) => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({ title: "Account created!", description: "Welcome to Krew Recruiter." });
+      try {
+        const token = data?.token;
+        const headers: Record<string, string> = {};
+        if (token) {
+          localStorage.setItem("krew_token", token);
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        const checkRes = await fetch("/api/admin/check", { credentials: "include", headers });
+        if (checkRes.ok) {
+          const { isSuperAdmin } = await checkRes.json();
+          if (isSuperAdmin) {
+            setLocation("/admin");
+            return;
+          }
+        }
+      } catch {}
       setLocation("/app");
     },
     onError: (error: Error) => {
