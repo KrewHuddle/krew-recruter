@@ -228,9 +228,9 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Hireline / Campaign Engine */}
+        {/* Krew Social / Campaign Engine */}
         <SidebarGroup>
-          <SidebarGroupLabel>Hireline</SidebarGroupLabel>
+          <SidebarGroupLabel>Krew Social</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {campaignNavItems.map((item) => (

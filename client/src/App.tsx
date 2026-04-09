@@ -440,7 +440,7 @@ function AppRouter() {
         </ProtectedEmployerRoute>
       </Route>
 
-      {/* Hireline / Campaign Engine (inside employer layout) */}
+      {/* Krew Social / Campaign Engine (inside employer layout) */}
       <Route path="/app/campaigns">
         <ProtectedEmployerRoute>
           <CampaignDashboard />
