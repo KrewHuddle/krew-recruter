@@ -40,6 +40,9 @@ import CandidateInterview from "@/pages/candidate-interview";
 import VideoInterviews from "@/pages/video-interviews";
 import ExternalJobs from "@/pages/external-jobs";
 import Login from "@/pages/login";
+import Billing from "@/pages/billing";
+import Pricing from "@/pages/pricing";
+import Help from "@/pages/help";
 
 // New campaign engine pages
 import CampaignLogin from "@/pages/campaign-login";
@@ -326,6 +329,8 @@ function AppRouter() {
       <Route path="/gigs" component={GigBoard} />
       <Route path="/gigs/join" component={GigJoin} />
       <Route path="/video-interviews" component={VideoInterviews} />
+      <Route path="/pricing" component={Pricing} />
+      <Route path="/help" component={Help} />
 
       {/* Onboarding */}
       <Route path="/onboarding">
@@ -417,6 +422,11 @@ function AppRouter() {
           <Interviews />
         </ProtectedEmployerRoute>
       </Route>
+      <Route path="/app/billing">
+        <ProtectedEmployerRoute>
+          <Billing />
+        </ProtectedEmployerRoute>
+      </Route>
       <Route path="/app/settings">
         <ProtectedEmployerRoute>
           <Settings />
@@ -425,6 +435,11 @@ function AppRouter() {
 
       {/* Admin */}
       <Route path="/admin">
+        <ProtectedAdminRoute>
+          <AdminDashboard />
+        </ProtectedAdminRoute>
+      </Route>
+      <Route path="/admin/dashboard">
         <ProtectedAdminRoute>
           <AdminDashboard />
         </ProtectedAdminRoute>

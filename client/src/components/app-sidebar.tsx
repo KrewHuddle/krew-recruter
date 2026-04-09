@@ -33,6 +33,7 @@ import {
   ChevronDown,
   LogOut,
   Shield,
+  CreditCard,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/lib/tenant-context";
@@ -55,6 +56,7 @@ const interviewsNavItems = [
 ];
 
 const settingsNavItems = [
+  { title: "Billing", url: "/app/billing", icon: CreditCard },
   { title: "Settings", url: "/app/settings", icon: Settings },
 ];
 
