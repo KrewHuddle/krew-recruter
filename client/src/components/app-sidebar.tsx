@@ -35,6 +35,11 @@ import {
   Shield,
   CreditCard,
   Search,
+  Megaphone,
+  UserCheck,
+  Wand2,
+  UsersRound,
+  HelpCircle,
 } from "lucide-react";
 import { useAuth } from "@/hooks/use-auth";
 import { useTenant } from "@/lib/tenant-context";
@@ -47,6 +52,14 @@ const mainNavItems = [
   { title: "Jobs", url: "/app/jobs", icon: Briefcase },
   { title: "Applicants", url: "/app/applicants", icon: Users },
   { title: "Talent Pool", url: "/app/talent", icon: Search },
+];
+
+const campaignNavItems = [
+  { title: "Campaigns", url: "/app/campaigns", icon: Megaphone },
+  { title: "Campaign Jobs", url: "/app/campaigns/jobs", icon: Wand2 },
+  { title: "Candidates", url: "/app/campaigns/candidates", icon: UserCheck },
+  { title: "Team", url: "/app/campaigns/team", icon: UsersRound },
+  { title: "Campaign Help", url: "/app/campaigns/help", icon: HelpCircle },
 ];
 
 const gigsNavItems = [
@@ -72,7 +85,7 @@ export function AppSidebar() {
   });
 
   const isActive = (path: string) => {
-    if (path === "/app") return location === "/app";
+    if (path === "/app" || path === "/app/campaigns") return location === path;
     return location.startsWith(path);
   };
 
@@ -203,6 +216,29 @@ export function AppSidebar() {
                     asChild
                     isActive={isActive(item.url)}
                     data-testid={`nav-${item.title.toLowerCase()}`}
+                  >
+                    <Link href={item.url}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
+
+        {/* Hireline / Campaign Engine */}
+        <SidebarGroup>
+          <SidebarGroupLabel>Hireline</SidebarGroupLabel>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {campaignNavItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={isActive(item.url)}
+                    data-testid={`nav-${item.title.toLowerCase().replace(/\s+/g, "-")}`}
                   >
                     <Link href={item.url}>
                       <item.icon className="h-4 w-4" />

@@ -439,6 +439,53 @@ function AppRouter() {
         </ProtectedEmployerRoute>
       </Route>
 
+      {/* Hireline / Campaign Engine (inside employer layout) */}
+      <Route path="/app/campaigns">
+        <ProtectedEmployerRoute>
+          <CampaignDashboard />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/jobs">
+        <ProtectedEmployerRoute>
+          <CampaignJobs />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/jobs/new">
+        <ProtectedEmployerRoute>
+          <CampaignWizard />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/candidates">
+        <ProtectedEmployerRoute>
+          <CampaignCandidates />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/interviews">
+        <ProtectedEmployerRoute>
+          <CampaignInterviews />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/team">
+        <ProtectedEmployerRoute>
+          <CampaignTeam />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/billing">
+        <ProtectedEmployerRoute>
+          <CampaignTeam defaultTab="billing" />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/settings">
+        <ProtectedEmployerRoute>
+          <CampaignSettings />
+        </ProtectedEmployerRoute>
+      </Route>
+      <Route path="/app/campaigns/help">
+        <ProtectedEmployerRoute>
+          <CampaignHelp />
+        </ProtectedEmployerRoute>
+      </Route>
+
       {/* Admin */}
       <Route path="/admin">
         <ProtectedAdminRoute>
