@@ -189,14 +189,18 @@ export default function Landing() {
                     <Briefcase className="h-4 w-4" />
                   </Button>
                 </a>
-                <Link href="/gigs/join">
+                <Link href="/workers/signup">
                   <Button variant="outline" size="lg" className="gap-2" data-testid="button-hero-worker">
                     I Want to Work
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </Link>
               </div>
-              <div className="mt-8 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
+              <p className="mt-4 text-sm text-muted-foreground text-center lg:text-left">
+                Already have an account?{" "}
+                <Link href="/login" className="text-primary hover:underline">Sign in</Link>
+              </p>
+              <div className="mt-4 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
                 <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-free">
                   <CheckCircle2 className="h-4 w-4 text-secondary" />
                   Free to start
@@ -581,7 +585,7 @@ export default function Landing() {
                     <Briefcase className="h-4 w-4" />
                   </Button>
                 </a>
-                <Link href="/gigs/join">
+                <Link href="/workers/signup">
                   <Button size="lg" variant="outline" className="gap-2 bg-white/10 border-white/30 text-primary-foreground" data-testid="button-cta-worker">
                     Join as a Worker
                     <ArrowRight className="h-4 w-4" />
@@ -618,7 +622,7 @@ export default function Landing() {
               <h4 className="font-semibold mb-4" data-testid="text-footer-workers-heading">For Workers</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 <li><Link href="/gigs"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-browse-gigs">Browse Gigs</span></Link></li>
-                <li><Link href="/gigs/join"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-join-worker">Join as Worker</span></Link></li>
+                <li><Link href="/workers/signup"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-join-worker">Join as Worker</span></Link></li>
                 <li><Link href="/jobs"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-full-time">Full-Time Jobs</span></Link></li>
               </ul>
             </div>

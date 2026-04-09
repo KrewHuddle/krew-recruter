@@ -57,6 +57,10 @@ import CampaignHelp from "@/pages/campaign-help";
 import CampaignSettings from "@/pages/campaign-settings";
 import CampaignTeam from "@/pages/campaign-team";
 
+// Worker signup & onboarding
+import WorkerSignup from "@/pages/worker-signup";
+import WorkerOnboarding from "@/pages/worker-onboarding";
+
 import { Loader2, Shield } from "lucide-react";
 import { UpgradePromptListener } from "@/components/upgrade-prompt";
 import type { UserProfile } from "@shared/schema";
@@ -333,6 +337,14 @@ function AppRouter() {
       <Route path="/video-interviews" component={VideoInterviews} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/help" component={Help} />
+
+      {/* Worker signup & onboarding (public entry, protected onboarding) */}
+      <Route path="/workers/signup" component={WorkerSignup} />
+      <Route path="/workers/onboarding">
+        <ProtectedRoute>
+          <WorkerOnboarding />
+        </ProtectedRoute>
+      </Route>
 
       {/* Onboarding */}
       <Route path="/onboarding">
