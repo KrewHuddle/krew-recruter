@@ -108,6 +108,42 @@ export class StripeService {
     const stripe = getStripeClient();
     return await stripe.subscriptions.retrieve(subscriptionId);
   }
+
+  /**
+   * Creates an invoice item for ad spend on an existing customer.
+   * Used for daily ad spend billing — charges accumulate on the
+   * customer's next invoice (or can be invoiced immediately).
+   */
+  async createAdSpendInvoiceItem(
+    customerId: string,
+    amountCents: number,
+    description: string,
+    metadata?: Record<string, string>
+  ) {
+    const stripe = getStripeClient();
+    return await stripe.invoiceItems.create({
+      customer: customerId,
+      amount: amountCents,
+      currency: "usd",
+      description,
+      metadata,
+    });
+  }
+
+  /**
+   * Creates and finalizes an invoice for pending invoice items,
+   * then attempts to pay it immediately.
+   */
+  async createAndPayInvoice(customerId: string) {
+    const stripe = getStripeClient();
+    const invoice = await stripe.invoices.create({
+      customer: customerId,
+      auto_advance: true,
+      collection_method: "charge_automatically",
+    });
+    // Finalize and attempt payment
+    return await stripe.invoices.pay(invoice.id);
+  }
 }
 
 export const stripeService = new StripeService();

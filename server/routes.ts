@@ -10,8 +10,11 @@ import { adzunaService } from "./services/adzuna";
 import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
 import { requirePlan } from "./middleware/requirePlan";
 import { db } from "./db";
-import { organizations, campaigns } from "@shared/schema";
-import { eq, desc } from "drizzle-orm";
+import {
+  organizations, campaigns, jobs, applications, interviewInvites,
+  campaignSpend, paymentHistory,
+} from "@shared/schema";
+import { eq, desc, sql, sum, count, and } from "drizzle-orm";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -2832,6 +2835,49 @@ export async function registerRoutes(
     }
   });
 
+  // GET /api/billing/usage — current period usage stats for billing page
+  app.get("/api/billing/usage", isAuthenticated, requireTenant, async (req, res) => {
+    try {
+      const tenantId = (req as any).tenantId;
+
+      // Jobs posted by this tenant
+      const [jobCount] = await db
+        .select({ count: count() })
+        .from(jobs)
+        .where(eq(jobs.tenantId, tenantId));
+
+      // Total applications (candidates) for this tenant
+      const [appCount] = await db
+        .select({ count: count() })
+        .from(applications)
+        .where(eq(applications.tenantId, tenantId));
+
+      // Video interviews completed for this tenant
+      const [interviewCount] = await db
+        .select({ count: count() })
+        .from(interviewInvites)
+        .where(eq(interviewInvites.tenantId, tenantId));
+
+      // Total ad spend across all campaigns for this tenant's org
+      // campaigns link via orgId — for tenants that also have an org, we match on tenantId
+      const [spendResult] = await db
+        .select({ total: sum(campaignSpend.spendCents) })
+        .from(campaignSpend)
+        .innerJoin(campaigns, eq(campaignSpend.campaignId, campaigns.id))
+        .where(eq(campaigns.orgId, tenantId));
+
+      res.json({
+        jobsPosted: jobCount?.count || 0,
+        totalCandidates: appCount?.count || 0,
+        videoInterviews: interviewCount?.count || 0,
+        adSpendCents: parseInt(String(spendResult?.total || "0"), 10),
+      });
+    } catch (error) {
+      console.error("Error fetching billing usage:", error);
+      res.status(500).json({ error: "Failed to fetch usage data" });
+    }
+  });
+
   // ============ WORKER PAYOUT ROUTES ============
 
   // Get worker payout account status
@@ -4114,6 +4160,143 @@ export async function registerRoutes(
     }
   );
 
+  // ============ ADMIN AD SPEND BILLING ============
+
+  // POST /api/admin/billing/process-daily-spend
+  // Called daily by cron or admin to charge employers for active campaign ad spend.
+  // For each active campaign: employer pays dailyBudgetCents (includes markup).
+  // We create a Stripe invoice item on the org's Stripe customer.
+  app.post("/api/admin/billing/process-daily-spend", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      const { getMetaCredentials } = await import("./services/platformSettings");
+
+      let markupPercent = 20;
+      try {
+        const creds = await getMetaCredentials();
+        markupPercent = creds.markupPercent;
+      } catch {
+        // Use default markup if Meta not configured
+      }
+
+      // Get all active campaigns with their org's Stripe customer ID
+      const activeCampaigns = await db
+        .select({
+          campaignId: campaigns.id,
+          title: campaigns.title,
+          dailyBudgetCents: campaigns.dailyBudgetCents,
+          orgId: campaigns.orgId,
+          orgName: organizations.name,
+          stripeCustomerId: organizations.stripeCustomerId,
+        })
+        .from(campaigns)
+        .innerJoin(organizations, eq(campaigns.orgId, organizations.id))
+        .where(eq(campaigns.status, "active"));
+
+      let charged = 0;
+      let skipped = 0;
+      const errors: string[] = [];
+
+      for (const campaign of activeCampaigns) {
+        if (!campaign.stripeCustomerId) {
+          skipped++;
+          continue;
+        }
+
+        const employerBudgetCents = campaign.dailyBudgetCents || 3200;
+        const metaSpendCents = Math.round(employerBudgetCents * 100 / (100 + markupPercent));
+        const markupCents = employerBudgetCents - metaSpendCents;
+
+        try {
+          // Create invoice item for this day's ad spend
+          await stripeService.createAdSpendInvoiceItem(
+            campaign.stripeCustomerId,
+            employerBudgetCents,
+            `Ad spend: ${campaign.title} (${today})`,
+            {
+              campaignId: campaign.campaignId,
+              date: today,
+              metaSpendCents: String(metaSpendCents),
+              markupCents: String(markupCents),
+            }
+          );
+
+          // Record the spend in our DB
+          await db.insert(campaignSpend).values({
+            campaignId: campaign.campaignId,
+            date: today,
+            spendCents: employerBudgetCents,
+          });
+
+          // Also update total spent on campaign
+          await db
+            .update(campaigns)
+            .set({
+              totalSpentCents: sql`${campaigns.totalSpentCents} + ${employerBudgetCents}`,
+            })
+            .where(eq(campaigns.id, campaign.campaignId));
+
+          charged++;
+        } catch (err: any) {
+          errors.push(`${campaign.orgName}/${campaign.title}: ${err.message}`);
+        }
+      }
+
+      res.json({
+        processed: activeCampaigns.length,
+        charged,
+        skipped,
+        errors: errors.length > 0 ? errors : undefined,
+        date: today,
+      });
+    } catch (error) {
+      console.error("Error processing daily spend:", error);
+      res.status(500).json({ error: "Failed to process daily ad spend" });
+    }
+  });
+
+  // POST /api/admin/billing/collect-invoices
+  // Collects all pending invoice items into invoices and charges them.
+  // Run after process-daily-spend, or at end of billing period.
+  app.post("/api/admin/billing/collect-invoices", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      // Get unique Stripe customer IDs that have active campaigns
+      const activeOrgs = await db
+        .select({
+          stripeCustomerId: organizations.stripeCustomerId,
+          orgName: organizations.name,
+        })
+        .from(campaigns)
+        .innerJoin(organizations, eq(campaigns.orgId, organizations.id))
+        .where(eq(campaigns.status, "active"));
+
+      const uniqueCustomers = Array.from(new Set(
+        activeOrgs
+          .map(o => o.stripeCustomerId)
+          .filter((id): id is string => !!id)
+      ));
+
+      let invoiced = 0;
+      const errors: string[] = [];
+
+      for (const customerId of uniqueCustomers) {
+        try {
+          await stripeService.createAndPayInvoice(customerId);
+          invoiced++;
+        } catch (err: any) {
+          // "Nothing to invoice" is not an error
+          if (err.message?.includes("Nothing to invoice")) continue;
+          errors.push(`${customerId}: ${err.message}`);
+        }
+      }
+
+      res.json({ invoiced, errors: errors.length > 0 ? errors : undefined });
+    } catch (error) {
+      console.error("Error collecting invoices:", error);
+      res.status(500).json({ error: "Failed to collect invoices" });
+    }
+  });
+
   // ============ ADMIN META ADS MANAGEMENT ============
 
   // GET /api/admin/meta/settings — return masked platform settings
@@ -4238,7 +4421,7 @@ export async function registerRoutes(
   // POST /api/admin/meta/campaigns/:id/pause — admin force pause
   app.post("/api/admin/meta/campaigns/:id/pause", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await db.update(campaigns).set({ status: "paused" } as any).where(eq(campaigns.id, id));
       res.json({ success: true });
     } catch (error) {
@@ -4250,7 +4433,7 @@ export async function registerRoutes(
   // POST /api/admin/meta/campaigns/:id/resume — admin resume
   app.post("/api/admin/meta/campaigns/:id/resume", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const id = req.params.id as string;
       await db.update(campaigns).set({ status: "active" } as any).where(eq(campaigns.id, id));
       res.json({ success: true });
     } catch (error) {
