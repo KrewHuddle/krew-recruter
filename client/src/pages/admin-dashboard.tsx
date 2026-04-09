@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { Link } from "wouter";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -76,6 +76,13 @@ import {
   CheckCircle2,
   UserCog,
   Eye,
+  Megaphone,
+  Loader2,
+  Pause,
+  Play,
+  Square,
+  Wifi,
+  WifiOff,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -224,6 +231,19 @@ export default function AdminDashboard() {
   const [newCouponDiscount, setNewCouponDiscount] = useState("");
   const [newCouponType, setNewCouponType] = useState<"percentage" | "fixed">("percentage");
   const [newCouponMaxUses, setNewCouponMaxUses] = useState("");
+
+  // Meta Ads state
+  const [metaAppId, setMetaAppId] = useState("");
+  const [metaAppSecret, setMetaAppSecret] = useState("");
+  const [metaAccessToken, setMetaAccessToken] = useState("");
+  const [metaAdAccountId, setMetaAdAccountId] = useState("");
+  const [metaPageId, setMetaPageId] = useState("");
+  const [metaDefaultBudget, setMetaDefaultBudget] = useState("32");
+  const [metaMaxBudget, setMetaMaxBudget] = useState("100");
+  const [metaMarkupPercent, setMetaMarkupPercent] = useState("20");
+  const [metaTestResult, setMetaTestResult] = useState<any>(null);
+  const [metaTesting, setMetaTesting] = useState(false);
+  const [pauseAllOpen, setPauseAllOpen] = useState(false);
   const [couponDialogOpen, setCouponDialogOpen] = useState(false);
 
   const createFlagMutation = useMutation({
@@ -331,6 +351,111 @@ export default function AdminDashboard() {
       maxRedemptions: newCouponMaxUses ? parseInt(newCouponMaxUses) : undefined,
     });
   };
+
+  // Meta Ads queries
+  const { data: metaSettings, isLoading: metaSettingsLoading } = useQuery<
+    Array<{ key: string; value: string; description: string | null; updatedAt: string | null }>
+  >({
+    queryKey: ["/api/admin/meta/settings"],
+  });
+
+  const { data: metaCampaigns, isLoading: metaCampaignsLoading } = useQuery<any[]>({
+    queryKey: ["/api/admin/meta/campaigns"],
+  });
+
+  // Populate form fields from fetched settings
+  useEffect(() => {
+    if (metaSettings) {
+      const map: Record<string, string> = {};
+      for (const s of metaSettings) map[s.key] = s.value;
+      if (map.meta_app_id) setMetaAppId(map.meta_app_id);
+      if (map.meta_app_secret) setMetaAppSecret(map.meta_app_secret);
+      if (map.meta_access_token) setMetaAccessToken(map.meta_access_token);
+      if (map.meta_ad_account_id) setMetaAdAccountId(map.meta_ad_account_id);
+      if (map.meta_page_id) setMetaPageId(map.meta_page_id);
+      if (map.meta_default_daily_budget_cents) setMetaDefaultBudget(String(parseInt(map.meta_default_daily_budget_cents) / 100));
+      if (map.meta_max_daily_budget_cents) setMetaMaxBudget(String(parseInt(map.meta_max_daily_budget_cents) / 100));
+      if (map.meta_platform_markup_percent) setMetaMarkupPercent(map.meta_platform_markup_percent);
+    }
+  }, [metaSettings]);
+
+  const saveMetaSettingsMutation = useMutation({
+    mutationFn: async (data: Record<string, any>) => {
+      return apiRequest("PUT", "/api/admin/meta/settings", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meta/settings"] });
+      toast({ title: "Meta settings saved" });
+    },
+    onError: () => {
+      toast({ title: "Failed to save Meta settings", variant: "destructive" });
+    },
+  });
+
+  const pauseCampaignMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/admin/meta/campaigns/${id}/pause`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meta/campaigns"] });
+      toast({ title: "Campaign paused" });
+    },
+  });
+
+  const resumeCampaignMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("POST", `/api/admin/meta/campaigns/${id}/resume`, {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meta/campaigns"] });
+      toast({ title: "Campaign resumed" });
+    },
+  });
+
+  const pauseAllMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/admin/meta/campaigns/pause-all", {});
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/meta/campaigns"] });
+      toast({ title: "All campaigns paused" });
+      setPauseAllOpen(false);
+    },
+  });
+
+  const handleTestMeta = async () => {
+    setMetaTesting(true);
+    setMetaTestResult(null);
+    try {
+      const res = await apiRequest("GET", "/api/admin/meta/test");
+      const data = await res.json();
+      setMetaTestResult(data);
+    } catch {
+      setMetaTestResult({ valid: false, error: "Request failed" });
+    } finally {
+      setMetaTesting(false);
+    }
+  };
+
+  const handleSaveMetaSettings = () => {
+    const payload: Record<string, any> = {};
+    // Only send non-masked values (user typed real credentials)
+    if (metaAppId && !metaAppId.startsWith("••")) payload.appId = metaAppId;
+    if (metaAppSecret && !metaAppSecret.startsWith("••")) payload.appSecret = metaAppSecret;
+    if (metaAccessToken && !metaAccessToken.startsWith("••")) payload.accessToken = metaAccessToken;
+    if (metaAdAccountId) payload.adAccountId = metaAdAccountId;
+    if (metaPageId) payload.pageId = metaPageId;
+    payload.defaultBudget = parseFloat(metaDefaultBudget) || 32;
+    payload.maxBudget = parseFloat(metaMaxBudget) || 100;
+    payload.markupPercent = parseInt(metaMarkupPercent) || 20;
+    saveMetaSettingsMutation.mutate(payload);
+  };
+
+  const metaConnected = metaSettings?.some(s => s.key === "meta_access_token" && s.value && s.value !== "••••");
+  const activeCampaignCount = metaCampaigns?.filter((c: any) => c.status === "active").length || 0;
+  const totalSpendToday = metaCampaigns
+    ?.filter((c: any) => c.status === "active")
+    .reduce((sum: number, c: any) => sum + (c.dailyBudgetCents || 0), 0) || 0;
 
   return (
     <div className="flex-1 space-y-6 p-6 lg:p-8">
@@ -451,6 +576,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="pages" data-testid="tab-pages">
             <Map className="h-4 w-4 mr-2" />
             Pages
+          </TabsTrigger>
+          <TabsTrigger value="meta-ads" data-testid="tab-meta-ads">
+            <Megaphone className="h-4 w-4 mr-2" />
+            Meta Ads
           </TabsTrigger>
         </TabsList>
 
@@ -1399,6 +1528,279 @@ export default function AdminDashboard() {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* ============ META ADS TAB ============ */}
+        <TabsContent value="meta-ads">
+          <div className="space-y-6">
+
+            {/* Connection Status */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      Meta Ads Configuration
+                    </CardTitle>
+                    <CardDescription>
+                      Manage Krew Recruiter's Meta Business account for all employer campaigns
+                    </CardDescription>
+                  </div>
+                  <Badge variant={metaConnected ? "default" : "destructive"} className="text-sm">
+                    {metaConnected ? (
+                      <><Wifi className="h-3 w-3 mr-1" /> Meta Connected</>
+                    ) : (
+                      <><WifiOff className="h-3 w-3 mr-1" /> Not Connected</>
+                    )}
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3 mb-6">
+                  <Button onClick={handleTestMeta} disabled={metaTesting} variant="outline">
+                    {metaTesting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : null}
+                    Test Connection
+                  </Button>
+                </div>
+                {metaTestResult && (
+                  <div className={`rounded-lg border p-4 mb-6 ${metaTestResult.valid ? "bg-green-50 dark:bg-green-950/30 border-green-200 dark:border-green-900" : "bg-red-50 dark:bg-red-950/30 border-red-200 dark:border-red-900"}`}>
+                    {metaTestResult.valid ? (
+                      <div className="space-y-1 text-sm">
+                        <p className="font-medium text-green-700 dark:text-green-400">Connection valid</p>
+                        <p>Ad Account: {metaTestResult.adAccountName}</p>
+                        {metaTestResult.pageName && <p>Page: {metaTestResult.pageName}</p>}
+                        <p>Currency: {metaTestResult.currency}</p>
+                      </div>
+                    ) : (
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">
+                        Connection failed: {metaTestResult.error}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Settings Form */}
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <Label htmlFor="meta-app-id">Meta App ID</Label>
+                    <Input
+                      id="meta-app-id"
+                      value={metaAppId}
+                      onChange={(e) => setMetaAppId(e.target.value)}
+                      placeholder="1234567890"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-app-secret">Meta App Secret</Label>
+                    <Input
+                      id="meta-app-secret"
+                      type="password"
+                      value={metaAppSecret}
+                      onChange={(e) => setMetaAppSecret(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label htmlFor="meta-access-token">System User Access Token</Label>
+                    <Input
+                      id="meta-access-token"
+                      type="password"
+                      value={metaAccessToken}
+                      onChange={(e) => setMetaAccessToken(e.target.value)}
+                      placeholder="••••••••"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Generate in Meta Business Manager &rarr; System Users &rarr; Generate Token. Never expires.
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-ad-account">Ad Account ID</Label>
+                    <Input
+                      id="meta-ad-account"
+                      value={metaAdAccountId}
+                      onChange={(e) => setMetaAdAccountId(e.target.value)}
+                      placeholder="act_1234567890"
+                      className="font-mono"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-page-id">Facebook Page ID</Label>
+                    <Input
+                      id="meta-page-id"
+                      value={metaPageId}
+                      onChange={(e) => setMetaPageId(e.target.value)}
+                      placeholder="Krew Recruiter Page ID"
+                      className="font-mono"
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      The Krew Recruiter Facebook Page used for ad creatives.
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-default-budget">Default Daily Budget ($)</Label>
+                    <Input
+                      id="meta-default-budget"
+                      type="number"
+                      value={metaDefaultBudget}
+                      onChange={(e) => setMetaDefaultBudget(e.target.value)}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-max-budget">Max Daily Budget ($)</Label>
+                    <Input
+                      id="meta-max-budget"
+                      type="number"
+                      value={metaMaxBudget}
+                      onChange={(e) => setMetaMaxBudget(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Employers cannot exceed this amount per day.
+                    </p>
+                  </div>
+                  <div>
+                    <Label htmlFor="meta-markup">Platform Markup %</Label>
+                    <Input
+                      id="meta-markup"
+                      type="number"
+                      value={metaMarkupPercent}
+                      onChange={(e) => setMetaMarkupPercent(e.target.value)}
+                    />
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Krew Recruiter charges this % on top of actual Meta spend.
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  onClick={handleSaveMetaSettings}
+                  disabled={saveMetaSettingsMutation.isPending}
+                  className="mt-6"
+                >
+                  {saveMetaSettingsMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                  Save Meta Settings
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Campaign Overview */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>All Campaigns</CardTitle>
+                    <CardDescription>
+                      {activeCampaignCount} active &middot; Platform daily spend: ${(totalSpendToday / 100).toFixed(2)}
+                    </CardDescription>
+                  </div>
+                  <div className="flex gap-2">
+                    <Dialog open={pauseAllOpen} onOpenChange={setPauseAllOpen}>
+                      <DialogTrigger asChild>
+                        <Button variant="destructive" size="sm" disabled={activeCampaignCount === 0}>
+                          <Square className="h-3.5 w-3.5 mr-1" />
+                          Pause All Campaigns
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader>
+                          <DialogTitle>Pause all active campaigns?</DialogTitle>
+                        </DialogHeader>
+                        <p className="text-sm text-muted-foreground">
+                          This will immediately pause {activeCampaignCount} active campaigns across all employers.
+                          Employers will be notified their campaigns are paused.
+                        </p>
+                        <DialogFooter>
+                          <Button variant="outline" onClick={() => setPauseAllOpen(false)}>Cancel</Button>
+                          <Button
+                            variant="destructive"
+                            onClick={() => pauseAllMutation.mutate()}
+                            disabled={pauseAllMutation.isPending}
+                          >
+                            {pauseAllMutation.isPending && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                            Confirm Pause All
+                          </Button>
+                        </DialogFooter>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </div>
+              </CardHeader>
+              <CardContent className="p-0">
+                {metaCampaignsLoading ? (
+                  <div className="p-8 text-center">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  </div>
+                ) : metaCampaigns && metaCampaigns.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Restaurant</TableHead>
+                        <TableHead>Job Title</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Employer Pays</TableHead>
+                        <TableHead>Meta Spend</TableHead>
+                        <TableHead>Markup</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {metaCampaigns.map((c: any) => {
+                        const markupPct = parseInt(metaMarkupPercent) || 20;
+                        const employerBudget = (c.dailyBudgetCents || 0) / 100;
+                        const metaSpend = employerBudget * 100 / (100 + markupPct);
+                        const markup = employerBudget - metaSpend;
+                        return (
+                          <TableRow key={c.id}>
+                            <TableCell className="font-medium">{c.orgName || "—"}</TableCell>
+                            <TableCell>{c.title}</TableCell>
+                            <TableCell>
+                              <Badge variant={
+                                c.status === "active" ? "default" :
+                                c.status === "paused" ? "secondary" : "outline"
+                              }>
+                                {c.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>${employerBudget.toFixed(2)}/day</TableCell>
+                            <TableCell>${metaSpend.toFixed(2)}/day</TableCell>
+                            <TableCell className="text-green-600">${markup.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <div className="flex gap-1">
+                                {c.status === "active" && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => pauseCampaignMutation.mutate(c.id)}
+                                    title="Pause"
+                                  >
+                                    <Pause className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                                {(c.status === "paused" || c.status === "draft") && (
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => resumeCampaignMutation.mutate(c.id)}
+                                    title="Resume"
+                                  >
+                                    <Play className="h-3.5 w-3.5" />
+                                  </Button>
+                                )}
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    No campaigns yet. Employers will create campaigns through the Campaign Engine.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

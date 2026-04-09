@@ -9,6 +9,9 @@ import { getStripePublishableKey, getStripeClient } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
 import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
 import { requirePlan } from "./middleware/requirePlan";
+import { db } from "./db";
+import { organizations, campaigns } from "@shared/schema";
+import { eq, desc } from "drizzle-orm";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -82,7 +85,7 @@ export async function registerRoutes(
 
   // Setup campaign engine routes (JWT-based)
   const { default: campaignRouter } = await import("./campaignRoutes");
-  const { registerHandler, loginHandler, meHandler, logoutHandler, requireAuth } = await import("./jwtAuth");
+  const { registerHandler, loginHandler, meHandler, logoutHandler, requireAuth, requireOrg } = await import("./jwtAuth");
   app.post("/api/v2/auth/register", registerHandler);
   app.post("/api/v2/auth/login", loginHandler);
   app.get("/api/v2/auth/me", requireAuth, meHandler);
@@ -3752,7 +3755,7 @@ export async function registerRoutes(
 
         let metaResult = null;
 
-        if (metaAds.isMetaConfigured()) {
+        if (await metaAds.isMetaConfigured()) {
           metaResult = await metaAds.createJobCampaign(
             {
               jobId: job.id,
@@ -3814,7 +3817,7 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Campaign not found" });
         }
 
-        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
           await metaAds.activateCampaign(campaign.metaCampaignId);
         }
 
@@ -3852,7 +3855,7 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Campaign not found" });
         }
 
-        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
           await metaAds.pauseCampaign(campaign.metaCampaignId);
         }
 
@@ -3890,7 +3893,7 @@ export async function registerRoutes(
           return res.status(404).json({ error: "Campaign not found" });
         }
 
-        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
           await metaAds.deleteCampaign(campaign.metaCampaignId);
         }
 
@@ -3935,7 +3938,7 @@ export async function registerRoutes(
         };
 
         // Fetch live stats from Meta if configured
-        if (campaign.metaCampaignId && metaAds.isMetaConfigured()) {
+        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
           stats = await metaAds.getCampaignStats(campaign.metaCampaignId);
 
           // Persist latest stats
@@ -3986,8 +3989,8 @@ export async function registerRoutes(
   );
 
   // Check if Meta API is configured
-  app.get("/api/meta/status", isAuthenticated, (_req, res) => {
-    res.json({ configured: metaAds.isMetaConfigured() });
+  app.get("/api/meta/status", isAuthenticated, async (_req, res) => {
+    res.json({ configured: await metaAds.isMetaConfigured() });
   });
 
   // ============ AD IMAGE GENERATION ============
@@ -4110,6 +4113,176 @@ export async function registerRoutes(
       }
     }
   );
+
+  // ============ ADMIN META ADS MANAGEMENT ============
+
+  // GET /api/admin/meta/settings — return masked platform settings
+  app.get("/api/admin/meta/settings", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { getMaskedPlatformSettings } = await import("./services/platformSettings");
+      const settings = await getMaskedPlatformSettings();
+      res.json(settings);
+    } catch (error) {
+      console.error("Error fetching meta settings:", error);
+      res.status(500).json({ error: "Failed to fetch settings" });
+    }
+  });
+
+  // PUT /api/admin/meta/settings — save platform settings
+  app.put("/api/admin/meta/settings", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { setPlatformSetting } = await import("./services/platformSettings");
+      const userId = getUserId(req) || "admin";
+      const {
+        appId, appSecret, accessToken, adAccountId,
+        pageId, defaultBudget, maxBudget, markupPercent,
+      } = req.body;
+
+      const updates: Array<{ key: string; value: string; description: string }> = [];
+
+      if (appId !== undefined) updates.push({ key: "meta_app_id", value: appId, description: "Meta App ID" });
+      if (appSecret !== undefined) updates.push({ key: "meta_app_secret", value: appSecret, description: "Meta App Secret" });
+      if (accessToken !== undefined) updates.push({ key: "meta_access_token", value: accessToken, description: "Meta System User Access Token" });
+      if (adAccountId !== undefined) updates.push({ key: "meta_ad_account_id", value: adAccountId, description: "Meta Ad Account ID (act_XXX)" });
+      if (pageId !== undefined) updates.push({ key: "meta_page_id", value: pageId, description: "Krew Recruiter Facebook Page ID" });
+      if (defaultBudget !== undefined) updates.push({ key: "meta_default_daily_budget_cents", value: String(Math.round(defaultBudget * 100)), description: "Default daily budget in cents" });
+      if (maxBudget !== undefined) updates.push({ key: "meta_max_daily_budget_cents", value: String(Math.round(maxBudget * 100)), description: "Max daily budget in cents" });
+      if (markupPercent !== undefined) updates.push({ key: "meta_platform_markup_percent", value: String(markupPercent), description: "Platform markup percentage on ad spend" });
+
+      for (const { key, value, description } of updates) {
+        if (value) {
+          await setPlatformSetting(key, value, userId, description);
+        }
+      }
+
+      res.json({ success: true, updated: updates.length });
+    } catch (error) {
+      console.error("Error saving meta settings:", error);
+      res.status(500).json({ error: "Failed to save settings" });
+    }
+  });
+
+  // GET /api/admin/meta/test — verify Meta API connection
+  app.get("/api/admin/meta/test", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { getMetaCredentials } = await import("./services/platformSettings");
+      const creds = await getMetaCredentials();
+
+      // Test the token by calling the Graph API
+      const meRes = await fetch(
+        `https://graph.facebook.com/v19.0/${creds.adAccountId}?fields=name,account_status,currency&access_token=${creds.accessToken}`
+      );
+      const meData = await meRes.json() as any;
+
+      if (meData.error) {
+        return res.json({
+          valid: false,
+          error: meData.error.message,
+        });
+      }
+
+      // Also fetch page name if pageId is set
+      let pageName = "";
+      if (creds.pageId) {
+        try {
+          const pageRes = await fetch(
+            `https://graph.facebook.com/v19.0/${creds.pageId}?fields=name&access_token=${creds.accessToken}`
+          );
+          const pageData = await pageRes.json() as any;
+          pageName = pageData.name || "";
+        } catch {}
+      }
+
+      res.json({
+        valid: true,
+        adAccountName: meData.name,
+        adAccountStatus: meData.account_status,
+        currency: meData.currency,
+        pageName,
+      });
+    } catch (error: any) {
+      res.json({
+        valid: false,
+        error: error.message || "Meta ads not configured",
+      });
+    }
+  });
+
+  // GET /api/admin/meta/campaigns — list all active campaigns across all orgs
+  app.get("/api/admin/meta/campaigns", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const allCampaigns = await db
+        .select({
+          id: campaigns.id,
+          orgId: campaigns.orgId,
+          title: campaigns.title,
+          status: campaigns.status,
+          dailyBudgetCents: campaigns.dailyBudgetCents,
+          totalSpentCents: campaigns.totalSpentCents,
+          location: campaigns.location,
+          createdAt: campaigns.createdAt,
+          activatedAt: campaigns.activatedAt,
+          orgName: organizations.name,
+        })
+        .from(campaigns)
+        .leftJoin(organizations, eq(campaigns.orgId, organizations.id))
+        .orderBy(desc(campaigns.createdAt));
+
+      res.json(allCampaigns);
+    } catch (error) {
+      console.error("Error fetching admin campaigns:", error);
+      res.status(500).json({ error: "Failed to fetch campaigns" });
+    }
+  });
+
+  // POST /api/admin/meta/campaigns/:id/pause — admin force pause
+  app.post("/api/admin/meta/campaigns/:id/pause", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.update(campaigns).set({ status: "paused" } as any).where(eq(campaigns.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error pausing campaign:", error);
+      res.status(500).json({ error: "Failed to pause campaign" });
+    }
+  });
+
+  // POST /api/admin/meta/campaigns/:id/resume — admin resume
+  app.post("/api/admin/meta/campaigns/:id/resume", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.update(campaigns).set({ status: "active" } as any).where(eq(campaigns.id, id));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error resuming campaign:", error);
+      res.status(500).json({ error: "Failed to resume campaign" });
+    }
+  });
+
+  // POST /api/admin/meta/campaigns/pause-all — emergency pause all active campaigns
+  app.post("/api/admin/meta/campaigns/pause-all", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      await db
+        .update(campaigns)
+        .set({ status: "paused" } as any)
+        .where(eq(campaigns.status, "active"));
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error pausing all campaigns:", error);
+      res.status(500).json({ error: "Failed to pause all campaigns" });
+    }
+  });
+
+  // GET /api/meta/configured — public check for employers (no credentials exposed)
+  app.get("/api/meta/configured", requireAuth, async (req, res) => {
+    try {
+      const { isMetaConfiguredFromDB } = await import("./services/platformSettings");
+      const configured = await isMetaConfiguredFromDB();
+      res.json({ configured });
+    } catch {
+      res.json({ configured: false });
+    }
+  });
 
   return httpServer;
 }

@@ -1542,3 +1542,18 @@ export const orgMembersRelations = relations(orgMembers, ({ one }) => ({
 export const insertOrgMemberSchema = createInsertSchema(orgMembers).omit({ id: true, invitedAt: true });
 export type InsertOrgMember = z.infer<typeof insertOrgMemberSchema>;
 export type OrgMember = typeof orgMembers.$inferSelect;
+
+// ============ PLATFORM SETTINGS ============
+
+export const platformSettings = pgTable("platform_settings", {
+  id: integer("id").primaryKey().generatedAlwaysAsIdentity(),
+  key: text("key").notNull().unique(),
+  value: text("value").notNull(),
+  description: text("description"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow(),
+  updatedBy: varchar("updated_by"),
+});
+
+export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
+export type PlatformSetting = typeof platformSettings.$inferSelect;

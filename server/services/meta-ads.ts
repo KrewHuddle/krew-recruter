@@ -4,26 +4,21 @@
  * Handles all Meta (Facebook/Instagram) ad campaign operations.
  * Flow: Campaign -> Ad Set -> Ad Creative -> Ad
  *
- * Requires env vars:
- *   META_APP_ID, META_APP_SECRET, META_ACCESS_TOKEN,
- *   META_AD_ACCOUNT_ID, META_PAGE_ID
+ * Credentials are read from the platformSettings table (DB),
+ * configured by super admins via /admin/meta.
  */
+
+import { getMetaCredentials, type MetaCredentials } from "./platformSettings";
 
 const META_API_VERSION = "v19.0";
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
-function getConfig() {
-  const accessToken = process.env.META_ACCESS_TOKEN;
-  const adAccountId = process.env.META_AD_ACCOUNT_ID;
-  const pageId = process.env.META_PAGE_ID;
+// Cached credentials — refreshed on each campaign operation
+let _cachedCreds: MetaCredentials | null = null;
 
-  if (!accessToken || !adAccountId || !pageId) {
-    throw new Error(
-      "Meta API not configured. Set META_ACCESS_TOKEN, META_AD_ACCOUNT_ID, and META_PAGE_ID env vars."
-    );
-  }
-
-  return { accessToken, adAccountId, pageId };
+async function getConfig() {
+  _cachedCreds = await getMetaCredentials();
+  return _cachedCreds;
 }
 
 async function metaApiCall(
@@ -31,7 +26,7 @@ async function metaApiCall(
   method: "GET" | "POST" | "DELETE" = "GET",
   body?: Record<string, any>
 ): Promise<any> {
-  const { accessToken } = getConfig();
+  const { accessToken } = await getConfig();
 
   const url = endpoint.startsWith("http")
     ? endpoint
@@ -109,7 +104,7 @@ export async function createJobCampaign(
   job: MetaJobInput,
   dailyBudgetUSD: number
 ): Promise<MetaCampaignResult> {
-  const { adAccountId, pageId } = getConfig();
+  const { adAccountId, pageId } = await getConfig();
   const budgetCents = Math.round(dailyBudgetUSD * 100);
 
   // 1. Create Campaign
@@ -269,7 +264,7 @@ export async function getCampaignStats(
 export async function uploadAdImage(
   imageBuffer: Buffer
 ): Promise<string> {
-  const { accessToken, adAccountId } = getConfig();
+  const { accessToken, adAccountId } = await getConfig();
 
   const formData = new FormData();
   formData.append("filename", new Blob([imageBuffer], { type: "image/png" }), "ad-image.png");
@@ -298,12 +293,13 @@ export async function uploadAdImage(
 }
 
 /**
- * Checks if Meta API credentials are configured.
+ * Checks if Meta API credentials are configured (reads from DB).
  */
-export function isMetaConfigured(): boolean {
-  return !!(
-    process.env.META_ACCESS_TOKEN &&
-    process.env.META_AD_ACCOUNT_ID &&
-    process.env.META_PAGE_ID
-  );
+export async function isMetaConfigured(): Promise<boolean> {
+  try {
+    await getConfig();
+    return true;
+  } catch {
+    return false;
+  }
 }
