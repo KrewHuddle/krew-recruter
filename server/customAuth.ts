@@ -2,6 +2,7 @@ import { Express, RequestHandler } from "express";
 import session from "express-session";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
+import jwt from "jsonwebtoken";
 import { db } from "./db";
 import { pool } from "./db";
 import { users, passwordResetTokens } from "@shared/schema";
@@ -138,8 +139,17 @@ export async function setupCustomAuth(app: Express) {
       req.session.lastName = user.lastName ?? undefined;
       req.session.profileImageUrl = user.profileImageUrl ?? undefined;
 
+      // Also generate JWT for API compatibility
+      const jwtSecret = process.env.JWT_SECRET || "krew-jwt-secret";
+      const token = jwt.sign(
+        { userId: user.id, email: user.email },
+        jwtSecret,
+        { expiresIn: "7d" }
+      );
+
       res.json({
         success: true,
+        token,
         user: {
           id: user.id,
           email: user.email,

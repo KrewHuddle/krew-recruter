@@ -2565,11 +2565,18 @@ export async function registerRoutes(
     }
 
     const userProfile = await storage.getUserProfile(userId);
-    if (!checkIsSuperAdmin(userProfile)) {
-      return res.status(403).json({ error: "Super admin access required" });
-    }
+    if (checkIsSuperAdmin(userProfile)) return next();
 
-    next();
+    // No profile — check session email
+    const sessionEmail = (req.session as any)?.email?.toLowerCase();
+    if (sessionEmail && SUPER_ADMIN_EMAILS.includes(sessionEmail)) return next();
+
+    // Check users table
+    const { users: usersTable } = await import("@shared/schema");
+    const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+    if (user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) return next();
+
+    return res.status(403).json({ error: "Super admin access required" });
   }
 
   // Check if current user is super admin
@@ -2601,7 +2608,24 @@ export async function registerRoutes(
       if (!userId) return res.json({ isSuperAdmin: false });
 
       const userProfile = await storage.getUserProfile(userId);
-      res.json({ isSuperAdmin: checkIsSuperAdmin(userProfile) });
+      if (userProfile) {
+        return res.json({ isSuperAdmin: checkIsSuperAdmin(userProfile) });
+      }
+
+      // No profile yet — check user's email directly from session or users table
+      const sessionEmail = (req.session as any)?.email?.toLowerCase();
+      if (sessionEmail && SUPER_ADMIN_EMAILS.includes(sessionEmail)) {
+        return res.json({ isSuperAdmin: true });
+      }
+
+      // Check users table as last resort
+      const { users: usersTable } = await import("@shared/schema");
+      const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+      if (user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        return res.json({ isSuperAdmin: true });
+      }
+
+      res.json({ isSuperAdmin: false });
     } catch (error) {
       console.error("Error checking admin status:", error);
       res.json({ isSuperAdmin: false });
