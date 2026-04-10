@@ -2,6 +2,23 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Mobile utilities */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 /* LIGHT MODE - Purple/Magenta Theme (Matching Logo Colors) */
 :root {
   --button-outline: rgba(0,0,0, .10);

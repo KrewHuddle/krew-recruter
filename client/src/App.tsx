@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Switch, Route, useLocation } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider, useQuery } from "@tanstack/react-query";
@@ -71,7 +72,7 @@ import JobsByLocation from "@/pages/jobs-by-location";
 import JobsByRole from "@/pages/jobs-by-role";
 
 import { HelmetProvider } from "react-helmet-async";
-import { Loader2, Shield } from "lucide-react";
+import { Loader2, Shield, Menu } from "lucide-react";
 import { UpgradePromptListener } from "@/components/upgrade-prompt";
 import { CookieBanner } from "@/components/CookieBanner";
 import { AnnouncementBanner } from "@/components/AnnouncementBanner";
@@ -126,6 +127,7 @@ function SeekerLayout({ children }: { children: React.ReactNode }) {
 }
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
+  const [adminSidebarOpen, setAdminSidebarOpen] = useState(false);
   const handleSignOut = async () => {
     try {
       await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
@@ -137,9 +139,24 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-background">
-      <AdminSidebarComponent onSignOut={handleSignOut} />
-      <main className="flex-1 ml-56 overflow-auto">
-        <div className="flex items-center justify-end h-12 px-6 border-b">
+      {/* Sidebar — hidden on mobile */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-56 transform transition-transform lg:translate-x-0 ${adminSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <AdminSidebarComponent onSignOut={handleSignOut} />
+      </div>
+      {adminSidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setAdminSidebarOpen(false)} />
+      )}
+      <main className="flex-1 lg:ml-56 overflow-auto">
+        {/* Mobile header */}
+        <div className="lg:hidden sticky top-0 bg-background border-b px-4 h-14 flex items-center justify-between z-30">
+          <button onClick={() => setAdminSidebarOpen(true)} className="p-2 -ml-2 rounded-lg hover:bg-accent">
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-semibold text-sm">Admin Portal</span>
+          <ThemeToggle />
+        </div>
+        {/* Desktop header */}
+        <div className="hidden lg:flex items-center justify-end h-12 px-6 border-b">
           <ThemeToggle />
         </div>
         {children}
@@ -306,25 +323,43 @@ function CampaignLayout({ children }: { children: React.ReactNode }) {
     enabled: !!orgId,
   });
 
+  const [campaignSidebarOpen, setCampaignSidebarOpen] = useState(false);
+
   return (
     <div className="flex h-screen w-full">
-      <CampaignSidebar
-        user={{
-          name: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User",
-          email: user?.email || "",
-        }}
-        org={{
-          name: currentOrg?.orgName || branding?.name || "My Organization",
-          logoUrl: branding?.logoUrl,
-        }}
-        orgs={organizations.map(o => ({
-          id: o.orgId,
-          name: o.orgName,
-        }))}
-        onOrgSwitch={(id: string) => switchOrg(id)}
-        onLogout={logout}
-      />
-      <div className="flex-1 ml-[220px] overflow-auto bg-background">
+      {/* Sidebar — hidden on mobile, always visible lg+ */}
+      <div className={`fixed inset-y-0 left-0 z-50 w-[220px] transform transition-transform lg:translate-x-0 ${campaignSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <CampaignSidebar
+          user={{
+            name: [user?.firstName, user?.lastName].filter(Boolean).join(" ") || user?.email || "User",
+            email: user?.email || "",
+          }}
+          org={{
+            name: currentOrg?.orgName || branding?.name || "My Organization",
+            logoUrl: branding?.logoUrl,
+          }}
+          orgs={organizations.map(o => ({
+            id: o.orgId,
+            name: o.orgName,
+          }))}
+          onOrgSwitch={(id: string) => switchOrg(id)}
+          onLogout={logout}
+        />
+      </div>
+      {/* Mobile backdrop */}
+      {campaignSidebarOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 lg:hidden" onClick={() => setCampaignSidebarOpen(false)} />
+      )}
+      {/* Main content */}
+      <div className="flex-1 lg:ml-[220px] overflow-auto bg-background">
+        {/* Mobile header */}
+        <div className="lg:hidden sticky top-0 bg-background border-b px-4 h-14 flex items-center justify-between z-30">
+          <button onClick={() => setCampaignSidebarOpen(true)} className="p-2 -ml-2 rounded-lg hover:bg-accent">
+            <Menu className="h-5 w-5" />
+          </button>
+          <span className="font-semibold text-sm">Krew Recruiter</span>
+          <div className="w-9" />
+        </div>
         {children}
       </div>
     </div>

@@ -25,6 +25,8 @@ import {
   Wand2,
   Radio,
   Megaphone,
+  Menu,
+  X,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
 import bartenderImage from "@assets/stock_images/american_bartender_s_130b2a50.jpg";
@@ -95,6 +97,7 @@ export default function Landing() {
   const [videoError, setVideoError] = useState(false);
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [jobSearchCity, setJobSearchCity] = useState("");
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fetch jobs for the landing page job board (debounced)
   const [landingJobs, setLandingJobs] = useState<any[]>([]);
@@ -167,37 +170,47 @@ export default function Landing() {
         })}</script>
       </Helmet>
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
-        <div className="mx-auto flex flex-wrap h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap items-center gap-2">
+        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+          <div className="flex items-center gap-2">
             <img src={logoImage} alt="Krew Recruiter" className="h-9 w-9 rounded-lg object-contain" data-testid="img-logo-nav" />
             <span className="text-xl font-semibold" data-testid="text-brand-nav">Krew Recruiter</span>
           </div>
-          <div className="hidden md:flex flex-wrap items-center gap-8">
-            <a href="#gigs" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-gigs">
-              Krew Gigs
-            </a>
-            <a href="/video-interviews" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-interviews">
-              Video Interviews
-            </a>
-            <a href="#testimonials" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-testimonials">
-              Testimonials
-            </a>
-            <Link href="/gigs">
-              <span className="text-sm text-muted-foreground cursor-pointer transition-colors duration-200" data-testid="link-nav-find-gigs">
-                Find Gigs
-              </span>
-            </Link>
+          <div className="hidden md:flex items-center gap-8">
+            <a href="#gigs" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-gigs">Krew Gigs</a>
+            <a href="/video-interviews" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-interviews">Video Interviews</a>
+            <a href="#testimonials" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-testimonials">Testimonials</a>
+            <Link href="/gigs"><span className="text-sm text-muted-foreground cursor-pointer transition-colors duration-200" data-testid="link-nav-find-gigs">Find Gigs</span></Link>
           </div>
-          <div className="flex flex-wrap items-center gap-3">
+          <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <a href="/login">
-              <Button variant="ghost" data-testid="button-login">Sign in</Button>
-            </a>
-            <a href="/login">
-              <Button data-testid="button-get-started">Get Started</Button>
-            </a>
+            <a href="/login"><Button variant="ghost" data-testid="button-login">Sign in</Button></a>
+            <a href="/login"><Button data-testid="button-get-started">Get Started</Button></a>
+          </div>
+          {/* Mobile: CTA + hamburger */}
+          <div className="flex md:hidden items-center gap-2">
+            <a href="/login"><Button size="sm" className="text-sm px-3">Get Started</Button></a>
+            <button className="p-2 rounded-lg hover:bg-accent" onClick={() => setMobileMenuOpen(!mobileMenuOpen)} aria-label="Toggle menu">
+              {mobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+            </button>
           </div>
         </div>
+        {/* Mobile dropdown menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-border bg-background px-4 py-4 flex flex-col gap-1">
+            {[
+              { label: "Krew Gigs", href: "#gigs" },
+              { label: "Video Interviews", href: "/video-interviews" },
+              { label: "Find Jobs", href: "/jobs" },
+              { label: "Find Gigs", href: "/gigs" },
+              { label: "Pricing", href: "/pricing" },
+            ].map(item => (
+              <a key={item.label} href={item.href} onClick={() => setMobileMenuOpen(false)} className="py-3 px-3 rounded-lg hover:bg-accent text-base font-medium">{item.label}</a>
+            ))}
+            <div className="border-t border-border my-2" />
+            <a href="/login"><Button variant="outline" className="w-full mb-2">Sign In</Button></a>
+            <a href="/workers/signup"><Button className="w-full">I Want to Work</Button></a>
+          </div>
+        )}
       </nav>
 
       <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
