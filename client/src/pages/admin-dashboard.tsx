@@ -157,19 +157,55 @@ const URL_TO_TAB: Record<string, string> = {
   revenue: "revenue",
   "meta-ads": "meta-ads",
   aggregation: "aggregation",
-  subscriptions: "tenants", // uses org tab for now
-  settings: "flags", // uses flags tab for now
-  "audit-log": "analytics",
-  announcements: "meta-ads",
+  subscriptions: "tenants",
+  settings: "flags",
+  "audit-log": "audit",
+  announcements: "announcements",
 };
 
-function getDefaultTab(): string {
+// Reverse map: tab value → URL path
+const TAB_TO_URL: Record<string, string> = {
+  tenants: "organizations",
+  users: "users",
+  analytics: "analytics",
+  health: "health",
+  flags: "flags",
+  coupons: "coupons",
+  revenue: "revenue",
+  "meta-ads": "meta-ads",
+  aggregation: "aggregation",
+  announcements: "announcements",
+  audit: "audit-log",
+  pages: "pages",
+};
+
+function getTabFromUrl(): string {
   const path = window.location.pathname.replace("/admin/", "").replace("/admin", "");
   return URL_TO_TAB[path] || "tenants";
 }
 
 export default function AdminDashboard() {
   const { toast } = useToast();
+  const [activeTab, setActiveTab] = useState(getTabFromUrl());
+
+  // Sync tab when URL changes (sidebar navigation)
+  useEffect(() => {
+    const handlePopState = () => setActiveTab(getTabFromUrl());
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  // Also check on every render in case wouter navigated
+  useEffect(() => {
+    const newTab = getTabFromUrl();
+    if (newTab !== activeTab) setActiveTab(newTab);
+  });
+
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    const urlPath = TAB_TO_URL[tab] || tab;
+    window.history.pushState({}, "", `/admin/${urlPath}`);
+  };
 
   const { data: stats, isLoading: statsLoading } = useQuery<AdminStats>({
     queryKey: ["/api/admin/stats"],
@@ -638,7 +674,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <Tabs defaultValue={getDefaultTab()} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={handleTabChange} className="space-y-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="tenants" data-testid="tab-tenants">
             <Building2 className="h-4 w-4 mr-2" />
