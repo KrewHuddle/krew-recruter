@@ -93,6 +93,17 @@ export default function Landing() {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [showPlayButton, setShowPlayButton] = useState(true);
   const [videoError, setVideoError] = useState(false);
+  const [jobSearchQuery, setJobSearchQuery] = useState("");
+  const [jobSearchCity, setJobSearchCity] = useState("");
+
+  // Fetch jobs for the landing page job board
+  const [landingJobs, setLandingJobs] = useState<any[]>([]);
+  useEffect(() => {
+    fetch(`/api/jobs/public?limit=6${jobSearchQuery ? `&q=${encodeURIComponent(jobSearchQuery)}` : ""}${jobSearchCity ? `&city=${encodeURIComponent(jobSearchCity)}` : ""}`)
+      .then(r => r.ok ? r.json() : { jobs: [] })
+      .then(d => setLandingJobs(d.jobs || []))
+      .catch(() => {});
+  }, [jobSearchQuery, jobSearchCity]);
 
   useEffect(() => {
     const video = videoRef.current;
@@ -411,6 +422,89 @@ export default function Landing() {
               <div className="text-3xl font-bold text-primary transition-transform duration-300">4hrs</div>
               <div className="mt-1 text-sm text-muted-foreground">Avg. Time to Fill Gig</div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ JOB SEARCH SECTION ═══════ */}
+      <section className="py-20 lg:py-28">
+        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold sm:text-4xl mb-3">Browse Hospitality Jobs</h2>
+            <p className="text-muted-foreground max-w-xl mx-auto">
+              Find restaurant, hotel, and food service positions near you.
+            </p>
+          </div>
+
+          {/* Search bar */}
+          <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto mb-10">
+            <input
+              type="text"
+              placeholder="Job title (e.g. Line Cook, Bartender)"
+              className="flex-1 px-4 py-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              value={jobSearchQuery}
+              onChange={e => setJobSearchQuery(e.target.value)}
+            />
+            <input
+              type="text"
+              placeholder="City (e.g. Charlotte)"
+              className="sm:w-44 px-4 py-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
+              value={jobSearchCity}
+              onChange={e => setJobSearchCity(e.target.value)}
+            />
+            <Button size="lg" className="shrink-0" onClick={() => {}}>
+              Search Jobs
+            </Button>
+          </div>
+
+          {/* Job listings */}
+          {landingJobs && landingJobs.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {landingJobs.slice(0, 6).map((job: any) => (
+                <a
+                  key={job.id}
+                  href="/workers/signup"
+                  className="block border rounded-xl p-5 hover:shadow-lg hover:border-primary/30 transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <h3 className="font-semibold group-hover:text-primary transition-colors">{job.title}</h3>
+                      <p className="text-sm text-muted-foreground">{job.company}</p>
+                    </div>
+                    {job.salary && (
+                      <span className="text-xs font-medium bg-primary/10 text-primary px-2 py-1 rounded-full shrink-0">
+                        {job.salary}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    {(job.city || job.location) && (
+                      <span className="flex items-center gap-1">
+                        <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                        {job.city && job.state ? `${job.city}, ${job.state}` : job.location}
+                      </span>
+                    )}
+                    {job.employmentType && <span>{job.employmentType}</span>}
+                    {job.source && <span className="opacity-50">via {job.source}</span>}
+                  </div>
+                  <p className="text-xs text-primary font-medium mt-3 group-hover:underline">
+                    Apply now &rarr;
+                  </p>
+                </a>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              <p>Jobs loading... Check back soon or <Link href="/workers/signup" className="text-primary underline">create your profile</Link> to get notified.</p>
+            </div>
+          )}
+
+          <div className="text-center mt-8">
+            <Link href="/jobs">
+              <Button variant="outline" size="lg">
+                View All Jobs <ArrowRight className="ml-2 h-4 w-4" />
+              </Button>
+            </Link>
           </div>
         </div>
       </section>
