@@ -4025,10 +4025,14 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   );
 
   // Activate a Meta campaign
+  // NOTE: plan-gated like create — preventing a downgraded tenant from
+  // resuming an old paused campaign and accruing fresh ad spend. Pause and
+  // delete are intentionally NOT plan-gated so users can always stop spending.
   app.post(
     "/api/meta/campaign/:id/activate",
     isAuthenticated,
     requireTenant,
+    requirePlan("PRO", "ENTERPRISE"),
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {

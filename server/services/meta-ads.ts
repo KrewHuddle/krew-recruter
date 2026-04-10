@@ -10,7 +10,11 @@
 
 import { getMetaCredentials, type MetaCredentials } from "./platformSettings";
 
-const META_API_VERSION = "v19.0";
+// Meta deprecates Graph API versions ~2 years after release. v19.0 reaches
+// end-of-life on 2026-05-21; bumping to v22.0 (released 2025-01-21) gives the
+// longest stable runway without jumping to a brand-new version. Bump again
+// before late 2027.
+const META_API_VERSION = "v22.0";
 const META_BASE_URL = `https://graph.facebook.com/${META_API_VERSION}`;
 
 // Cached credentials — refreshed on each campaign operation
