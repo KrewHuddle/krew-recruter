@@ -935,7 +935,7 @@ async function extractJobFromHtml(html: string): Promise<any> {
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 1500,
         system: `You are a job posting parser. Extract structured data from job posting text and return ONLY valid JSON. No markdown, no backticks, no explanation — just the JSON object.`,
         messages: [{
@@ -1014,7 +1014,7 @@ async function generateAdCreative(campaign: any, instructions?: string): Promise
         "anthropic-version": "2023-06-01",
       },
       body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
+        model: "claude-sonnet-4-6",
         max_tokens: 1000,
         system: `You are an expert social media recruiter specializing in restaurants and hospitality. You write high-converting Facebook and Instagram job ads for independent restaurants. Your ads are punchy, specific, and highlight the 2-3 strongest selling points. Always highlight pay, schedule, and notable benefits. Keep it short — workers see this on their phone for 2 seconds. Return ONLY valid JSON. No markdown, no backticks, no explanation text.`,
         messages: [{
