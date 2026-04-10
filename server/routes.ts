@@ -389,6 +389,57 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     }
   );
 
+  // ============ PUBLIC JOB FEED (no auth — must be BEFORE /api/jobs/:id) ============
+
+  app.get("/api/jobs/public", async (req, res) => {
+    try {
+      const { city, state, q, page = "1", limit = "20" } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = Math.min(parseInt(limit as string, 10), 50);
+      const offset = (pageNum - 1) * limitNum;
+
+      const results = await db
+        .select()
+        .from(aggregatedJobs)
+        .where(eq(aggregatedJobs.isActive, true))
+        .orderBy(desc(aggregatedJobs.postedAt))
+        .limit(limitNum)
+        .offset(offset);
+
+      let filtered = results;
+      if (city) {
+        const cityLower = (city as string).toLowerCase();
+        filtered = filtered.filter(j => j.city?.toLowerCase().includes(cityLower));
+      }
+      if (state) {
+        const stateLower = (state as string).toLowerCase();
+        filtered = filtered.filter(j => j.state?.toLowerCase().includes(stateLower));
+      }
+      if (q) {
+        const qLower = (q as string).toLowerCase();
+        filtered = filtered.filter(
+          j => j.title?.toLowerCase().includes(qLower) || j.company?.toLowerCase().includes(qLower)
+        );
+      }
+
+      res.json({ jobs: filtered, page: pageNum, hasMore: results.length === limitNum });
+    } catch (error) {
+      console.error("Public jobs error:", error);
+      res.json({ jobs: [] });
+    }
+  });
+
+  app.get("/api/jobs/public/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const [job] = await db.select().from(aggregatedJobs).where(eq(aggregatedJobs.id, id as string));
+      if (!job) return res.status(404).json({ error: "Job not found" });
+      res.json(job);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
   // ============ JOB ROUTES ============
 
   app.get("/api/jobs", isAuthenticated, requireTenant, async (req, res) => {
@@ -2107,49 +2158,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     } catch (error) {
       console.error("Error completing interview:", error);
       res.status(500).json({ error: "Failed to complete interview" });
-    }
-  });
-
-  // ============ PUBLIC JOB ROUTES (Job Seeker) ============
-
-  // Get all published jobs (public - no auth required)
-  app.get("/api/jobs/public", async (req, res) => {
-    try {
-      const jobsList = await storage.getPublishedJobs();
-      
-      // Get location and tenant info for each job
-      const jobsWithInfo = await Promise.all(
-        jobsList.map(async (job) => {
-          const location = job.locationId ? await storage.getLocation(job.locationId) : null;
-          const tenant = await storage.getTenant(job.tenantId);
-          return { ...job, location, tenant };
-        })
-      );
-      
-      res.json(jobsWithInfo);
-    } catch (error) {
-      console.error("Error fetching public jobs:", error);
-      res.status(500).json({ error: "Failed to fetch jobs" });
-    }
-  });
-
-  // Get single public job details
-  app.get("/api/jobs/public/:id", async (req, res) => {
-    try {
-      const { id } = req.params;
-      const job = await storage.getJob(id);
-      
-      if (!job || job.status !== "PUBLISHED") {
-        return res.status(404).json({ error: "Job not found" });
-      }
-      
-      const location = job.locationId ? await storage.getLocation(job.locationId) : null;
-      const tenant = await storage.getTenant(job.tenantId);
-      
-      res.json({ ...job, location, tenant });
-    } catch (error) {
-      console.error("Error fetching job:", error);
-      res.status(500).json({ error: "Failed to fetch job" });
     }
   });
 
@@ -4664,52 +4672,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     } catch (error) {
       console.error("Aggregation stats error:", error);
       res.status(500).json({ error: "Failed to fetch stats" });
-    }
-  });
-
-  // GET /api/jobs/public — public job feed for seekers (aggregated + internal)
-  app.get("/api/jobs/public", async (req, res) => {
-    try {
-      const { city, state, q, page = "1", limit = "20" } = req.query;
-      const pageNum = parseInt(page as string, 10);
-      const limitNum = Math.min(parseInt(limit as string, 10), 50);
-      const offset = (pageNum - 1) * limitNum;
-
-      let query = db
-        .select()
-        .from(aggregatedJobs)
-        .where(eq(aggregatedJobs.isActive, true))
-        .orderBy(desc(aggregatedJobs.postedAt))
-        .limit(limitNum)
-        .offset(offset);
-
-      const results = await query;
-
-      // Filter in JS for city/state/query (drizzle doesn't have ilike easily)
-      let filtered = results;
-      if (city) {
-        const cityLower = (city as string).toLowerCase();
-        filtered = filtered.filter(j => j.city?.toLowerCase().includes(cityLower));
-      }
-      if (state) {
-        const stateLower = (state as string).toLowerCase();
-        filtered = filtered.filter(j => j.state?.toLowerCase().includes(stateLower));
-      }
-      if (q) {
-        const qLower = (q as string).toLowerCase();
-        filtered = filtered.filter(
-          j => j.title?.toLowerCase().includes(qLower) || j.company?.toLowerCase().includes(qLower)
-        );
-      }
-
-      res.json({
-        jobs: filtered,
-        page: pageNum,
-        hasMore: results.length === limitNum,
-      });
-    } catch (error) {
-      console.error("Public jobs error:", error);
-      res.status(500).json({ error: "Failed to fetch jobs" });
     }
   });
 
