@@ -11,6 +11,7 @@ import { TenantProvider } from "@/lib/tenant-context";
 import { useAuth } from "@/hooks/use-auth";
 import { CampaignAuthProvider, useCampaignAuth } from "@/lib/campaign-auth";
 import { CampaignSidebar } from "@/components/campaign-sidebar";
+import { AdminSidebar as AdminSidebarComponent } from "@/components/admin-sidebar";
 
 // Original pages
 import NotFound from "@/pages/not-found";
@@ -73,6 +74,7 @@ import { HelmetProvider } from "react-helmet-async";
 import { Loader2, Shield } from "lucide-react";
 import { UpgradePromptListener } from "@/components/upgrade-prompt";
 import { CookieBanner } from "@/components/CookieBanner";
+import { AnnouncementBanner } from "@/components/AnnouncementBanner";
 import type { UserProfile } from "@shared/schema";
 
 // ============ ORIGINAL LAYOUTS ============
@@ -134,26 +136,14 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-6">
-        <div className="flex items-center gap-2">
-          <Shield className="h-5 w-5 text-primary" />
-          <span className="font-semibold">Super Admin</span>
-        </div>
-        <div className="flex items-center gap-4">
-          <a href="/campaign" className="text-sm text-muted-foreground hover:text-foreground">
-            Campaign Engine
-          </a>
-          <button
-            onClick={handleSignOut}
-            className="text-sm text-destructive hover:text-destructive/80"
-          >
-            Sign Out
-          </button>
+    <div className="flex min-h-screen bg-background">
+      <AdminSidebarComponent onSignOut={handleSignOut} />
+      <main className="flex-1 ml-56 overflow-auto">
+        <div className="flex items-center justify-end h-12 px-6 border-b">
           <ThemeToggle />
         </div>
-      </header>
-      <main>{children}</main>
+        {children}
+      </main>
     </div>
   );
 }
@@ -548,7 +538,7 @@ function AppRouter() {
           <AdminDashboard />
         </ProtectedAdminRoute>
       </Route>
-      <Route path="/admin/dashboard">
+      <Route path="/admin/:section">
         <ProtectedAdminRoute>
           <AdminDashboard />
         </ProtectedAdminRoute>
@@ -643,6 +633,7 @@ function App() {
         <TooltipProvider>
           <Toaster />
           <UpgradePromptListener />
+          <AnnouncementBanner />
           <CookieBanner />
           <AppRouter />
         </TooltipProvider>

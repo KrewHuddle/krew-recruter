@@ -146,6 +146,28 @@ const planColors: Record<string, string> = {
   ENTERPRISE: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
 };
 
+// Map URL path segments to tab values
+const URL_TO_TAB: Record<string, string> = {
+  organizations: "tenants",
+  users: "users",
+  analytics: "analytics",
+  health: "health",
+  flags: "flags",
+  coupons: "coupons",
+  revenue: "revenue",
+  "meta-ads": "meta-ads",
+  aggregation: "aggregation",
+  subscriptions: "tenants", // uses org tab for now
+  settings: "flags", // uses flags tab for now
+  "audit-log": "analytics",
+  announcements: "meta-ads",
+};
+
+function getDefaultTab(): string {
+  const path = window.location.pathname.replace("/admin/", "").replace("/admin", "");
+  return URL_TO_TAB[path] || "tenants";
+}
+
 export default function AdminDashboard() {
   const { toast } = useToast();
 
@@ -479,6 +501,51 @@ export default function AdminDashboard() {
     }
   };
 
+  // Announcements
+  const [annTitle, setAnnTitle] = useState("");
+  const [annMessage, setAnnMessage] = useState("");
+  const [annType, setAnnType] = useState("info");
+
+  const { data: adminAnnouncements } = useQuery<any[]>({
+    queryKey: ["/api/admin/announcements"],
+  });
+
+  const createAnnouncementMutation = useMutation({
+    mutationFn: async (data: { title: string; message: string; type: string }) => {
+      return apiRequest("POST", "/api/admin/announcements", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/announcements"] });
+      toast({ title: "Announcement created" });
+      setAnnTitle("");
+      setAnnMessage("");
+    },
+  });
+
+  const toggleAnnouncementMutation = useMutation({
+    mutationFn: async ({ id, isActive }: { id: string; isActive: boolean }) => {
+      return apiRequest("PATCH", `/api/admin/announcements/${id}`, { isActive });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/announcements"] });
+    },
+  });
+
+  const deleteAnnouncementMutation = useMutation({
+    mutationFn: async (id: string) => {
+      return apiRequest("DELETE", `/api/admin/announcements/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/announcements"] });
+      toast({ title: "Announcement deleted" });
+    },
+  });
+
+  // Audit Log
+  const { data: auditLog } = useQuery<{ events: any[] }>({
+    queryKey: ["/api/admin/audit-log"],
+  });
+
   const metaConnected = metaSettings?.some(s => s.key === "meta_access_token" && s.value && s.value !== "••••");
   const activeCampaignCount = metaCampaigns?.filter((c: any) => c.status === "active").length || 0;
   const totalSpendToday = metaCampaigns
@@ -571,7 +638,7 @@ export default function AdminDashboard() {
         </Card>
       </div>
 
-      <Tabs defaultValue="tenants" className="space-y-4">
+      <Tabs defaultValue={getDefaultTab()} className="space-y-4">
         <TabsList className="flex-wrap">
           <TabsTrigger value="tenants" data-testid="tab-tenants">
             <Building2 className="h-4 w-4 mr-2" />
@@ -612,6 +679,14 @@ export default function AdminDashboard() {
           <TabsTrigger value="aggregation" data-testid="tab-aggregation">
             <Globe className="h-4 w-4 mr-2" />
             Job Aggregation
+          </TabsTrigger>
+          <TabsTrigger value="announcements" data-testid="tab-announcements">
+            <Megaphone className="h-4 w-4 mr-2" />
+            Announcements
+          </TabsTrigger>
+          <TabsTrigger value="audit" data-testid="tab-audit">
+            <Eye className="h-4 w-4 mr-2" />
+            Audit Log
           </TabsTrigger>
         </TabsList>
 
@@ -1963,6 +2038,132 @@ export default function AdminDashboard() {
               </CardContent>
             </Card>
           </div>
+        </TabsContent>
+
+        {/* ============ ANNOUNCEMENTS TAB ============ */}
+        <TabsContent value="announcements">
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Create Announcement</CardTitle>
+                <CardDescription>Send a banner message to all platform users</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div>
+                    <Label>Title</Label>
+                    <Input value={annTitle} onChange={e => setAnnTitle(e.target.value)} placeholder="e.g. Scheduled Maintenance" className="mt-1" />
+                  </div>
+                  <div>
+                    <Label>Message</Label>
+                    <Textarea value={annMessage} onChange={e => setAnnMessage(e.target.value)} placeholder="Details..." className="mt-1" rows={2} />
+                  </div>
+                  <div>
+                    <Label>Type</Label>
+                    <Select value={annType} onValueChange={setAnnType}>
+                      <SelectTrigger className="mt-1"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="info">Info (blue)</SelectItem>
+                        <SelectItem value="warning">Warning (yellow)</SelectItem>
+                        <SelectItem value="success">Success (green)</SelectItem>
+                        <SelectItem value="maintenance">Maintenance (orange)</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button onClick={() => createAnnouncementMutation.mutate({ title: annTitle, message: annMessage, type: annType })} disabled={!annTitle.trim()}>
+                    Publish Announcement
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Active Announcements</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                {adminAnnouncements && adminAnnouncements.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Title</TableHead>
+                        <TableHead>Type</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead>Created</TableHead>
+                        <TableHead>Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {adminAnnouncements.map((ann: any) => (
+                        <TableRow key={ann.id}>
+                          <TableCell className="font-medium">{ann.title}</TableCell>
+                          <TableCell><Badge variant="secondary">{ann.type}</Badge></TableCell>
+                          <TableCell>
+                            <Switch
+                              checked={ann.isActive}
+                              onCheckedChange={(checked) => toggleAnnouncementMutation.mutate({ id: ann.id, isActive: checked })}
+                            />
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {ann.createdAt ? new Date(ann.createdAt).toLocaleDateString() : "—"}
+                          </TableCell>
+                          <TableCell>
+                            <Button size="icon" variant="ghost" onClick={() => deleteAnnouncementMutation.mutate(ann.id)}>
+                              <Trash2 className="h-4 w-4 text-destructive" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">No announcements yet.</div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ============ AUDIT LOG TAB ============ */}
+        <TabsContent value="audit">
+          <Card>
+            <CardHeader>
+              <CardTitle>Audit Log</CardTitle>
+              <CardDescription>All admin and system actions</CardDescription>
+            </CardHeader>
+            <CardContent className="p-0">
+              {auditLog?.events && auditLog.events.length > 0 ? (
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Timestamp</TableHead>
+                      <TableHead>Action</TableHead>
+                      <TableHead>Resource</TableHead>
+                      <TableHead>User</TableHead>
+                      <TableHead>Details</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {auditLog.events.map((event: any) => (
+                      <TableRow key={event.id}>
+                        <TableCell className="text-muted-foreground text-xs">
+                          {event.createdAt ? new Date(event.createdAt).toLocaleString() : "—"}
+                        </TableCell>
+                        <TableCell><Badge variant="outline">{event.action}</Badge></TableCell>
+                        <TableCell className="text-sm">{event.resourceType} {event.resourceId ? `#${event.resourceId.slice(0, 8)}` : ""}</TableCell>
+                        <TableCell className="text-sm text-muted-foreground">{event.userId?.slice(0, 8) || "system"}</TableCell>
+                        <TableCell className="text-xs text-muted-foreground max-w-[200px] truncate">
+                          {event.metadataJson ? JSON.stringify(event.metadataJson).slice(0, 100) : "—"}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              ) : (
+                <div className="text-center py-8 text-muted-foreground">No audit events recorded yet.</div>
+              )}
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

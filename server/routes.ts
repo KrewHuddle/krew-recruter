@@ -12,7 +12,8 @@ import { requirePlan } from "./middleware/requirePlan";
 import { db } from "./db";
 import {
   organizations, campaigns, jobs, applications, interviewInvites,
-  campaignSpend, paymentHistory, aggregatedJobs,
+  campaignSpend, paymentHistory, aggregatedJobs, announcements,
+  auditEvents,
 } from "@shared/schema";
 import { eq, desc, sql, sum, count, and } from "drizzle-orm";
 
@@ -4329,6 +4330,112 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       }
     }
   );
+
+  // ============ ANNOUNCEMENTS ============
+
+  // GET /api/announcements — public, shows active announcements
+  app.get("/api/announcements", async (_req, res) => {
+    try {
+      const active = await db
+        .select()
+        .from(announcements)
+        .where(eq(announcements.isActive, true))
+        .orderBy(desc(announcements.createdAt));
+      res.json(active);
+    } catch (error) {
+      console.error("Announcements error:", error);
+      res.json([]);
+    }
+  });
+
+  // GET /api/admin/announcements — all announcements
+  app.get("/api/admin/announcements", isAuthenticated, requireSuperAdmin, async (_req, res) => {
+    try {
+      const all = await db.select().from(announcements).orderBy(desc(announcements.createdAt));
+      res.json(all);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch announcements" });
+    }
+  });
+
+  // POST /api/admin/announcements — create announcement
+  app.post("/api/admin/announcements", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const userId = getUserId(req) || (req.session as any)?.userId;
+      const { title, message, type, target } = req.body;
+      const [ann] = await db.insert(announcements).values({
+        title, message, type: type || "info", target: target || "all",
+        createdBy: userId,
+      }).returning();
+      res.json(ann);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to create announcement" });
+    }
+  });
+
+  // PATCH /api/admin/announcements/:id — toggle active
+  app.patch("/api/admin/announcements/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      const { isActive } = req.body;
+      const [updated] = await db.update(announcements)
+        .set({ isActive })
+        .where(eq(announcements.id, id as string))
+        .returning();
+      res.json(updated);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to update announcement" });
+    }
+  });
+
+  // DELETE /api/admin/announcements/:id
+  app.delete("/api/admin/announcements/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { id } = req.params;
+      await db.delete(announcements).where(eq(announcements.id, id as string));
+      res.json({ success: true });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to delete announcement" });
+    }
+  });
+
+  // ============ AUDIT LOG ============
+
+  app.get("/api/admin/audit-log", isAuthenticated, requireSuperAdmin, async (req, res) => {
+    try {
+      const { page = "1", limit = "50", action } = req.query;
+      const pageNum = parseInt(page as string, 10);
+      const limitNum = parseInt(limit as string, 10);
+
+      let query = db.select().from(auditEvents)
+        .orderBy(desc(auditEvents.createdAt))
+        .limit(limitNum)
+        .offset((pageNum - 1) * limitNum);
+
+      const results = await query;
+
+      // Filter by action in JS if specified
+      const filtered = action
+        ? results.filter(e => e.action === action)
+        : results;
+
+      res.json({ events: filtered, page: pageNum });
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch audit log" });
+    }
+  });
+
+  // ============ PLATFORM SETTINGS (admin view all) ============
+
+  app.get("/api/admin/platform-settings", isAuthenticated, requireSuperAdmin, async (_req, res) => {
+    try {
+      const { getMaskedPlatformSettings } = await import("./services/platformSettings");
+      const settings = await getMaskedPlatformSettings();
+      res.json(settings);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch platform settings" });
+    }
+  });
 
   // ============ ADMIN AD SPEND BILLING ============
 

@@ -1590,3 +1590,18 @@ export const aggregatedJobs = pgTable("aggregated_jobs", {
 export const insertAggregatedJobSchema = createInsertSchema(aggregatedJobs).omit({ id: true, fetchedAt: true });
 export type InsertAggregatedJob = z.infer<typeof insertAggregatedJobSchema>;
 export type AggregatedJobRecord = typeof aggregatedJobs.$inferSelect;
+
+// ============ ANNOUNCEMENTS ============
+
+export const announcements = pgTable("announcements", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").notNull().default("info"), // info, warning, success, maintenance
+  target: text("target").notNull().default("all"), // all, employers, seekers
+  isActive: boolean("is_active").default(true),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow(),
+});
+
+export type Announcement = typeof announcements.$inferSelect;
