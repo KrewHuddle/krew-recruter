@@ -2024,15 +2024,18 @@ export default function AdminDashboard() {
                       <Badge variant="default">Active — No key needed</Badge>
                     </div>
                     <div className="flex items-center justify-between">
+                      <span>PostJobFree</span>
+                      <Badge variant="default">Active — No key needed</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
                       <span>Adzuna</span>
-                      <Badge variant={process.env.ADZUNA_APP_ID ? "default" : "secondary"}>
-                        {/* Can't check env from client — show setup instructions */}
+                      <Badge variant="secondary">
                         Needs ADZUNA_APP_ID + ADZUNA_APP_KEY
                       </Badge>
                     </div>
                   </div>
                   <p className="text-xs text-muted-foreground mt-3">
-                    Add ADZUNA_APP_ID and ADZUNA_APP_KEY to environment variables. Free tier at developer.adzuna.com.
+                    PostJobFree jobs link back to the original posting (required by their ToS). Adzuna needs API keys from developer.adzuna.com.
                   </p>
                 </div>
               </CardContent>

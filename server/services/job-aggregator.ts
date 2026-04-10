@@ -8,6 +8,7 @@
  * 1. Adzuna API (free tier, 250 calls/day)
  * 2. Arbeitnow (free, no key needed)
  * 3. The Muse API (free, no key needed)
+ * 4. PostJobFree (free, no key needed — ToS requires linking back)
  */
 
 import { quickFilter, aiFilter } from "./job-filter";
@@ -161,6 +162,164 @@ async function fetchTheMuse(): Promise<AggregatedJob[]> {
   }
 }
 
+// ============ SOURCE 4: PostJobFree ============
+
+const PJF_SEARCHES = [
+  // Hospitality roles x major US markets
+  { q: "line+cook", l: "Charlotte,+NC" },
+  { q: "bartender", l: "Charlotte,+NC" },
+  { q: "server+restaurant", l: "Charlotte,+NC" },
+  { q: "chef", l: "Charlotte,+NC" },
+  { q: "restaurant+manager", l: "Charlotte,+NC" },
+  { q: "dishwasher", l: "Charlotte,+NC" },
+  { q: "line+cook", l: "Atlanta,+GA" },
+  { q: "bartender", l: "Atlanta,+GA" },
+  { q: "server+restaurant", l: "Atlanta,+GA" },
+  { q: "line+cook", l: "Nashville,+TN" },
+  { q: "bartender", l: "Nashville,+TN" },
+  { q: "line+cook", l: "Raleigh,+NC" },
+  { q: "line+cook", l: "New+York,+NY" },
+  { q: "bartender", l: "New+York,+NY" },
+  { q: "line+cook", l: "Miami,+FL" },
+  { q: "bartender", l: "Miami,+FL" },
+  { q: "line+cook", l: "Houston,+TX" },
+  { q: "line+cook", l: "Chicago,+IL" },
+  { q: "bartender", l: "Chicago,+IL" },
+  { q: "line+cook", l: "Los+Angeles,+CA" },
+  { q: "bartender", l: "Las+Vegas,+NV" },
+  { q: "hotel+front+desk", l: "Las+Vegas,+NV" },
+];
+
+function parsePostJobFreeHtml(html: string, searchCity: string, searchState: string): AggregatedJob[] {
+  const jobs: AggregatedJob[] = [];
+
+  // PostJobFree lists jobs in <div class="snippetPadding"> blocks
+  // Each has: title link, company, location, description snippet, posted date
+  const blocks = html.match(/<div[^>]*class="[^"]*snippetPadding[^"]*"[^>]*>[\s\S]*?(?=<div[^>]*class="[^"]*snippetPadding|$)/gi) || [];
+
+  for (const block of blocks) {
+    try {
+      // Title and URL
+      const titleMatch = block.match(/<a[^>]*href="(\/job\/[^"]+)"[^>]*>([^<]+)<\/a>/i);
+      if (!titleMatch) continue;
+
+      const relativeUrl = titleMatch[1];
+      const title = titleMatch[2].replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").trim();
+      const applyUrl = `https://www.postjobfree.com${relativeUrl}`;
+
+      // Generate stable external ID from URL
+      const externalId = `pjf_${relativeUrl.replace(/[^a-z0-9]/gi, "_")}`;
+
+      // Company name — usually in a <span class="company"> or after "- " in text
+      const companyMatch = block.match(/<span[^>]*class="[^"]*company[^"]*"[^>]*>([^<]+)<\/span>/i)
+        || block.match(/<b>([^<]+)<\/b>/i);
+      const company = companyMatch?.[1]?.trim() || "See posting";
+
+      // Location
+      const locMatch = block.match(/<span[^>]*class="[^"]*location[^"]*"[^>]*>([^<]+)<\/span>/i);
+      const locationText = locMatch?.[1]?.trim() || `${searchCity}, ${searchState}`;
+
+      // Parse city/state from location
+      const locParts = locationText.split(",").map(s => s.trim());
+      const city = locParts[0] || searchCity;
+      const state = locParts[1]?.replace(/\d+/g, "").trim() || searchState;
+
+      // Description snippet
+      const descMatch = block.match(/<span[^>]*class="[^"]*desc[^"]*"[^>]*>([\s\S]*?)<\/span>/i);
+      const description = (descMatch?.[1] || "")
+        .replace(/<[^>]*>/g, " ")
+        .replace(/&amp;/g, "&")
+        .replace(/&nbsp;/g, " ")
+        .replace(/\s+/g, " ")
+        .trim()
+        .substring(0, 500);
+
+      // Salary if present
+      const salaryMatch = block.match(/\$[\d,.]+\s*[-–to]+\s*\$[\d,.]+/i)
+        || block.match(/\$[\d,.]+\s*(?:\/hr|\/hour|per hour|\/yr|\/year|annually)/i);
+      const salary = salaryMatch?.[0] || null;
+
+      // Posted date
+      const dateMatch = block.match(/<span[^>]*class="[^"]*when[^"]*"[^>]*>([^<]+)<\/span>/i);
+      let postedAt = new Date();
+      if (dateMatch) {
+        const dateText = dateMatch[1].trim().toLowerCase();
+        if (dateText.includes("today") || dateText.includes("just")) {
+          postedAt = new Date();
+        } else if (dateText.includes("yesterday")) {
+          postedAt = new Date(Date.now() - 86400000);
+        } else {
+          const daysMatch = dateText.match(/(\d+)\s*d/);
+          if (daysMatch) {
+            postedAt = new Date(Date.now() - parseInt(daysMatch[1]) * 86400000);
+          }
+        }
+      }
+
+      jobs.push({
+        externalId,
+        source: "postjobfree",
+        title,
+        company,
+        location: locationText,
+        city,
+        state,
+        country: "US",
+        description,
+        applyUrl, // Links back to PostJobFree as required by their ToS
+        salary,
+        employmentType: "Full-time",
+        postedAt,
+        category: null,
+        logoUrl: null,
+        remote: false,
+      });
+    } catch {
+      // Skip malformed blocks
+    }
+  }
+
+  return jobs;
+}
+
+async function fetchPostJobFree(): Promise<AggregatedJob[]> {
+  console.log("[aggregator] Fetching PostJobFree...");
+  const allJobs: AggregatedJob[] = [];
+
+  for (const search of PJF_SEARCHES) {
+    try {
+      const url = `https://www.postjobfree.com/jobs?q=${search.q}&l=${search.l}&radius=25`;
+      const res = await fetch(url, {
+        headers: {
+          "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml",
+        },
+      });
+
+      if (!res.ok) {
+        console.warn(`[aggregator] PostJobFree ${search.q} ${search.l}: ${res.status}`);
+        continue;
+      }
+
+      const html = await res.text();
+      const cityParts = search.l.replace(/\+/g, " ").split(",");
+      const city = cityParts[0]?.trim() || "";
+      const state = cityParts[1]?.trim() || "";
+
+      const parsed = parsePostJobFreeHtml(html, city, state);
+      allJobs.push(...parsed);
+
+      // Rate limit — be respectful
+      await new Promise((r) => setTimeout(r, 500));
+    } catch (err) {
+      console.error(`[aggregator] PostJobFree "${search.q}" failed:`, err);
+    }
+  }
+
+  console.log(`[aggregator] PostJobFree: ${allJobs.length} jobs`);
+  return allJobs;
+}
+
 // ============ MAIN AGGREGATION ============
 
 function deduplicateJobs(jobs: AggregatedJob[]): AggregatedJob[] {
@@ -197,7 +356,7 @@ export async function runAggregation(options?: {
   skipAiFilter?: boolean;
   sources?: string[];
 }): Promise<{ jobs: AggregatedJob[]; stats: AggregationResult }> {
-  const enabledSources = options?.sources || ["adzuna", "arbeitnow", "the_muse"];
+  const enabledSources = options?.sources || ["adzuna", "arbeitnow", "the_muse", "postjobfree"];
   const errors: string[] = [];
   const sourceCounts: Record<string, number> = {};
 
@@ -208,6 +367,7 @@ export async function runAggregation(options?: {
   if (enabledSources.includes("adzuna")) fetchers.push(fetchAdzuna());
   if (enabledSources.includes("arbeitnow")) fetchers.push(fetchArbeitnow());
   if (enabledSources.includes("the_muse")) fetchers.push(fetchTheMuse());
+  if (enabledSources.includes("postjobfree")) fetchers.push(fetchPostJobFree());
 
   const results = await Promise.allSettled(fetchers);
   let allJobs: AggregatedJob[] = [];
