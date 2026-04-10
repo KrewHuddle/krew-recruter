@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { Helmet } from "react-helmet-async";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -123,6 +124,31 @@ export default function Landing() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Krew Recruiter — #1 Hospitality Hiring Platform | Find Restaurant Jobs & Staff</title>
+        <meta name="description" content="Krew Recruiter connects restaurants and hospitality venues with passionate staff. Post jobs, run Facebook ad campaigns, screen with video interviews, and fill gig shifts instantly. Join 50K+ hospitality professionals." />
+        <meta name="keywords" content="hospitality jobs, restaurant jobs, line cook jobs, bartender jobs, server jobs, restaurant hiring, hospitality staffing, food service jobs, chef jobs, hire restaurant staff" />
+        <link rel="canonical" href="https://krewrecruiter.com" />
+        <meta property="og:title" content="Krew Recruiter — Hospitality Hiring Platform" />
+        <meta property="og:description" content="Find hospitality jobs or hire restaurant staff. Video interviews, Facebook ad campaigns, and gig shifts in one platform." />
+        <meta property="og:url" content="https://krewrecruiter.com" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Krew Recruiter — Hospitality Hiring Platform" />
+        <meta name="twitter:description" content="The hiring platform for hospitality." />
+        <script type="application/ld+json">{JSON.stringify({
+          "@context": "https://schema.org",
+          "@type": "WebSite",
+          "name": "Krew Recruiter",
+          "url": "https://krewrecruiter.com",
+          "description": "Hospitality hiring platform for restaurants and venues",
+          "potentialAction": {
+            "@type": "SearchAction",
+            "target": "https://krewrecruiter.com/jobs?q={search_term_string}",
+            "query-input": "required name=search_term_string"
+          }
+        })}</script>
+      </Helmet>
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex flex-wrap h-16 max-w-7xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex flex-wrap items-center gap-2">

@@ -65,6 +65,11 @@ import WorkerOnboarding from "@/pages/worker-onboarding";
 import Privacy from "@/pages/privacy";
 import Terms from "@/pages/terms";
 
+// SEO pages
+import JobsByLocation from "@/pages/jobs-by-location";
+import JobsByRole from "@/pages/jobs-by-role";
+
+import { HelmetProvider } from "react-helmet-async";
 import { Loader2, Shield } from "lucide-react";
 import { UpgradePromptListener } from "@/components/upgrade-prompt";
 import { CookieBanner } from "@/components/CookieBanner";
@@ -373,6 +378,8 @@ function AppRouter() {
       <Route path="/help" component={Help} />
       <Route path="/privacy" component={Privacy} />
       <Route path="/terms" component={Terms} />
+      <Route path="/jobs/location/:cityState" component={JobsByLocation} />
+      <Route path="/jobs/role/:role" component={JobsByRole} />
 
       {/* Worker signup & onboarding (public entry, protected onboarding) */}
       <Route path="/workers/signup" component={WorkerSignup} />
@@ -630,6 +637,7 @@ function PlaceholderPage({ title }: { title: string }) {
 
 function App() {
   return (
+    <HelmetProvider>
     <QueryClientProvider client={queryClient}>
       <CampaignAuthProvider>
         <TooltipProvider>
@@ -640,6 +648,7 @@ function App() {
         </TooltipProvider>
       </CampaignAuthProvider>
     </QueryClientProvider>
+    </HelmetProvider>
   );
 }
 

@@ -101,7 +101,112 @@ export async function registerRoutes(
 
   app.use("/api", campaignRouter);
 
-  // TODO: Object storage routes will use Supabase Storage (replacing Replit object storage)
+  // ============ SEO ROUTES ============
+
+  app.get("/robots.txt", (_req, res) => {
+    res.type("text/plain").send(
+`User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api
+Disallow: /campaign
+Disallow: /app
+Disallow: /seeker
+Sitemap: https://krewrecruiter.com/sitemap.xml`
+    );
+  });
+
+  app.get("/sitemap.xml", async (_req, res) => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+
+      const staticPages = [
+        { loc: "/", priority: "1.0", freq: "weekly" },
+        { loc: "/jobs", priority: "0.9", freq: "daily" },
+        { loc: "/pricing", priority: "0.8", freq: "monthly" },
+        { loc: "/workers/signup", priority: "0.8", freq: "monthly" },
+        { loc: "/login", priority: "0.5", freq: "monthly" },
+        { loc: "/privacy", priority: "0.3", freq: "yearly" },
+        { loc: "/terms", priority: "0.3", freq: "yearly" },
+      ];
+
+      const locations = [
+        "charlotte-nc", "new-york-ny", "los-angeles-ca", "chicago-il",
+        "houston-tx", "miami-fl", "atlanta-ga", "nashville-tn",
+        "las-vegas-nv", "seattle-wa", "portland-or", "denver-co",
+        "san-francisco-ca", "austin-tx", "dallas-tx", "boston-ma",
+        "philadelphia-pa", "phoenix-az", "san-diego-ca", "tampa-fl",
+        "orlando-fl", "raleigh-nc", "new-orleans-la", "minneapolis-mn",
+        "kansas-city-mo", "indianapolis-in", "columbus-oh", "san-antonio-tx",
+        "jacksonville-fl", "fort-worth-tx", "waxhaw-nc",
+      ];
+
+      const roles = [
+        "line-cook", "bartender", "server", "chef", "sous-chef",
+        "executive-chef", "dishwasher", "host-hostess", "food-runner",
+        "barback", "prep-cook", "restaurant-manager", "general-manager",
+        "catering-staff", "hotel-front-desk", "barista", "busser",
+      ];
+
+      // Fetch active aggregated jobs for dynamic pages
+      let jobUrls: string[] = [];
+      try {
+        const activeJobs = await db
+          .select({ id: aggregatedJobs.id })
+          .from(aggregatedJobs)
+          .where(eq(aggregatedJobs.isActive, true))
+          .limit(1000);
+        jobUrls = activeJobs.map(j => `/jobs/${j.id}`);
+      } catch {}
+
+      let xml = `<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+`;
+      for (const page of staticPages) {
+        xml += `  <url>
+    <loc>https://krewrecruiter.com${page.loc}</loc>
+    <lastmod>${today}</lastmod>
+    <changefreq>${page.freq}</changefreq>
+    <priority>${page.priority}</priority>
+  </url>
+`;
+      }
+
+      for (const loc of locations) {
+        xml += `  <url>
+    <loc>https://krewrecruiter.com/jobs/location/${loc}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+`;
+      }
+
+      for (const role of roles) {
+        xml += `  <url>
+    <loc>https://krewrecruiter.com/jobs/role/${role}</loc>
+    <changefreq>weekly</changefreq>
+    <priority>0.8</priority>
+  </url>
+`;
+      }
+
+      for (const jobUrl of jobUrls) {
+        xml += `  <url>
+    <loc>https://krewrecruiter.com${jobUrl}</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.7</priority>
+  </url>
+`;
+      }
+
+      xml += `</urlset>`;
+
+      res.type("application/xml").send(xml);
+    } catch (error) {
+      console.error("Sitemap error:", error);
+      res.status(500).send("Error generating sitemap");
+    }
+  });
 
   // ============ TENANT ROUTES ============
 
