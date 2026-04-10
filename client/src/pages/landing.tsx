@@ -213,7 +213,7 @@ export default function Landing() {
         )}
       </nav>
 
-      <section className="relative pt-32 pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
+      <section className="relative pt-24 pb-12 sm:pt-32 sm:pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-0 left-0 right-0 h-full bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
           <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/8 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
@@ -226,7 +226,7 @@ export default function Landing() {
                 <Heart className="h-4 w-4" />
                 <span data-testid="text-hero-tagline-text">Built for hospitality, by hospitality</span>
               </div>
-              <h1 className="font-serif text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl" data-testid="text-hero-heading">
+              <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl" data-testid="text-hero-heading">
                 Find people who{" "}
                 <span className="text-primary relative">
                   love to serve
@@ -235,18 +235,18 @@ export default function Landing() {
                   </svg>
                 </span>
               </h1>
-              <p className="mt-6 text-xl text-muted-foreground leading-relaxed" data-testid="text-hero-description">
+              <p className="mt-4 sm:mt-6 text-base sm:text-xl text-muted-foreground leading-relaxed" data-testid="text-hero-description">
                 Great hospitality starts with great people. Krew Recruiter helps you discover passionate talent through video interviews, and fills last-minute shifts with our gig worker marketplace.
               </p>
-              <div className="mt-10 flex flex-col sm:flex-row flex-wrap items-center justify-center lg:justify-start gap-4">
-                <a href="/login">
-                  <Button size="lg" className="gap-2 shadow-lg shadow-primary/25" data-testid="button-hero-employer">
+              <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
+                <a href="/login" className="w-full sm:w-auto">
+                  <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-primary/25" data-testid="button-hero-employer">
                     I'm Hiring
                     <Briefcase className="h-4 w-4" />
                   </Button>
                 </a>
-                <Link href="/workers/signup">
-                  <Button variant="outline" size="lg" className="gap-2" data-testid="button-hero-worker">
+                <Link href="/workers/signup" className="w-full sm:w-auto">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-worker">
                     I Want to Work
                     <ArrowRight className="h-4 w-4" />
                   </Button>

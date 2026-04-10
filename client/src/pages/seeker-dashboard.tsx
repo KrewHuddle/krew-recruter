@@ -138,7 +138,7 @@ export default function SeekerDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 md:gap-6 md:grid-cols-4">
         <Card>
           <CardContent className="p-6">
             <div className="flex items-center gap-3">

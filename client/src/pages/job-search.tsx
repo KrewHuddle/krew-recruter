@@ -253,8 +253,8 @@ export default function JobSearch() {
       </div>
 
       <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-6">
-        <div className="flex gap-6">
-          <aside className={`w-64 shrink-0 ${showFilters ? "block" : "hidden"} md:block`}>
+        <div className="flex flex-col md:flex-row gap-6">
+          <aside className={`w-full md:w-64 md:shrink-0 ${showFilters ? "block" : "hidden"} md:block`}>
             <div className="sticky top-24 space-y-6">
               <div>
                 <h3 className="font-semibold mb-3">Job Type</h3>

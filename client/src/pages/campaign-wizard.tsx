@@ -338,35 +338,49 @@ export default function CampaignWizard() {
   // ---- Stepper for steps 2-4 (full-page) ----
   function Stepper() {
     return (
-      <div className="flex items-center gap-2 mb-8">
-        {STEP_LABELS.map((label, i) => (
-          <div key={label} className="flex items-center gap-2">
-            {i > 0 && <div className={`h-px w-8 ${i <= currentMainStep ? "bg-primary" : "bg-border"}`} />}
-            <div className="flex items-center gap-1.5">
-              {i < currentMainStep ? (
-                <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
-                  <Check className="h-3.5 w-3.5 text-primary-foreground" />
-                </div>
-              ) : (
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
-                  i === currentMainStep
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-muted text-muted-foreground"
-                }`}>
-                  {i + 1}
-                </div>
-              )}
-              <span className={`text-sm ${
-                i === currentMainStep
-                  ? "text-primary font-medium"
-                  : i < currentMainStep ? "text-foreground" : "text-muted-foreground"
-              }`}>
-                {label}
-              </span>
-            </div>
+      <>
+        {/* Mobile: simplified single-step display */}
+        <div className="md:hidden mb-6">
+          <div className="flex items-center gap-1 mb-2">
+            {STEP_LABELS.map((_, i) => (
+              <div key={i} className={`flex-1 h-1 rounded-full ${i <= currentMainStep ? "bg-primary" : "bg-muted"}`} />
+            ))}
           </div>
-        ))}
-      </div>
+          <p className="text-xs text-muted-foreground">
+            Step {currentMainStep + 1} of {STEP_LABELS.length}: <span className="text-foreground font-medium">{STEP_LABELS[currentMainStep]}</span>
+          </p>
+        </div>
+        {/* Desktop: full stepper */}
+        <div className="hidden md:flex items-center gap-2 mb-8">
+          {STEP_LABELS.map((label, i) => (
+            <div key={label} className="flex items-center gap-2">
+              {i > 0 && <div className={`h-px w-8 ${i <= currentMainStep ? "bg-primary" : "bg-border"}`} />}
+              <div className="flex items-center gap-1.5">
+                {i < currentMainStep ? (
+                  <div className="w-6 h-6 rounded-full bg-primary flex items-center justify-center">
+                    <Check className="h-3.5 w-3.5 text-primary-foreground" />
+                  </div>
+                ) : (
+                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium ${
+                    i === currentMainStep
+                      ? "bg-primary text-primary-foreground"
+                      : "bg-muted text-muted-foreground"
+                  }`}>
+                    {i + 1}
+                  </div>
+                )}
+                <span className={`text-sm ${
+                  i === currentMainStep
+                    ? "text-primary font-medium"
+                    : i < currentMainStep ? "text-foreground" : "text-muted-foreground"
+                }`}>
+                  {label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>
     );
   }
 
@@ -641,7 +655,7 @@ export default function CampaignWizard() {
     const showLogoPrompt = !branding?.logoUrl && !localStorage.getItem("krew_logo_prompt_shown");
 
     return (
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <Stepper />
 
         {/* Logo upload prompt for first-time users */}
@@ -869,7 +883,7 @@ export default function CampaignWizard() {
   // ============ STEP 3: Set your Budget (full page) ============
   if (step === 3) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <Stepper />
 
         <div className="grid grid-cols-1 lg:grid-cols-[60%_40%] gap-8">
@@ -953,7 +967,7 @@ export default function CampaignWizard() {
   // ============ STEP 4: Checkout & Post (full page) ============
   if (step === 4) {
     return (
-      <div className="max-w-5xl mx-auto px-6 py-8">
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         <Stepper />
 
         <div className="max-w-lg mx-auto">
