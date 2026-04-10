@@ -96,13 +96,16 @@ export default function Landing() {
   const [jobSearchQuery, setJobSearchQuery] = useState("");
   const [jobSearchCity, setJobSearchCity] = useState("");
 
-  // Fetch jobs for the landing page job board
+  // Fetch jobs for the landing page job board (debounced)
   const [landingJobs, setLandingJobs] = useState<any[]>([]);
   useEffect(() => {
-    fetch(`/api/jobs/public?limit=6${jobSearchQuery ? `&q=${encodeURIComponent(jobSearchQuery)}` : ""}${jobSearchCity ? `&city=${encodeURIComponent(jobSearchCity)}` : ""}`)
-      .then(r => r.ok ? r.json() : { jobs: [] })
-      .then(d => setLandingJobs(d.jobs || []))
-      .catch(() => {});
+    const timer = setTimeout(() => {
+      fetch(`/api/jobs/public?limit=6${jobSearchQuery ? `&q=${encodeURIComponent(jobSearchQuery)}` : ""}${jobSearchCity ? `&city=${encodeURIComponent(jobSearchCity)}` : ""}`)
+        .then(r => r.ok ? r.json() : { jobs: [] })
+        .then(d => setLandingJobs(d.jobs || []))
+        .catch(() => {});
+    }, 300);
+    return () => clearTimeout(timer);
   }, [jobSearchQuery, jobSearchCity]);
 
   useEffect(() => {

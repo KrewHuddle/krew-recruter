@@ -69,9 +69,21 @@ export default function JobSearch() {
   const [selectedSchedules, setSelectedSchedules] = useState<string[]>([]);
   const [showFilters, setShowFilters] = useState(false);
 
-  const { data: jobs, isLoading } = useQuery<JobWithDetails[]>({
+  const { data: jobsResponse, isLoading } = useQuery<{ jobs: any[] } | any[]>({
     queryKey: ["/api/jobs/public", searchQuery, locationQuery],
+    queryFn: async () => {
+      const params = new URLSearchParams();
+      if (searchQuery) params.set("q", searchQuery);
+      if (locationQuery) params.set("city", locationQuery);
+      params.set("limit", "50");
+      const res = await fetch(`/api/jobs/public?${params.toString()}`);
+      if (!res.ok) return { jobs: [] };
+      return res.json();
+    },
   });
+
+  // Handle both old format (array) and new format ({ jobs: [] })
+  const jobs: any[] = Array.isArray(jobsResponse) ? jobsResponse : (jobsResponse as any)?.jobs || [];
 
   const { data: savedJobsData } = useQuery<SavedJob[]>({
     queryKey: ["/api/saved-jobs"],
@@ -140,34 +152,23 @@ export default function JobSearch() {
     );
   };
 
-  const filteredJobs = jobs?.filter((job) => {
-    if (selectedTypes.length > 0 && !selectedTypes.includes(job.jobType)) {
-      return false;
-    }
-    if (selectedSchedules.length > 0) {
-      const jobSchedules = job.scheduleTags || [];
-      if (!selectedSchedules.some((s) => jobSchedules.includes(s))) {
-        return false;
-      }
-    }
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      if (
-        !job.title.toLowerCase().includes(query) &&
-        !job.role.toLowerCase().includes(query) &&
-        !(job.tenant?.name || "").toLowerCase().includes(query)
-      ) {
-        return false;
-      }
-    }
-    if (locationQuery) {
-      const loc = locationQuery.toLowerCase();
-      if (
-        !(job.location?.city || "").toLowerCase().includes(loc) &&
-        !(job.location?.state || "").toLowerCase().includes(loc)
-      ) {
-        return false;
-      }
+  // Normalize job data — handle both old tenant format and new aggregated format
+  const normalizedJobs = (jobs || []).map((job: any) => ({
+    ...job,
+    companyName: job.tenant?.name || job.company || "Company",
+    cityName: job.location?.city || job.city || "",
+    stateName: job.location?.state || job.state || "",
+    typeLabel: job.jobType === "FULL_TIME" ? "Full-time" : job.jobType === "PART_TIME" ? "Part-time" : job.employmentType || "Full-time",
+    payDisplay: job.payRangeMin ? `$${job.payRangeMin}${job.payRangeMax ? `-$${job.payRangeMax}` : ""}/hr` : job.salary || null,
+    applyLink: job.applyUrl || `/jobs/${job.id}`,
+  }));
+
+  const filteredJobs = normalizedJobs.filter((job: any) => {
+    if (selectedTypes.length > 0) {
+      const typeMatch = selectedTypes.some(t =>
+        t === job.jobType || job.typeLabel?.toUpperCase().replace(/[- ]/g, "_").includes(t)
+      );
+      if (!typeMatch) return false;
     }
     return true;
   });
@@ -371,47 +372,48 @@ export default function JobSearch() {
                     <CardContent className="p-5">
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex-1 min-w-0">
-                          <Link href={`/jobs/${job.id}`}>
+                          <a href={job.applyUrl || job.applyLink || `/jobs/${job.id}`} target={job.applyUrl ? "_blank" : undefined} rel={job.applyUrl ? "noopener noreferrer" : undefined}>
                             <h3 className="font-semibold text-lg hover:text-primary cursor-pointer">
                               {job.title}
                             </h3>
-                          </Link>
+                          </a>
                           <p className="text-muted-foreground flex items-center gap-1 mt-1">
                             <Building2 className="h-4 w-4" />
-                            {job.tenant?.name || "Company"}
+                            {job.companyName}
                           </p>
                         </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => toggleSave(job.id)}
-                          disabled={saveJobMutation.isPending || unsaveJobMutation.isPending}
-                          data-testid={`button-save-${job.id}`}
-                        >
-                          {savedJobIds.has(job.id) ? (
-                            <BookmarkCheck className="h-5 w-5 text-primary" />
-                          ) : (
-                            <Bookmark className="h-5 w-5" />
-                          )}
-                        </Button>
+                        {isAuthenticated && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => toggleSave(job.id)}
+                            disabled={saveJobMutation.isPending || unsaveJobMutation.isPending}
+                            data-testid={`button-save-${job.id}`}
+                          >
+                            {savedJobIds.has(job.id) ? (
+                              <BookmarkCheck className="h-5 w-5 text-primary" />
+                            ) : (
+                              <Bookmark className="h-5 w-5" />
+                            )}
+                          </Button>
+                        )}
                       </div>
 
                       <div className="mt-3 flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-                        {job.location && (
+                        {(job.cityName || job.stateName) && (
                           <span className="flex items-center gap-1">
                             <MapPin className="h-4 w-4" />
-                            {job.location.city}, {job.location.state}
+                            {[job.cityName, job.stateName].filter(Boolean).join(", ")}
                           </span>
                         )}
                         <span className="flex items-center gap-1">
                           <Clock className="h-4 w-4" />
-                          {job.jobType === "FULL_TIME" ? "Full-time" : "Part-time"}
+                          {job.typeLabel}
                         </span>
-                        {job.payRangeMin && (
+                        {job.payDisplay && (
                           <span className="flex items-center gap-1">
                             <DollarSign className="h-4 w-4" />
-                            ${job.payRangeMin}
-                            {job.payRangeMax && `-$${job.payRangeMax}`}/hr
+                            {job.payDisplay}
                           </span>
                         )}
                       </div>
@@ -424,7 +426,7 @@ export default function JobSearch() {
 
                       {job.scheduleTags && job.scheduleTags.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-1">
-                          {job.scheduleTags.map((tag, i) => (
+                          {job.scheduleTags.map((tag: string, i: number) => (
                             <Badge key={i} variant="outline" className="text-xs">
                               {tag}
                             </Badge>
