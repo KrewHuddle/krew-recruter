@@ -119,6 +119,15 @@ function SeekerLayout({ children }: { children: React.ReactNode }) {
 }
 
 function AdminLayout({ children }: { children: React.ReactNode }) {
+  const handleSignOut = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {}
+    localStorage.removeItem("krew_token");
+    localStorage.removeItem("krew_org_id");
+    window.location.href = "/login";
+  };
+
   return (
     <div className="min-h-screen bg-background">
       <header className="flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border px-6">
@@ -127,9 +136,15 @@ function AdminLayout({ children }: { children: React.ReactNode }) {
           <span className="font-semibold">Super Admin</span>
         </div>
         <div className="flex items-center gap-4">
-          <a href="/app" className="text-sm text-muted-foreground hover:text-foreground">
-            Back to App
+          <a href="/campaign" className="text-sm text-muted-foreground hover:text-foreground">
+            Campaign Engine
           </a>
+          <button
+            onClick={handleSignOut}
+            className="text-sm text-destructive hover:text-destructive/80"
+          >
+            Sign Out
+          </button>
           <ThemeToggle />
         </div>
       </header>
