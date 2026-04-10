@@ -83,6 +83,8 @@ import {
   Square,
   Wifi,
   WifiOff,
+  RefreshCw,
+  Globe,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -451,6 +453,32 @@ export default function AdminDashboard() {
     saveMetaSettingsMutation.mutate(payload);
   };
 
+  // Aggregation
+  const [aggRunning, setAggRunning] = useState(false);
+  const [aggResult, setAggResult] = useState<any>(null);
+
+  const { data: aggStats, isLoading: aggStatsLoading } = useQuery<{
+    total: number; active: number; bySource: Record<string, number>;
+  }>({
+    queryKey: ["/api/admin/aggregation/stats"],
+  });
+
+  const handleRunAggregation = async (skipAi = false) => {
+    setAggRunning(true);
+    setAggResult(null);
+    try {
+      const res = await apiRequest("POST", "/api/admin/aggregation/run", { skipAiFilter: skipAi });
+      const data = await res.json();
+      setAggResult(data);
+      queryClient.invalidateQueries({ queryKey: ["/api/admin/aggregation/stats"] });
+      toast({ title: "Aggregation complete", description: `${data.saved} jobs saved from ${data.total} fetched` });
+    } catch {
+      toast({ title: "Aggregation failed", variant: "destructive" });
+    } finally {
+      setAggRunning(false);
+    }
+  };
+
   const metaConnected = metaSettings?.some(s => s.key === "meta_access_token" && s.value && s.value !== "••••");
   const activeCampaignCount = metaCampaigns?.filter((c: any) => c.status === "active").length || 0;
   const totalSpendToday = metaCampaigns
@@ -580,6 +608,10 @@ export default function AdminDashboard() {
           <TabsTrigger value="meta-ads" data-testid="tab-meta-ads">
             <Megaphone className="h-4 w-4 mr-2" />
             Meta Ads
+          </TabsTrigger>
+          <TabsTrigger value="aggregation" data-testid="tab-aggregation">
+            <Globe className="h-4 w-4 mr-2" />
+            Job Aggregation
           </TabsTrigger>
         </TabsList>
 
@@ -1798,6 +1830,136 @@ export default function AdminDashboard() {
                     No campaigns yet. Employers will create campaigns through the Campaign Engine.
                   </div>
                 )}
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* ============ JOB AGGREGATION TAB ============ */}
+        <TabsContent value="aggregation">
+          <div className="space-y-6">
+            {/* Stats */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Total Aggregated Jobs</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{aggStats?.total || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">Active Jobs</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{aggStats?.active || 0}</div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-sm font-medium">By Source</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {aggStats?.bySource ? (
+                    <div className="space-y-1 text-sm">
+                      {Object.entries(aggStats.bySource).map(([source, count]) => (
+                        <div key={source} className="flex justify-between">
+                          <span className="text-muted-foreground">{source}</span>
+                          <span className="font-medium">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No data yet</p>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Run Controls */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Run Aggregation</CardTitle>
+                <CardDescription>
+                  Pull hospitality jobs from external sources (Adzuna, Arbeitnow, The Muse), filter with AI, and save to the job board.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-3 mb-4">
+                  <Button onClick={() => handleRunAggregation(false)} disabled={aggRunning}>
+                    {aggRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                    Run Full Aggregation
+                  </Button>
+                  <Button variant="outline" onClick={() => handleRunAggregation(true)} disabled={aggRunning}>
+                    {aggRunning ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                    Quick Run (skip AI filter)
+                  </Button>
+                </div>
+
+                {aggResult && (
+                  <div className="rounded-lg border p-4 bg-muted/50">
+                    <p className="font-medium text-sm mb-2">Last Run Results</p>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                      <div>
+                        <p className="text-muted-foreground">Fetched</p>
+                        <p className="font-bold text-lg">{aggResult.total}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">After Filter</p>
+                        <p className="font-bold text-lg">{aggResult.filtered}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Saved</p>
+                        <p className="font-bold text-lg text-green-600">{aggResult.saved}</p>
+                      </div>
+                      <div>
+                        <p className="text-muted-foreground">Sources</p>
+                        <p className="font-bold text-lg">{Object.keys(aggResult.sources || {}).length}</p>
+                      </div>
+                    </div>
+                    {aggResult.sources && (
+                      <div className="mt-3 flex gap-2 flex-wrap">
+                        {Object.entries(aggResult.sources).map(([source, count]) => (
+                          <Badge key={source} variant="secondary">
+                            {source}: {count as number}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                    {aggResult.errors?.length > 0 && (
+                      <div className="mt-3 text-sm text-destructive">
+                        {aggResult.errors.map((err: string, i: number) => (
+                          <p key={i}>{err}</p>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="mt-6 rounded-lg border p-4">
+                  <p className="font-medium text-sm mb-2">Source Configuration</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span>Arbeitnow</span>
+                      <Badge variant="default">Active — No key needed</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>The Muse</span>
+                      <Badge variant="default">Active — No key needed</Badge>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span>Adzuna</span>
+                      <Badge variant={process.env.ADZUNA_APP_ID ? "default" : "secondary"}>
+                        {/* Can't check env from client — show setup instructions */}
+                        Needs ADZUNA_APP_ID + ADZUNA_APP_KEY
+                      </Badge>
+                    </div>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-3">
+                    Add ADZUNA_APP_ID and ADZUNA_APP_KEY to environment variables. Free tier at developer.adzuna.com.
+                  </p>
+                </div>
               </CardContent>
             </Card>
           </div>
