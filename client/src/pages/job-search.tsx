@@ -438,11 +438,19 @@ export default function JobSearch() {
                         <span className="text-xs text-muted-foreground">
                           Posted {job.createdAt ? new Date(job.createdAt).toLocaleDateString() : "recently"}
                         </span>
-                        <Link href={`/jobs/${job.id}`}>
-                          <Button size="sm" data-testid={`button-apply-${job.id}`}>
-                            View Job
-                          </Button>
-                        </Link>
+                        {job.applyUrl ? (
+                          <a href={job.applyUrl} target="_blank" rel="noopener noreferrer">
+                            <Button size="sm" data-testid={`button-apply-${job.id}`}>
+                              Apply Now
+                            </Button>
+                          </a>
+                        ) : (
+                          <Link href={isAuthenticated ? `/jobs/${job.id}` : "/workers/signup"}>
+                            <Button size="sm" data-testid={`button-apply-${job.id}`}>
+                              Apply Now
+                            </Button>
+                          </Link>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
