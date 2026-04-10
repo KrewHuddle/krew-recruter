@@ -22,6 +22,9 @@ import {
   Building2,
   UserCheck,
   Sparkles,
+  Wand2,
+  Radio,
+  Megaphone,
 } from "lucide-react";
 import logoImage from "@assets/3_1768835575859.png";
 import bartenderImage from "@assets/stock_images/american_bartender_s_130b2a50.jpg";
@@ -281,6 +284,110 @@ export default function Landing() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ═══════ HOW IT WORKS SECTION ═══════ */}
+      <section className="py-24 px-6 relative overflow-hidden" style={{ background: "hsl(270 25% 6%)" }}>
+        {/* Dot pattern */}
+        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle, #7C3AED 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+
+        <div className="max-w-6xl mx-auto relative">
+          {/* Header */}
+          <div className="text-center mb-16">
+            <span className="text-primary text-xs font-semibold tracking-[0.2em] uppercase mb-4 block">How It Works</span>
+            <h2 className="text-white text-4xl md:text-5xl font-bold mb-6">
+              Hire smarter. <span className="text-primary">Fill shifts faster.</span>
+            </h2>
+            <p className="text-white/60 text-lg max-w-2xl mx-auto">
+              Krew Recruiter runs targeted ads for your open positions on Facebook & Instagram — reaching hospitality workers who aren't on job boards.
+            </p>
+          </div>
+
+          {/* 4 Steps */}
+          <div className="relative">
+            <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-px border-t-2 border-dashed border-primary/30 z-0" />
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
+              {[
+                { num: "01", icon: <Briefcase className="h-6 w-6 text-white" />, title: "Post Your Job", desc: "Add job details in minutes. Import directly from Indeed or ZipRecruiter with a single link." },
+                { num: "02", icon: <Wand2 className="h-6 w-6 text-white" />, title: "We Build Your Ad", desc: "We auto-generate a high-converting ad with your logo and branding. No design skills needed." },
+                { num: "03", icon: <Radio className="h-6 w-6 text-white" />, title: "Ad Goes Live", desc: "Your job ad reaches hospitality workers within miles of your restaurant. Set your own daily budget." },
+                { num: "04", icon: <Users className="h-6 w-6 text-white" />, title: "Candidates Come to You", desc: "Review video interviews and shortlist candidates — all inside your Krew Recruiter dashboard." },
+              ].map((step, i) => (
+                <div key={i} className="flex flex-col items-center text-center relative z-10">
+                  <div className="relative mb-6">
+                    <div className="w-20 h-20 rounded-full p-[2px]" style={{ background: "linear-gradient(135deg, hsl(280 70% 52%), hsl(320 65% 48%))" }}>
+                      <div className="w-full h-full rounded-full flex flex-col items-center justify-center" style={{ background: "hsl(270 25% 10%)" }}>
+                        {step.icon}
+                        <span className="text-primary text-xs font-bold mt-0.5">{step.num}</span>
+                      </div>
+                    </div>
+                  </div>
+                  <h3 className="text-white font-semibold text-lg mb-2">{step.title}</h3>
+                  <p className="text-white/50 text-sm leading-relaxed">{step.desc}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Social Media Platforms Bar */}
+          <div className="mt-16 rounded-2xl border border-white/10 bg-white/5 px-8 py-8">
+            <p className="text-center text-white/40 text-xs font-semibold tracking-[0.15em] uppercase mb-8">
+              Your job ads appear across these platforms — reaching the 97% of workers not on job boards
+            </p>
+            <div className="flex flex-wrap items-center justify-center gap-10">
+              {/* Facebook */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#1877F2"/><path d="M28.5 25H25.5V36H21V25H18.5V21H21V18.5C21 15.5 22.5 13 26 13H29V17H27C25.9 17 25.5 17.5 25.5 18.5V21H29L28.5 25Z" fill="white"/></svg>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                </div>
+                <span className="text-white font-medium text-sm">Facebook</span>
+                <span className="text-white/40 text-xs">2.9B+ users</span>
+              </div>
+              {/* Instagram */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><defs><radialGradient id="ig-grad" cx="30%" cy="107%" r="150%"><stop offset="0%" stopColor="#fdf497"/><stop offset="5%" stopColor="#fdf497"/><stop offset="45%" stopColor="#fd5949"/><stop offset="60%" stopColor="#d6249f"/><stop offset="90%" stopColor="#285AEB"/></radialGradient></defs><rect width="48" height="48" rx="12" fill="url(#ig-grad)"/><rect x="13" y="13" width="22" height="22" rx="6" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="24" cy="24" r="5.5" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="31.5" cy="16.5" r="1.5" fill="white"/></svg>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                </div>
+                <span className="text-white font-medium text-sm">Instagram</span>
+                <span className="text-white/40 text-xs">2B+ users</span>
+              </div>
+              {/* Messenger */}
+              <div className="flex flex-col items-center gap-2">
+                <div className="relative">
+                  <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="msg-grad" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#00B2FF"/><stop offset="100%" stopColor="#006AFF"/></linearGradient></defs><circle cx="24" cy="24" r="24" fill="url(#msg-grad)"/><path d="M24 10C16.27 10 10 15.9 10 23.2C10 27.32 11.98 31 15.2 33.44V38L19.84 35.4C21.16 35.76 22.56 36 24 36C31.73 36 38 30.1 38 22.8C38 15.5 31.73 10 24 10ZM25.2 27L22 23.6L15.8 27L22.6 19.6L25.8 23L32 19.6L25.2 27Z" fill="white"/></svg>
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                </div>
+                <span className="text-white font-medium text-sm">Messenger</span>
+                <span className="text-white/40 text-xs">1B+ users</span>
+              </div>
+              {/* Divider */}
+              <div className="hidden md:block w-px h-16 bg-white/10" />
+              {/* TikTok — Coming Soon */}
+              <div className="flex flex-col items-center gap-2 opacity-50">
+                <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#010101"/><path d="M31 16.5C29.9 15.3 29.2 13.7 29 12H25.4V29C25.3 30.7 23.9 32 22.2 32C20.4 32 19 30.6 19 28.8C19 26.7 20.9 25.1 23 25.5V21.8C18.8 21.4 15.5 24.7 15.5 28.8C15.5 32.9 18.5 36 22.2 36C26.1 36 29.2 32.9 29.2 29V20.1C30.7 21.2 32.5 21.8 34.5 21.8V18.2C32.9 18.2 31.8 17.5 31 16.5Z" fill="white"/></svg>
+                <span className="text-white font-medium text-sm">TikTok</span>
+                <span className="bg-white/10 text-white/50 text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Stats Bar */}
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+            {[
+              { icon: "\uD83C\uDF7D\uFE0F", number: "50K+", label: "Hospitality professionals in our network" },
+              { icon: "\u26A1", number: "48 hrs", label: "Average time to first qualified candidate" },
+              { icon: "\uD83D\uDCB0", number: "20%", label: "Below average job board cost per hire" },
+            ].map((stat, i) => (
+              <div key={i} className="flex flex-col items-center justify-center py-8 px-6 text-center">
+                <span className="text-2xl mb-2">{stat.icon}</span>
+                <span className="text-primary text-3xl font-bold mb-1">{stat.number}</span>
+                <span className="text-white/50 text-sm">{stat.label}</span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
