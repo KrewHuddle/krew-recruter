@@ -4006,6 +4006,29 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   const paramStr = (val: string | string[]): string =>
     Array.isArray(val) ? val[0] : val;
 
+  // Two-layer budget validation: a hardcoded Zod ceiling guards against
+  // garbage / negative / typo input regardless of platform configuration,
+  // and the per-deployment policy ceiling from platform_settings is
+  // enforced separately below. The Zod ceiling is intentionally generous
+  // ($10k/day) — its job is to catch obvious abuse and type errors, not
+  // to enforce business policy. The platform admin sets the real cap via
+  // meta_max_daily_budget_cents, defaulting to $100/day in
+  // getMetaCredentials() if unset.
+  const createMetaCampaignBodySchema = z.object({
+    jobId: z.string().min(1, "jobId is required"),
+    dailyBudgetUSD: z
+      .number({ invalid_type_error: "dailyBudgetUSD must be a number" })
+      .positive("dailyBudgetUSD must be greater than zero")
+      .min(1, "dailyBudgetUSD must be at least $1/day")
+      .max(10000, "dailyBudgetUSD exceeds the $10,000/day absolute ceiling"),
+    radius: z
+      .number()
+      .int()
+      .positive()
+      .max(50, "radius cannot exceed 50 miles (Meta maximum)")
+      .optional(),
+  });
+
   // Create a Meta ad campaign for a job
   app.post(
     "/api/meta/campaign",
@@ -4016,11 +4039,20 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId;
-        const { jobId, dailyBudgetUSD } = req.body;
 
-        if (!jobId || !dailyBudgetUSD) {
-          return res.status(400).json({ error: "jobId and dailyBudgetUSD are required" });
+        // Validate request shape. The previous truthy-only check let strings,
+        // negatives, and astronomical numbers pass straight through to the
+        // Meta API, which would happily accept e.g. dailyBudgetUSD: 999999
+        // and create a $999,999/day ad set.
+        const parsed = createMetaCampaignBodySchema.safeParse(req.body);
+        if (!parsed.success) {
+          return res.status(400).json({
+            error: "Invalid request",
+            details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
+          });
         }
+        const { jobId, dailyBudgetUSD } = parsed.data;
+        const radiusOverride = parsed.data.radius;
 
         // Fetch the job
         const job = await storage.getJob(jobId);
@@ -4055,6 +4087,20 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         let metaResult = null;
 
         if (await metaAds.isMetaConfigured()) {
+          // Per-deployment policy ceiling. Reads the same credentials object
+          // the meta-ads service uses, so the cap stays in sync with whatever
+          // the platform admin has configured via the admin UI.
+          const { getMetaCredentials } = await import("./services/platformSettings");
+          const creds = await getMetaCredentials();
+          const requestedCents = Math.round(dailyBudgetUSD * 100);
+          if (requestedCents > creds.maxDailyBudgetCents) {
+            return res.status(400).json({
+              error: `Daily budget of $${dailyBudgetUSD} exceeds the platform maximum of $${(
+                creds.maxDailyBudgetCents / 100
+              ).toFixed(2)}/day. Contact support if you need a higher cap.`,
+            });
+          }
+
           metaResult = await metaAds.createJobCampaign(
             {
               jobId: job.id,
@@ -4063,7 +4109,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
               location: locationStr,
               latitude: lat,
               longitude: lng,
-              radius: req.body.radius || smartRadius,
+              radius: radiusOverride || smartRadius,
               pay: job.payRangeMin && job.payRangeMax
                 ? `$${job.payRangeMin}-$${job.payRangeMax}/hr`
                 : job.payRangeMin ? `$${job.payRangeMin}/hr` : undefined,
