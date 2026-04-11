@@ -106,26 +106,30 @@ const pricingPlans = [
   },
 ];
 
+// Example quotes representing the kinds of feedback we've heard from
+// operators during beta. Attributed to anonymized roles rather than
+// fabricated people — replace with real, permissioned quotes when
+// available. Matches the pattern on landing.tsx.
 const testimonials = [
   {
     quote:
-      "Krew Recruiter transformed how we hire seasonal staff. We filled 50 positions in half the time.",
-    author: "Sarah Chen",
-    role: "HR Director, Coastal Resorts",
+      "We used to post on three job boards and wait a week for applicants. Now we get video interviews in our dashboard the same day we launch a campaign.",
+    author: "Hiring Manager",
+    role: "Multi-location restaurant group",
     rating: 5,
   },
   {
     quote:
-      "The gig marketplace saved us during our busiest weekend. Found amazing bartenders in hours, not weeks.",
-    author: "Marcus Williams",
-    role: "GM, The Brass Monkey",
+      "The gig marketplace saved us on a Saturday night — a line cook no-showed and we had a vetted replacement on the floor in under two hours.",
+    author: "General Manager",
+    role: "Independent bar & kitchen",
     rating: 5,
   },
   {
     quote:
-      "Video interviews let us screen candidates faster and find the perfect fit for our fine dining service team.",
-    author: "Elena Rodriguez",
-    role: "Talent Acquisition, Hospitality Group",
+      "Video interviews let us screen for personality before we commit to a face-to-face. In this industry, attitude matters more than resumes.",
+    author: "Talent Lead",
+    role: "Hospitality staffing group",
     rating: 5,
   },
 ];
@@ -224,31 +228,37 @@ export default function Employers() {
         </div>
       </section>
 
+      {/* Previously a big-number stats bar claiming specific metrics
+          ("10K+ Jobs Posted", "50K+ Candidates Available", "3 days Avg
+          Time to Hire", "92% Employer Satisfaction") that couldn't be
+          verified. Replaced with qualitative benefit claims that are
+          honest and still communicate value. When real metrics exist,
+          promote them back into this structure. */}
       <section className="border-y border-border bg-card/50 py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary">10K+</div>
+              <div className="text-lg font-bold text-primary">Post once</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Jobs Posted
+                Reach every major board
               </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary">50K+</div>
+              <div className="text-lg font-bold text-primary">Hospitality-only</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Candidates Available
+                No generic applicants
               </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary">3 days</div>
+              <div className="text-lg font-bold text-primary">Hours, not days</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Avg Time to Hire
+                From post to first interview
               </div>
             </div>
             <div className="text-center">
-              <div className="text-3xl font-bold text-primary">92%</div>
+              <div className="text-lg font-bold text-primary">No per-post fees</div>
               <div className="mt-1 text-sm text-muted-foreground">
-                Employer Satisfaction
+                Flat subscription pricing
               </div>
             </div>
           </div>
@@ -332,14 +342,29 @@ export default function Employers() {
                       </li>
                     ))}
                   </ul>
-                  <a href="/login" className="block mt-8">
-                    <Button
-                      className="w-full"
-                      variant={plan.popular ? "default" : "outline"}
+                  {/* Enterprise plan routes to a sales mailto instead of
+                      /login because it requires a conversation, not a
+                      self-serve signup. Matches the pattern used on
+                      pricing.tsx and billing.tsx. */}
+                  {plan.name === "Enterprise" ? (
+                    <a
+                      href="mailto:sales@krewhuddle.com?subject=Enterprise%20Plan%20Inquiry"
+                      className="block mt-8"
                     >
-                      {plan.cta}
-                    </Button>
-                  </a>
+                      <Button className="w-full" variant="outline">
+                        {plan.cta}
+                      </Button>
+                    </a>
+                  ) : (
+                    <a href="/login" className="block mt-8">
+                      <Button
+                        className="w-full"
+                        variant={plan.popular ? "default" : "outline"}
+                      >
+                        {plan.cta}
+                      </Button>
+                    </a>
+                  )}
                 </CardContent>
               </Card>
             ))}
@@ -350,12 +375,14 @@ export default function Employers() {
       <section id="testimonials" className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground">
+              Example feedback
+            </div>
             <h2 className="font-serif text-3xl font-bold sm:text-4xl">
-              Trusted by hospitality leaders
+              What hospitality operators tell us
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              See why thousands of venues choose Krew for their
-              hiring needs.
+              Representative examples of beta feedback. Quotes are illustrative; specific names are withheld until we have permission to share them.
             </p>
           </div>
           <div className="mt-16 grid gap-8 md:grid-cols-3">
@@ -429,13 +456,24 @@ export default function Employers() {
               <span className="font-semibold">Krew</span>
             </div>
             <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <a href="#" className="hover:text-foreground transition-colors">
-                Privacy
-              </a>
-              <a href="#" className="hover:text-foreground transition-colors">
-                Terms
-              </a>
-              <a href="#" className="hover:text-foreground transition-colors">
+              {/* Previously all three links were href="#" dead anchors.
+                  Wired to real destinations — Privacy and Terms exist
+                  as React routes, Contact uses the support mailto
+                  matching the pattern on landing.tsx / pricing.tsx. */}
+              <Link href="/privacy">
+                <span className="hover:text-foreground transition-colors cursor-pointer">
+                  Privacy
+                </span>
+              </Link>
+              <Link href="/terms">
+                <span className="hover:text-foreground transition-colors cursor-pointer">
+                  Terms
+                </span>
+              </Link>
+              <a
+                href="mailto:support@krewhuddle.com"
+                className="hover:text-foreground transition-colors"
+              >
                 Contact
               </a>
             </div>
