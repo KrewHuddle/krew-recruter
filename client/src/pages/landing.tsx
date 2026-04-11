@@ -150,7 +150,7 @@ export default function Landing() {
     <div className="min-h-screen bg-background">
       <Helmet>
         <title>Krew Recruiter — #1 Hospitality Hiring Platform | Find Restaurant Jobs & Staff</title>
-        <meta name="description" content="Krew Recruiter connects restaurants and hospitality venues with passionate staff. Post jobs, run Facebook ad campaigns, screen with video interviews, and fill gig shifts instantly. Join 50K+ hospitality professionals." />
+        <meta name="description" content="Krew Recruiter connects restaurants and hospitality venues with passionate staff. Post jobs, run Facebook and Instagram ad campaigns, screen with async video interviews, and fill gig shifts instantly — built for hospitality operators." />
         <meta name="keywords" content="hospitality jobs, restaurant jobs, line cook jobs, bartender jobs, server jobs, restaurant hiring, hospitality staffing, food service jobs, chef jobs, hire restaurant staff" />
         <link rel="canonical" href="https://krewrecruiter.com" />
         <meta property="og:title" content="Krew Recruiter — Hospitality Hiring Platform" />
@@ -243,12 +243,16 @@ export default function Landing() {
                 Great hospitality starts with great people. Krew Recruiter helps you discover passionate talent through video interviews, and fills last-minute shifts with our gig worker marketplace.
               </p>
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
-                <a href="/login" className="w-full sm:w-auto">
+                {/* "I'm Hiring" now points to /employers (the real employer
+                    landing page) instead of /login. Previously new visitors
+                    clicking this button had nothing to sign into — friction
+                    at the highest-value conversion point on the page. */}
+                <Link href="/employers" className="w-full sm:w-auto">
                   <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-primary/25">
                     I'm Hiring
                     <Briefcase className="h-4 w-4" />
                   </Button>
-                </a>
+                </Link>
                 <Link href="/workers/signup" className="w-full sm:w-auto">
                   <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2">
                     I Want to Work
@@ -275,41 +279,57 @@ export default function Landing() {
                 </div>
               </div>
             </div>
+            {/* Mobile hero image — a single strong hero shot for mobile
+                users. Previously the entire right column was `hidden
+                lg:block` so visitors on phones saw no hero imagery at
+                all, which loses ~40% of the page's visual impact on
+                devices that probably account for the majority of
+                traffic. Shown only below lg; desktop uses the 3-image
+                mosaic below. */}
+            <div className="relative lg:hidden mt-10">
+              <div className="absolute -inset-4 bg-gradient-to-r from-primary/15 to-secondary/15 rounded-3xl blur-2xl" />
+              <img
+                src={serverImage}
+                alt="Friendly server at work"
+                className="relative rounded-2xl shadow-2xl object-cover h-64 sm:h-80 w-full"
+              />
+            </div>
+
             <div className="relative hidden lg:block">
               <div className="relative">
                 <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 to-secondary/20 rounded-3xl blur-2xl" />
                 <div className="relative grid grid-cols-2 gap-4">
                   <div className="space-y-4">
-                    <img 
-                      src={bartenderImage} 
-                      alt="Professional bartender" 
+                    <img
+                      src={bartenderImage}
+                      alt="Professional bartender"
                       className="rounded-2xl shadow-2xl object-cover h-48 w-full"
-                     
+
                     />
-                    <img 
-                      src={chefImage} 
-                      alt="Professional chef" 
+                    <img
+                      src={chefImage}
+                      alt="Professional chef"
                       className="rounded-2xl shadow-2xl object-cover h-32 w-full"
-                     
+
                     />
                   </div>
                   <div className="pt-8">
-                    <img 
-                      src={serverImage} 
-                      alt="Friendly server" 
+                    <img
+                      src={serverImage}
+                      alt="Friendly server"
                       className="rounded-2xl shadow-2xl object-cover h-72 w-full"
-                     
+
                     />
                   </div>
                 </div>
                 <div className="absolute -bottom-4 -right-4 bg-card border border-border rounded-xl p-4 shadow-xl">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-secondary flex flex-wrap items-center justify-center">
-                      <Users className="h-5 w-5 text-secondary-foreground" />
+                      <Heart className="h-5 w-5 text-secondary-foreground" />
                     </div>
                     <div>
-                      <div className="text-2xl font-bold">50K+</div>
-                      <div className="text-xs text-muted-foreground">Hospitality Pros</div>
+                      <div className="text-sm font-bold">Built for</div>
+                      <div className="text-xs text-muted-foreground">Hospitality Teams</div>
                     </div>
                   </div>
                 </div>
@@ -413,45 +433,37 @@ export default function Landing() {
             </div>
           </div>
 
-          {/* Stats Bar */}
+          {/* Benefits bar. Previously this was a big-number stats bar
+              claiming specific counts (50K+ in network, 48 hrs to first
+              candidate, 20% below board cost per hire) that couldn't
+              be verified. Replaced with qualitative benefit claims
+              that are honest and still communicate the product value.
+              When real metrics are available, promote them back here. */}
           <div className="mt-10 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border rounded-2xl border border-border bg-background/50 overflow-hidden">
             {[
-              { icon: "\uD83C\uDF7D\uFE0F", number: "50K+", label: "Hospitality professionals in our network" },
-              { icon: "\u26A1", number: "48 hrs", label: "Average time to first qualified candidate" },
-              { icon: "\uD83D\uDCB0", number: "20%", label: "Below average job board cost per hire" },
+              { icon: "\uD83C\uDF7D\uFE0F", title: "Hospitality-only", desc: "Every candidate is focused on restaurant and hospitality work" },
+              { icon: "\u26A1", title: "Hours, not weeks", desc: "Candidates reach you as soon as the ad starts running" },
+              { icon: "\uD83D\uDCB0", title: "Lower cost per hire", desc: "Pay per ad spend, not per posting — no per-job board fees" },
             ].map((stat, i) => (
               <div key={i} className="flex flex-col items-center justify-center py-8 px-6 text-center">
-                <span className="text-2xl mb-2">{stat.icon}</span>
-                <span className="text-primary text-3xl font-bold mb-1">{stat.number}</span>
-                <span className="text-muted-foreground text-sm">{stat.label}</span>
+                <span className="text-2xl mb-3">{stat.icon}</span>
+                <span className="text-primary text-lg font-bold mb-1">{stat.title}</span>
+                <span className="text-muted-foreground text-sm">{stat.desc}</span>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      <section className="border-y border-border bg-gradient-to-r from-card via-card/80 to-card py-12">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
-            <div className="text-center group">
-              <div className="text-3xl font-bold text-primary transition-transform duration-300">50K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">Hospitality Pros</div>
-            </div>
-            <div className="text-center group">
-              <div className="text-3xl font-bold text-primary transition-transform duration-300">10K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">Video Interviews</div>
-            </div>
-            <div className="text-center group">
-              <div className="text-3xl font-bold text-primary transition-transform duration-300">2K+</div>
-              <div className="mt-1 text-sm text-muted-foreground">Venues Served</div>
-            </div>
-            <div className="text-center group">
-              <div className="text-3xl font-bold text-primary transition-transform duration-300">4hrs</div>
-              <div className="mt-1 text-sm text-muted-foreground">Avg. Time to Fill Gig</div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* The second big-number stats bar that used to live here (50K+
+          Hospitality Pros / 10K+ Video Interviews / 2K+ Venues Served /
+          4hrs Avg Time to Fill Gig) was removed. Reasons: (1) it was
+          redundant with the How It Works stats bar right above it —
+          two big-number panels back-to-back was visually repetitive,
+          and (2) the specific counts couldn't be verified and would
+          be a false-advertising risk if fabricated. The page flows
+          directly from the How It Works section into the job search
+          without needing another metrics bar. */}
 
       {/* ═══════ JOB SEARCH SECTION ═══════ */}
       <section className="py-20 lg:py-28">
@@ -624,8 +636,16 @@ export default function Landing() {
                   <span className="text-sm text-muted-foreground">Posted 2h ago</span>
                 </div>
                 <div>
+                  {/* Mock gig-shift card for visual demo. Using a
+                      generic restaurant descriptor rather than a
+                      fake restaurant name ("The Brass Monkey") that
+                      was also reused as the company in fake
+                      testimonials on this same page — that
+                      repetition was a tell that the social proof
+                      wasn't real. Generic descriptor is honest as
+                      an obvious example. */}
                   <h3 className="text-xl font-semibold">Bartender Needed Tonight</h3>
-                  <p className="text-muted-foreground mt-1">The Brass Monkey - Downtown</p>
+                  <p className="text-muted-foreground mt-1">Example restaurant · Downtown</p>
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div className="flex flex-wrap items-center gap-1.5">
@@ -859,12 +879,13 @@ export default function Landing() {
                 Whether you need full-time staff or gig workers for tonight, Krew Recruiter has you covered.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
-                <a href="/login">
+                {/* Matches the hero: employer CTA → /employers, not /login */}
+                <Link href="/employers">
                   <Button size="lg" variant="secondary" className="gap-2 shadow-xl">
                     Start Hiring Free
                     <Briefcase className="h-4 w-4" />
                   </Button>
-                </a>
+                </Link>
                 <Link href="/workers/signup">
                   <Button size="lg" variant="outline" className="gap-2 bg-white/10 border-white/30 text-primary-foreground">
                     Join as a Worker
