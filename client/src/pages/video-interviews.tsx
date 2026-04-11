@@ -154,11 +154,16 @@ const faqs = [
   },
 ];
 
+// Previously specific unverifiable metrics (90% less scheduling,
+// 5x more screened, 48hrs avg response, 4.9/5 satisfaction). Replaced
+// with short qualitative labels that fit the existing big-number
+// rendering (text-3xl font-bold). When real product metrics exist,
+// promote them back here.
 const stats = [
-  { value: "90%", label: "Less time scheduling" },
-  { value: "5x", label: "More candidates screened" },
-  { value: "48hrs", label: "Avg. time to first response" },
-  { value: "4.9/5", label: "Candidate satisfaction" },
+  { value: "0 min", label: "Scheduling time needed" },
+  { value: "Bulk", label: "Review candidates in one sitting" },
+  { value: "Async", label: "Candidates respond on their own time" },
+  { value: "Team", label: "Share videos with your whole team" },
 ];
 
 export default function VideoInterviews() {

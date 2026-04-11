@@ -163,7 +163,7 @@ export default function Login() {
                 </div>
                 <div>
                   <h3 className="font-medium">Fast Hiring</h3>
-                  <p className="text-sm text-muted-foreground">Fill positions 3x faster with our ATS and gig marketplace</p>
+                  <p className="text-sm text-muted-foreground">ATS and gig marketplace built to move from post to hire in days, not weeks</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
@@ -172,7 +172,7 @@ export default function Login() {
                 </div>
                 <div>
                   <h3 className="font-medium">Quality Candidates</h3>
-                  <p className="text-sm text-muted-foreground">Access 50K+ vetted hospitality professionals</p>
+                  <p className="text-sm text-muted-foreground">Vetted hospitality professionals reviewed before they reach your inbox</p>
                 </div>
               </div>
               <div className="flex items-start gap-3">
