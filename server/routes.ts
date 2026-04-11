@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import fs from "fs/promises";
 import path from "path";
 import jwt from "jsonwebtoken";
+import multer from "multer";
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUserClaims as getCustomUserClaims } from "./customAuth";
 import {
@@ -1590,12 +1591,17 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const questions = await storage.getQuestionsByTemplate(invite.templateId);
       const responses = await storage.getInterviewResponsesByInvite(invite.id);
       
-      // Generate signed URLs for video responses
+      // Generate signed URLs for video responses.
+      // videoPath stores the DO Spaces object key (e.g.
+      // "interview-videos/<inviteId>/response-<ts>-<rand>.webm").
+      // We mint a 1-hour signed download URL so the recruiter can play
+      // the video back from the dashboard without exposing the bucket.
+      const { getSignedDownloadUrl, isObjectStorageConfigured } = await import("./services/objectStorage");
       const responsesWithUrls = await Promise.all(
         responses.map(async (response) => {
-          if (response.type === "VIDEO" && response.videoPath) {
+          if (response.type === "VIDEO" && response.videoPath && isObjectStorageConfigured()) {
             try {
-              const signedUrl = await objectStorageService.getObjectEntityReadURL(response.videoPath);
+              const signedUrl = await getSignedDownloadUrl(response.videoPath);
               return { ...response, videoPath: signedUrl };
             } catch (err) {
               console.error("Error generating signed URL:", err);
@@ -1697,12 +1703,14 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         let deletedRatings = 0;
         let deletedComments = 0;
         
-        // Explicitly delete all related data for GDPR compliance
+        // Explicitly delete all related data for GDPR compliance.
+        // videoPath holds the DO Spaces object key.
+        const { deleteFile } = await import("./services/objectStorage");
         for (const response of responses) {
           // Delete video files from object storage
           if (response.videoPath) {
             try {
-              await objectStorageService.deleteObject(response.videoPath);
+              await deleteFile(response.videoPath);
               deletedFiles++;
             } catch (err) {
               console.error("Failed to delete video:", response.videoPath, err);
@@ -2090,23 +2098,46 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   });
   
   // Get upload URL for video response
+  //
+  // Migrated from the broken Replit object storage sidecar (which
+  // tried to fetch creds from 127.0.0.1:1106 — a Replit-only platform
+  // service that doesn't exist on DigitalOcean) to DO Spaces presigned
+  // URLs. The client uploads directly to Spaces, bypassing this
+  // server's request body limits — essential for video files that
+  // can be 50MB+.
   app.post("/api/public/interview/:token/upload-url", async (req, res) => {
     try {
-      const { token } = (req.params as Record<string, string>);
+      const { token } = req.params as Record<string, string>;
       const invite = await storage.getInterviewInviteByToken(token);
-      
+
       if (!invite) {
         return res.status(404).json({ error: "Interview not found" });
       }
-      
+
       if (invite.status === "COMPLETED" || invite.status === "EXPIRED") {
         return res.status(400).json({ error: "Cannot upload to a completed or expired interview" });
       }
-      
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      
-      res.json({ uploadURL, objectPath });
+
+      const { getPresignedUploadUrl, makeKey, isObjectStorageConfigured } = await import("./services/objectStorage");
+      if (!isObjectStorageConfigured()) {
+        return res.status(503).json({
+          error: "File uploads are not configured on this server. Contact support.",
+        });
+      }
+
+      // Use the invite ID as the scope so all videos for one interview
+      // group together in the bucket. webm because that's what
+      // MediaRecorder produces in the browser. The actual PUT must
+      // include Content-Type: video/webm to match the signed URL.
+      const key = makeKey(`interview-videos/${invite.id}`, "response", "webm");
+      const { uploadUrl, key: objectPath } = await getPresignedUploadUrl(
+        key,
+        "video/webm",
+        900,  // 15 minute expiry
+        false // private — playback uses signed download URLs from the recruiter dashboard
+      );
+
+      res.json({ uploadURL: uploadUrl, objectPath });
     } catch (error) {
       console.error("Error getting upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
@@ -2180,6 +2211,66 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   });
 
   // ============ JOB SEEKER PROFILE ROUTES ============
+
+  // Multer config for worker profile photo uploads. Memory storage
+  // because the buffer is immediately pushed to DO Spaces — no temp
+  // files on disk. 2MB limit matches the client-side check in
+  // worker-onboarding.tsx so the server gives a clean error rather
+  // than failing in the cloud upload step.
+  const profilePhotoUpload = multer({
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 2 * 1024 * 1024 }, // 2MB
+    fileFilter: (_req, file, cb) => {
+      const allowed = ["image/jpeg", "image/png", "image/gif", "image/webp"];
+      if (allowed.includes(file.mimetype)) {
+        cb(null, true);
+      } else {
+        cb(new Error("Only JPG, PNG, GIF, and WebP images are allowed"));
+      }
+    },
+  });
+
+  // POST /api/worker/profile-photo — upload worker profile photo
+  //
+  // Closes the long-standing TODO in worker-onboarding.tsx where the
+  // photo upload was never actually implemented (just read into a
+  // base64 data URL in React state and silently dropped on submit).
+  // Now pushes to DO Spaces and persists the URL to
+  // user_profiles.avatar_url so it survives onboarding completion.
+  app.post(
+    "/api/worker/profile-photo",
+    isAuthenticated,
+    profilePhotoUpload.single("file"),
+    async (req, res) => {
+      try {
+        const userId = getUserId(req);
+        if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+        const file = (req as any).file as Express.Multer.File | undefined;
+        if (!file) return res.status(400).json({ error: "No file uploaded" });
+
+        const { uploadPublicFile, makeKey, isObjectStorageConfigured } = await import("./services/objectStorage");
+        if (!isObjectStorageConfigured()) {
+          return res.status(503).json({
+            error: "File uploads are not configured on this server. Contact support.",
+          });
+        }
+
+        const ext = path.extname(file.originalname).slice(1) || "png";
+        const key = makeKey("worker-photos", userId, ext);
+        const url = await uploadPublicFile(key, file.buffer, file.mimetype);
+
+        // Persist to user_profiles.avatar_url so the photo survives
+        // beyond the in-memory React state of the onboarding form.
+        await storage.updateUserProfile(userId, { avatarUrl: url });
+
+        res.json({ url });
+      } catch (error: any) {
+        console.error("Profile photo upload error:", error);
+        res.status(500).json({ error: error.message || "Failed to upload photo" });
+      }
+    }
+  );
 
   // Get current user's profile
   app.get("/api/profile", isAuthenticated, async (req, res) => {
@@ -2406,12 +2497,43 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   });
 
   // Get upload URL for authenticated users (e.g., video prompts)
+  //
+  // Migrated from broken Replit object storage to DO Spaces presigned
+  // URLs. The client uploads directly to Spaces. Used by recruiters
+  // to upload video prompts when building interview templates — these
+  // are typically <30s clips so the size is moderate.
+  //
+  // Accepts optional `contentType` and `prefix` from the request body.
+  // If the client doesn't provide them, defaults to video/webm under
+  // `recruiter-uploads/`.
   app.post("/api/upload-url", isAuthenticated, async (req, res) => {
     try {
-      const uploadURL = await objectStorageService.getObjectEntityUploadURL();
-      const objectPath = objectStorageService.normalizeObjectEntityPath(uploadURL);
-      
-      res.json({ uploadURL, objectPath });
+      const userId = getUserId(req);
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+
+      const { getPresignedUploadUrl, makeKey, isObjectStorageConfigured } = await import("./services/objectStorage");
+      if (!isObjectStorageConfigured()) {
+        return res.status(503).json({
+          error: "File uploads are not configured on this server. Contact support.",
+        });
+      }
+
+      const contentType = (req.body?.contentType as string) || "video/webm";
+      const prefix = (req.body?.prefix as string) || "recruiter-uploads";
+      // Pick a sensible extension from the content type. Browsers usually
+      // send video/webm or video/mp4 for MediaRecorder output, image/png
+      // or image/jpeg for canvas snapshots.
+      const ext = contentType.split("/")[1]?.split(";")[0] || "bin";
+      const key = makeKey(prefix.replace(/[^a-z0-9_/-]/gi, ""), userId, ext);
+
+      const { uploadUrl, key: objectPath } = await getPresignedUploadUrl(
+        key,
+        contentType,
+        900,  // 15 minute expiry
+        false // private — playback uses signed download URLs
+      );
+
+      res.json({ uploadURL: uploadUrl, objectPath });
     } catch (error) {
       console.error("Error getting upload URL:", error);
       res.status(500).json({ error: "Failed to get upload URL" });
