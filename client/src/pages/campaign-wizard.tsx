@@ -679,22 +679,65 @@ export default function CampaignWizard() {
                   <input type="file" accept="image/*" className="hidden" onChange={async (e) => {
                     const file = e.target.files?.[0];
                     if (!file) return;
-                    const formData = new FormData();
-                    formData.append("file", file);
+
+                    if (!file.type.startsWith("image/")) {
+                      toast({ title: "Invalid file", description: "Please select an image.", variant: "destructive" });
+                      return;
+                    }
+                    if (file.size > 5 * 1024 * 1024) {
+                      toast({ title: "File too large", description: "Images must be under 5 MB.", variant: "destructive" });
+                      return;
+                    }
+
+                    // Presigned direct-to-Spaces upload — see
+                    // server/campaignRoutes.ts → ORG PRESIGNED UPLOADS
+                    // for why we don't go through Express here.
                     try {
-                      const res = await apiFetch("/api/org/logo", { method: "POST", body: formData });
-                      if (res.ok) {
-                        await res.json();
-                        localStorage.setItem("krew_logo_prompt_shown", "1");
-                        toast({ title: "Logo uploaded!", description: "Your logo will appear in ad previews." });
-                      } else {
-                        const errBody = await res.json().catch(() => ({}));
+                      const presignRes = await apiFetch("/api/org/logo/presign", {
+                        method: "POST",
+                        body: JSON.stringify({ contentType: file.type }),
+                      });
+                      if (!presignRes.ok) {
+                        const errBody = await presignRes.json().catch(() => ({}));
                         toast({
                           title: "Upload failed",
-                          description: errBody?.error || "Could not upload logo. Please try again.",
+                          description: errBody?.error || "Could not prepare upload.",
                           variant: "destructive",
                         });
+                        return;
                       }
+                      const { uploadUrl, key } = await presignRes.json();
+
+                      const putRes = await fetch(uploadUrl, {
+                        method: "PUT",
+                        headers: { "Content-Type": file.type },
+                        body: file,
+                      });
+                      if (!putRes.ok) {
+                        toast({
+                          title: "Upload failed",
+                          description: `Could not upload to storage (${putRes.status}).`,
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+
+                      const confirmRes = await apiFetch("/api/org/logo/confirm", {
+                        method: "POST",
+                        body: JSON.stringify({ key }),
+                      });
+                      if (!confirmRes.ok) {
+                        const errBody = await confirmRes.json().catch(() => ({}));
+                        toast({
+                          title: "Upload failed",
+                          description: errBody?.error || "Upload completed but could not be saved.",
+                          variant: "destructive",
+                        });
+                        return;
+                      }
+                      await confirmRes.json();
+                      localStorage.setItem("krew_logo_prompt_shown", "1");
+                      toast({ title: "Logo uploaded!", description: "Your logo will appear in ad previews." });
                     } catch {
                       toast({
                         title: "Upload failed",

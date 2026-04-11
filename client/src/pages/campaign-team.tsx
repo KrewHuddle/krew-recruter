@@ -323,31 +323,91 @@ function BrandingForm({ apiFetch, branding, orgName, toast, queryClient, orgId }
     }
   }, [branding]);
 
+  // Direct-to-Spaces upload via presigned URL. Bypasses Express entirely
+  // so we dodge DigitalOcean App Platform's ~1MB gateway body limit — the
+  // file streams from the browser straight to the Spaces bucket, and the
+  // only things that touch our server are two small JSON calls (presign +
+  // confirm). See server/campaignRoutes.ts → ORG PRESIGNED UPLOADS.
   const handleUpload = async (file: File, type: "logo" | "cover") => {
+    // Client-side validation — instant feedback before we even talk to
+    // the server. 5MB is both a sensible UX ceiling and the limit the
+    // old multer endpoints were configured with.
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image (JPG, PNG, GIF, or WebP).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Images must be under 5 MB. Try resizing or compressing it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(type);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await apiFetch(`/api/org/${type}`, {
+      // Step 1: ask the server for a presigned upload URL
+      const presignRes = await apiFetch(`/api/org/${type}/presign`, {
         method: "POST",
-        body: formData,
+        body: JSON.stringify({ contentType: file.type }),
       });
-      if (res.ok) {
-        const data = await res.json();
-        if (type === "logo") setLogoUrl(data.url);
-        else setCoverUrl(data.url);
-      } else {
-        // Surface the server's error message instead of silently falling
-        // through. Previously any non-2xx response (e.g. 400 "No file
-        // uploaded", 503 "uploads not configured") left the UI blank
-        // with no feedback.
-        const errBody = await res.json().catch(() => ({}));
+      if (!presignRes.ok) {
+        const errBody = await presignRes.json().catch(() => ({}));
         toast({
           title: "Upload failed",
-          description: errBody?.error || `Could not upload ${type}. Please try again.`,
+          description: errBody?.error || "Could not prepare upload. Please try again.",
           variant: "destructive",
         });
+        return;
       }
+      const { uploadUrl, key } = await presignRes.json();
+
+      // Step 2: PUT the file directly to Spaces. Must NOT go through
+      // apiFetch — that would send our auth headers to DO, which would
+      // break the request signature. Plain native fetch, only Content-Type
+      // matching what the server signed. The ACL is baked into the
+      // presigned URL as a query param, so no x-amz-acl header needed.
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) {
+        toast({
+          title: "Upload failed",
+          description: `Could not upload to storage (${putRes.status}). Check the CORS rule on your Spaces bucket.`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 3: tell the server the upload is done so it can persist
+      // the permanent URL to the orgBranding row.
+      const confirmRes = await apiFetch(`/api/org/${type}/confirm`, {
+        method: "POST",
+        body: JSON.stringify({ key }),
+      });
+      if (!confirmRes.ok) {
+        const errBody = await confirmRes.json().catch(() => ({}));
+        toast({
+          title: "Upload failed",
+          description: errBody?.error || "Upload completed but could not be saved. Please try again.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const { url } = await confirmRes.json();
+      if (type === "logo") setLogoUrl(url);
+      else setCoverUrl(url);
+      toast({
+        title: `${type === "logo" ? "Logo" : "Cover photo"} uploaded!`,
+        description: "Click Save Changes to apply.",
+      });
     } catch {
       toast({
         title: "Upload failed",

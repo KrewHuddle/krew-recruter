@@ -69,33 +69,81 @@ export default function CampaignSettings() {
     },
   });
 
+  // Direct-to-Spaces upload via presigned URL. Bypasses Express entirely
+  // so we dodge DigitalOcean App Platform's ~1MB gateway body limit. See
+  // server/campaignRoutes.ts → ORG PRESIGNED UPLOADS for the flow.
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    if (!file.type.startsWith("image/")) {
+      toast({
+        title: "Invalid file",
+        description: "Please select an image (JPG, PNG, GIF, or WebP).",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      toast({
+        title: "File too large",
+        description: "Images must be under 5 MB. Try resizing or compressing it.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-
-      // apiFetch detects FormData and skips the JSON Content-Type header
-      // so the browser can set the multipart boundary itself.
-      const res = await apiFetch("/api/org/logo", {
+      // Step 1: presign
+      const presignRes = await apiFetch("/api/org/logo/presign", {
         method: "POST",
-        body: formData,
+        body: JSON.stringify({ contentType: file.type }),
       });
-
-      if (res.ok) {
-        const data = await res.json();
-        setLogoUrl(data.url);
-      } else {
-        const errBody = await res.json().catch(() => ({}));
+      if (!presignRes.ok) {
+        const errBody = await presignRes.json().catch(() => ({}));
         toast({
           title: "Upload failed",
-          description: errBody?.error || "Could not upload logo. Please try again.",
+          description: errBody?.error || "Could not prepare upload. Please try again.",
           variant: "destructive",
         });
+        return;
       }
+      const { uploadUrl, key } = await presignRes.json();
+
+      // Step 2: PUT to Spaces directly (native fetch, not apiFetch —
+      // we don't want our auth headers leaking to a third-party host).
+      const putRes = await fetch(uploadUrl, {
+        method: "PUT",
+        headers: { "Content-Type": file.type },
+        body: file,
+      });
+      if (!putRes.ok) {
+        toast({
+          title: "Upload failed",
+          description: `Could not upload to storage (${putRes.status}).`,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Step 3: confirm with server so the URL gets persisted
+      const confirmRes = await apiFetch("/api/org/logo/confirm", {
+        method: "POST",
+        body: JSON.stringify({ key }),
+      });
+      if (!confirmRes.ok) {
+        const errBody = await confirmRes.json().catch(() => ({}));
+        toast({
+          title: "Upload failed",
+          description: errBody?.error || "Upload completed but could not be saved.",
+          variant: "destructive",
+        });
+        return;
+      }
+      const { url } = await confirmRes.json();
+      setLogoUrl(url);
+      toast({ title: "Logo uploaded!" });
     } catch {
       toast({ title: "Upload failed", description: "Network error. Please try again.", variant: "destructive" });
     } finally {
