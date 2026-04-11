@@ -1499,7 +1499,7 @@ export default function AdminDashboard() {
                         </TableCell>
                         <TableCell>
                           <Switch
-                            checked={flag.enabled}
+                            checked={flag.enabled ?? false}
                             onCheckedChange={(checked) => toggleFlagMutation.mutate({ id: flag.id, enabled: checked })}
                             data-testid={`switch-flag-${flag.id}`}
                           />
@@ -1632,20 +1632,26 @@ export default function AdminDashboard() {
                       <TableRow key={coupon.id} data-testid={`coupon-row-${coupon.id}`}>
                         <TableCell className="font-medium font-mono">{coupon.code}</TableCell>
                         <TableCell>
-                          {coupon.discountType === 'percentage' 
-                            ? `${coupon.discountValue}%` 
-                            : `$${coupon.discountValue}`}
+                          {/* Schema field renames: the coupons table uses
+                              `type` (enum: PERCENT_OFF | AMOUNT_OFF |
+                              FREE_TRIAL_DAYS), `value`, `validUntil`,
+                              `active` — not the legacy discountType /
+                              discountValue / expiresAt / isActive names
+                              this UI was originally written against. */}
+                          {coupon.type === 'PERCENT_OFF'
+                            ? `${coupon.value}%`
+                            : `$${coupon.value}`}
                         </TableCell>
                         <TableCell className="text-center">{coupon.currentRedemptions || 0}</TableCell>
                         <TableCell className="text-center">
                           {coupon.maxRedemptions || '∞'}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString() : 'Never'}
+                          {coupon.validUntil ? new Date(coupon.validUntil).toLocaleDateString() : 'Never'}
                         </TableCell>
                         <TableCell>
                           <Switch
-                            checked={coupon.isActive}
+                            checked={coupon.active ?? false}
                             onCheckedChange={(checked) => toggleCouponMutation.mutate({ id: coupon.id, isActive: checked })}
                             data-testid={`switch-coupon-${coupon.id}`}
                           />

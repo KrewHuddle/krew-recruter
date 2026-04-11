@@ -145,7 +145,10 @@ const stripeWebhookHandler = async (req: Request, res: Response) => {
             tenantId: tenant.id,
             stripeInvoiceId: invoice.id,
             stripePaymentIntentId: invoice.payment_intent as string,
-            amount: invoice.amount_paid,
+            // Schema field is amountCents, not amount. Stripe returns
+            // amount_paid in the smallest currency unit (cents for USD)
+            // so the units already match — just renaming the field key.
+            amountCents: invoice.amount_paid,
             currency: invoice.currency,
             status: "SUCCEEDED" as any,
             description: `Subscription payment - ${invoice.lines.data[0]?.description || ""}`,
@@ -169,7 +172,9 @@ const stripeWebhookHandler = async (req: Request, res: Response) => {
           await storage.createPaymentHistory({
             tenantId: tenant.id,
             stripeInvoiceId: invoice.id,
-            amount: invoice.amount_due,
+            // Schema field is amountCents, not amount. Same rename
+            // as the payment_succeeded branch above.
+            amountCents: invoice.amount_due,
             currency: invoice.currency,
             status: "FAILED" as any,
           });

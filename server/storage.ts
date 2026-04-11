@@ -649,7 +649,9 @@ export class DatabaseStorage implements IStorage {
     
     for (const payout of allPayouts) {
       totalRevenue += payout.amountCents;
-      platformFees += payout.platformFeeCents;
+      // platformFeeCents is nullable in the schema (defaults to 0 in SQL
+      // but the typed select returns number | null)
+      platformFees += payout.platformFeeCents ?? 0;
       totalPayouts += payout.netAmountCents;
       
       if (payout.status === "COMPLETED") {
