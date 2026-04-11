@@ -12,6 +12,17 @@ import { storage } from "./storage";
 const app = express();
 const httpServer = createServer(app);
 
+// DigitalOcean App Platform terminates TLS at its load balancer and forwards
+// X-Forwarded-Proto: https. Without trust proxy, req.protocol returns "http"
+// even for HTTPS requests, which silently mis-builds any URL derived from
+// req.protocol (cookies, OAuth callbacks, signed URLs, ad apply links).
+// trust proxy was previously set conditionally inside customAuth.ts and
+// replitAuth.ts setup functions, but those only run after auth is wired up.
+// Setting it here ensures every middleware sees correct protocol/host info
+// from app boot. Value of 1 = trust the first proxy hop (matches what the
+// auth modules set, so the later calls are idempotent).
+app.set("trust proxy", 1);
+
 // Log env var status on startup
 console.log("=== Environment Check ===");
 console.log("NODE_ENV:", process.env.NODE_ENV || "NOT SET");
