@@ -457,11 +457,44 @@ export default function WorkerOnboarding() {
                       return;
                     }
                     setPhotoUploading(true);
-                    // TODO: Upload to server when endpoint exists
-                    const reader = new FileReader();
-                    reader.onload = () => setPhotoUrl(reader.result as string);
-                    reader.readAsDataURL(file);
-                    setPhotoUploading(false);
+
+                    // Real upload to /api/worker/profile-photo, which
+                    // pushes to DigitalOcean Spaces and returns a
+                    // permanent public URL. Previously this was a
+                    // TODO that just read the file as a base64 data
+                    // URL and set it in React state — the photo was
+                    // visible until form submit, then dropped on the
+                    // floor because no upload ever happened.
+                    try {
+                      const token = localStorage.getItem("krew_token");
+                      const formData = new FormData();
+                      formData.append("file", file);
+                      const res = await fetch("/api/worker/profile-photo", {
+                        method: "POST",
+                        headers: token ? { Authorization: `Bearer ${token}` } : {},
+                        credentials: "include",
+                        body: formData,
+                      });
+                      if (!res.ok) {
+                        const errBody = await res.json().catch(() => ({}));
+                        toast({
+                          title: "Upload failed",
+                          description: errBody?.error || "Could not upload photo. Please try again.",
+                          variant: "destructive",
+                        });
+                      } else {
+                        const data = await res.json();
+                        setPhotoUrl(data.url);
+                      }
+                    } catch (err) {
+                      toast({
+                        title: "Upload failed",
+                        description: "Network error. Please try again.",
+                        variant: "destructive",
+                      });
+                    } finally {
+                      setPhotoUploading(false);
+                    }
                   }} />
                 </label>
               </div>

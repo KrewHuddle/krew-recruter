@@ -13,6 +13,36 @@ services:
   - key: PORT
     value: "8080"
     scope: RUN_TIME
+  # ─── DigitalOcean Spaces (object storage) ───────────────────────
+  # Required for ALL photo and file uploads. Without these, every
+  # upload endpoint returns 503 "File uploads are not configured".
+  # See server/services/objectStorage.ts for the provisioning
+  # checklist (create Space, generate API key, set CORS).
+  #
+  # The values below are PLACEHOLDERS — set the real ones in the DO
+  # dashboard under Settings → Components → krew-recruter →
+  # Environment Variables. DO_SPACES_SECRET should be marked encrypted.
+  #
+  # Region slugs: nyc3, sfo3, fra1, ams3, sgp1, syd1, blr1
+  - key: DO_SPACES_KEY
+    value: "set-in-do-dashboard"
+    scope: RUN_TIME
+  - key: DO_SPACES_SECRET
+    value: "set-in-do-dashboard"
+    scope: RUN_TIME
+    type: SECRET
+  - key: DO_SPACES_BUCKET
+    value: "set-in-do-dashboard"
+    scope: RUN_TIME
+  - key: DO_SPACES_REGION
+    value: "nyc3"
+    scope: RUN_TIME
+  # Optional: CDN endpoint for faster public file delivery. Format:
+  # https://<cdn-id>.cdn.digitaloceanspaces.com (find in the Space
+  # settings after enabling CDN).
+  - key: DO_SPACES_CDN_ENDPOINT
+    value: ""
+    scope: RUN_TIME
   - key: npm_config_prefix
     value: ""
     scope: BUILD_TIME

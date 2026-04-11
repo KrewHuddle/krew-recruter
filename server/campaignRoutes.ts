@@ -720,19 +720,29 @@ const logoUpload = multer({
 });
 
 // POST /api/org/logo — upload org logo
+//
+// Migrated from writing to local disk (which silently lost files on
+// every DigitalOcean container restart due to ephemeral filesystem)
+// to DigitalOcean Spaces via the new objectStorage service. The
+// returned URL is now a permanent CDN URL instead of a /uploads/...
+// path served by express.static.
 router.post("/org/logo", requireAuth, requireOrg, logoUpload.single("file"), async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
     const file = (req as any).file;
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-    const ext = path.extname(file.originalname) || ".png";
-    const filename = `${orgId}-logo-${Date.now()}${ext}`;
-    const uploadsDir = path.join(process.cwd(), "uploads", "org-logos");
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
+    const { uploadPublicFile, makeKey, isObjectStorageConfigured } = await import("./services/objectStorage");
 
-    const url = `/uploads/org-logos/${filename}`;
+    if (!isObjectStorageConfigured()) {
+      return res.status(503).json({
+        error: "File uploads are not configured on this server. Contact support.",
+      });
+    }
+
+    const ext = path.extname(file.originalname).slice(1) || "png";
+    const key = makeKey("org-logos", orgId, ext);
+    const url = await uploadPublicFile(key, file.buffer, file.mimetype);
 
     // Save to branding record
     const [existing] = await db.select().from(orgBranding)
@@ -754,19 +764,26 @@ router.post("/org/logo", requireAuth, requireOrg, logoUpload.single("file"), asy
 });
 
 // POST /api/org/cover — upload org cover photo
+//
+// Same migration as /org/logo above: now writes to DO Spaces instead
+// of the ephemeral local uploads/ directory.
 router.post("/org/cover", requireAuth, requireOrg, logoUpload.single("file"), async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
     const file = (req as any).file;
     if (!file) return res.status(400).json({ error: "No file uploaded" });
 
-    const ext = path.extname(file.originalname) || ".png";
-    const filename = `${orgId}-cover-${Date.now()}${ext}`;
-    const uploadsDir = path.join(process.cwd(), "uploads", "org-covers");
-    await fs.mkdir(uploadsDir, { recursive: true });
-    await fs.writeFile(path.join(uploadsDir, filename), file.buffer);
+    const { uploadPublicFile, makeKey, isObjectStorageConfigured } = await import("./services/objectStorage");
 
-    const url = `/uploads/org-covers/${filename}`;
+    if (!isObjectStorageConfigured()) {
+      return res.status(503).json({
+        error: "File uploads are not configured on this server. Contact support.",
+      });
+    }
+
+    const ext = path.extname(file.originalname).slice(1) || "png";
+    const key = makeKey("org-covers", orgId, ext);
+    const url = await uploadPublicFile(key, file.buffer, file.mimetype);
 
     // Save to branding record
     const [existing] = await db.select().from(orgBranding)
