@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useLocation, Link } from "wouter";
+import { useLocation, useSearch, Link } from "wouter";
 import { useMutation } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -9,7 +9,15 @@ import { useToast } from "@/hooks/use-toast";
 import { Loader2, Eye, EyeOff, Briefcase, Zap, ChefHat, Video, Star } from "lucide-react";
 export default function WorkerSignup() {
   const [, setLocation] = useLocation();
+  const searchParams = useSearch();
   const { toast } = useToast();
+
+  // If the user landed here from clicking "Apply Now" on a public job page
+  // while unauthenticated, that page passes ?jobId=<uuid> through to us so
+  // we can auto-submit the application after signup completes. Without this
+  // step, every Meta-driven application requires the user to manually
+  // navigate back to the job after signup — and most won't.
+  const incomingJobId = new URLSearchParams(searchParams).get("jobId");
 
   const [intent, setIntent] = useState<"jobs" | "gigs">("jobs");
   const [firstName, setFirstName] = useState("");
@@ -62,6 +70,47 @@ export default function WorkerSignup() {
       // Store token if JWT-based
       if (data.token) {
         localStorage.setItem("krew_token", data.token);
+      }
+
+      // Auto-apply to the originating job if this signup was kicked off
+      // by an "Apply Now" click on a public job page. We always continue
+      // to onboarding regardless of apply success/failure — the goal here
+      // is to get the application into the employer's queue ASAP, not to
+      // gate onboarding on it. The apply endpoint already handles the
+      // job-not-published / already-applied / job-not-found cases with
+      // 4xx responses, which we surface as a destructive toast but don't
+      // treat as a fatal error.
+      if (incomingJobId) {
+        try {
+          const applyRes = await fetch("/api/applications/apply", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(data.token ? { Authorization: `Bearer ${data.token}` } : {}),
+            },
+            credentials: "include",
+            body: JSON.stringify({ jobId: incomingJobId }),
+          });
+          if (applyRes.ok) {
+            toast({
+              title: "Application submitted!",
+              description: "We'll let you know when the employer responds.",
+            });
+          } else {
+            const errBody = await applyRes.json().catch(() => ({}));
+            toast({
+              title: "Account created — but we couldn't submit your application",
+              description: errBody?.error || "You can apply manually from your dashboard.",
+              variant: "destructive",
+            });
+          }
+        } catch {
+          toast({
+            title: "Account created — but we couldn't submit your application",
+            description: "You can apply manually from your dashboard.",
+            variant: "destructive",
+          });
+        }
       }
 
       setLocation("/workers/onboarding");
