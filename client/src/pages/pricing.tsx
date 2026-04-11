@@ -63,7 +63,14 @@ const PLANS = [
     cta: "Start Pro",
     href: "/login?plan=pro",
     popular: true,
-    footnote: "Includes $0 in ad spend. Pay only for actual ads.",
+    // Rephrased from the confusing "Includes $0 in ad spend. Pay only
+    // for actual ads." — which read as "you get zero free ad credit"
+    // and sounded like an anti-sell. The real intent is a required
+    // disclosure: the subscription fee doesn't include ad budget, and
+    // ad spend is billed separately with a 20% management fee on top
+    // (matches the FAQ entry and the meta_platform_markup_percent
+    // default in platformSettings.ts).
+    footnote: "Subscription only. Meta ad spend billed separately (+20% management fee).",
   },
   {
     name: "Enterprise",
@@ -292,15 +299,49 @@ export default function Pricing() {
         {/* Bottom CTA */}
         <div className="text-center py-12 border rounded-lg bg-primary/5">
           <h2 className="text-2xl font-bold mb-2">Ready to start hiring?</h2>
+          {/* Removed "Join hundreds of restaurants..." — couldn't verify
+              the specific number. Replaced with value-prop phrasing
+              that doesn't make a count claim. */}
           <p className="text-muted-foreground mb-6 max-w-lg mx-auto">
-            Join hundreds of restaurants using Krew Recruiter to find and hire
-            great hospitality talent.
+            Post your first job in minutes. Start on the Free plan and upgrade whenever you're ready.
           </p>
           <Button size="lg" onClick={() => setLocation("/login")}>
             Get Started Free <ArrowRight className="ml-2 h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {/* Footer — pricing page previously had no footer at all, which
+          was inconsistent with every other page on the site. Users at
+          the end of the page had nowhere to go for legal/contact info. */}
+      <footer className="border-t border-border py-8">
+        <div className="max-w-6xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
+            <img src={logoImage} alt="Krew Recruiter" className="h-6 w-6 rounded-md object-contain" />
+            <span>&copy; {new Date().getFullYear()} Krew Recruiter. All rights reserved.</span>
+          </div>
+          <div className="flex items-center gap-5 text-sm text-muted-foreground">
+            <a
+              href="/privacy"
+              className="hover:text-foreground transition-colors"
+            >
+              Privacy
+            </a>
+            <a
+              href="/terms"
+              className="hover:text-foreground transition-colors"
+            >
+              Terms
+            </a>
+            <a
+              href="mailto:support@krewhuddle.com"
+              className="hover:text-foreground transition-colors"
+            >
+              Contact
+            </a>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
