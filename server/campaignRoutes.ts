@@ -203,7 +203,7 @@ router.post("/campaigns/import-url", requireAuth, requireOrg, async (req: Reques
 router.get("/campaigns/:id", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
 
     const [campaign] = await db.select().from(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId)));
@@ -239,7 +239,7 @@ router.get("/campaigns/:id", requireAuth, requireOrg, async (req: Request, res: 
 router.patch("/campaigns/:id", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
 
     const [existing] = await db.select().from(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId)));
@@ -275,7 +275,7 @@ router.patch("/campaigns/:id", requireAuth, requireOrg, async (req: Request, res
 router.patch("/campaigns/:id/status", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
     const { status } = req.body;
 
     const validStatuses = ["draft", "active", "paused", "filled", "cancelled"];
@@ -314,7 +314,7 @@ router.patch("/campaigns/:id/status", requireAuth, requireOrg, async (req: Reque
 router.patch("/campaigns/:id/budget", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
     const { dailyBudgetCents } = req.body;
 
     if (!dailyBudgetCents || dailyBudgetCents < 1000 || dailyBudgetCents > 20000) {
@@ -341,7 +341,7 @@ router.patch("/campaigns/:id/budget", requireAuth, requireOrg, async (req: Reque
 router.delete("/campaigns/:id", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
 
     const [deleted] = await db.delete(campaigns)
       .where(and(eq(campaigns.id, id), eq(campaigns.orgId, orgId)))
@@ -363,7 +363,7 @@ router.delete("/campaigns/:id", requireAuth, requireOrg, async (req: Request, re
 // PATCH /api/campaigns/:id/creative — update ad creative
 router.patch("/campaigns/:id/creative", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
     const { headline, subheadline, bulletPoints, payDisplay, benefitsDisplay, cta } = req.body;
 
     const [creative] = await db.select().from(adCreatives)
@@ -398,7 +398,7 @@ router.patch("/campaigns/:id/creative", requireAuth, requireOrg, async (req: Req
 router.post("/campaigns/:id/regenerate", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
     const { instructions } = req.body;
 
     const [campaign] = await db.select().from(campaigns)
@@ -476,7 +476,7 @@ router.get("/applicants", requireAuth, requireOrg, async (req: Request, res: Res
 router.get("/applicants/:id", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
 
     const [result] = await db.select({
       applicant: applicants,
@@ -504,7 +504,7 @@ router.get("/applicants/:id", requireAuth, requireOrg, async (req: Request, res:
 router.patch("/applicants/:id", requireAuth, requireOrg, async (req: Request, res: Response) => {
   try {
     const orgId = req.orgId!;
-    const { id } = req.params;
+    const { id } = (req.params as Record<string, string>);
     const { status, notes, interviewScheduledAt } = req.body;
 
     const updates: Record<string, any> = {};
@@ -826,7 +826,7 @@ router.post("/org/members/invite", requireAuth, requireOrg, async (req: Request,
 // GET /api/apply/:campaignId — get campaign info + screening questions (public)
 router.get("/apply/:campaignId", async (req: Request, res: Response) => {
   try {
-    const { campaignId } = req.params;
+    const { campaignId } = (req.params as Record<string, string>);
 
     const [campaign] = await db.select().from(campaigns)
       .where(and(eq(campaigns.id, campaignId), eq(campaigns.status, "active")));
@@ -864,7 +864,7 @@ router.get("/apply/:campaignId", async (req: Request, res: Response) => {
 // POST /api/apply/:campaignId — submit application (public)
 router.post("/apply/:campaignId", async (req: Request, res: Response) => {
   try {
-    const { campaignId } = req.params;
+    const { campaignId } = (req.params as Record<string, string>);
     const { firstName, lastName, email, phone, location, screeningResponses, passedScreening } = req.body;
 
     const [campaign] = await db.select().from(campaigns)

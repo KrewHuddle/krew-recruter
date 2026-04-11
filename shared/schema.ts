@@ -467,7 +467,12 @@ export const interviewInvitesRelations = relations(interviewInvites, ({ one, man
   reviews: many(interviewReviews),
 }));
 
-export const insertInterviewInviteSchema = createInsertSchema(interviewInvites).omit({ id: true, createdAt: true, completedAt: true });
+// completedAt is intentionally kept in the schema (not omitted) so that
+// storage.updateInterviewInvite (typed as Partial<InsertInterviewInvite>)
+// can set it when an interview is completed. Allowing it on create is a
+// semantic no-op since the field is nullable and no downstream logic
+// fires on the creation path.
+export const insertInterviewInviteSchema = createInsertSchema(interviewInvites).omit({ id: true, createdAt: true });
 export type InsertInterviewInvite = z.infer<typeof insertInterviewInviteSchema>;
 export type InterviewInvite = typeof interviewInvites.$inferSelect;
 
@@ -1554,7 +1559,11 @@ export const platformSettings = pgTable("platform_settings", {
   updatedBy: varchar("updated_by"),
 });
 
-export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ id: true, updatedAt: true });
+// platform_settings.id uses generatedAlwaysAsIdentity() so drizzle-zod
+// automatically excludes it from the insert schema — attempting to
+// .omit({ id: true }) produces a "boolean is not assignable to never"
+// error because `id` isn't a valid key to omit.
+export const insertPlatformSettingSchema = createInsertSchema(platformSettings).omit({ updatedAt: true });
 export type InsertPlatformSetting = z.infer<typeof insertPlatformSettingSchema>;
 export type PlatformSetting = typeof platformSettings.$inferSelect;
 
