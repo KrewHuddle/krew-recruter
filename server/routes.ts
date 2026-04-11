@@ -282,7 +282,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireTenant,
     async (req, res) => {
       try {
-        const { tenantId } = req.params;
+        const { tenantId } = (req.params as Record<string, string>);
         const members = await storage.getMembershipsByTenant(tenantId);
         res.json(members);
       } catch (error) {
@@ -300,7 +300,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN"),
     async (req, res) => {
       try {
-        const { tenantId } = req.params;
+        const { tenantId } = (req.params as Record<string, string>);
         const { email, role } = req.body;
 
         const inviteToken = randomBytes(32).toString("hex");
@@ -371,7 +371,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const location = await storage.updateLocation(id, req.body);
         res.json(location);
       } catch (error) {
@@ -388,7 +388,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         await storage.deleteLocation(id);
         res.json({ success: true });
       } catch (error) {
@@ -440,7 +440,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.get("/api/jobs/public/:id", async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const [job] = await db.select().from(aggregatedJobs).where(eq(aggregatedJobs.id, id as string));
       if (!job) return res.status(404).json({ error: "Job not found" });
       res.json(job);
@@ -475,7 +475,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.get("/api/jobs/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const job = await storage.getJob(id);
       if (!job) return res.status(404).json({ error: "Job not found" });
       
@@ -513,7 +513,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const job = await storage.updateJob(id, req.body);
         res.json(job);
       } catch (error) {
@@ -530,7 +530,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         await storage.deleteJob(id);
         res.json({ success: true });
       } catch (error) {
@@ -793,7 +793,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "REVIEWER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const app = await storage.updateApplication(id, req.body);
         res.json(app);
       } catch (error) {
@@ -897,7 +897,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get single gig by ID
   app.get("/api/gigs/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const tenantId = (req as any).tenantId;
       const gig = await storage.getGigPost(id);
       
@@ -942,7 +942,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const tenantId = (req as any).tenantId;
         
         // Verify gig belongs to this tenant
@@ -967,7 +967,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const tenantId = (req as any).tenantId;
         
         // Verify gig belongs to this tenant
@@ -993,7 +993,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const tenantId = (req as any).tenantId;
         
         // Verify gig belongs to this tenant
@@ -1039,7 +1039,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         return res.status(403).json({ error: "Only job seekers can apply for gigs" });
       }
       
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const gig = await storage.getGigPost(id);
       
       if (!gig) {
@@ -1083,7 +1083,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const assignment = await storage.getGigAssignmentByGigAndWorker(id, userId);
       
       if (!assignment) {
@@ -1110,7 +1110,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const { status } = req.body;
         const tenantId = (req as any).tenantId;
         
@@ -1152,7 +1152,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER", "LOCATION_MANAGER"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         const tenantId = (req as any).tenantId;
         const { hoursWorked } = req.body;
         
@@ -1210,7 +1210,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
       
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const { rating, review, ratedUserId, raterType } = req.body;
       
       if (!rating || rating < 1 || rating > 5) {
@@ -1272,7 +1272,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get ratings for a user
   app.get("/api/users/:userId/ratings", async (req, res) => {
     try {
-      const { userId } = req.params;
+      const { userId } = (req.params as Record<string, string>);
       const ratings = await storage.getGigRatingsByUser(userId);
       const avgRating = await storage.getAverageRatingForUser(userId);
       
@@ -1386,7 +1386,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const userId = getUserId(req);
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         
         const payout = await storage.getGigPayoutByAssignment(id);
         if (!payout) {
@@ -1481,7 +1481,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     requireRole("OWNER", "ADMIN"),
     async (req, res) => {
       try {
-        const { id } = req.params;
+        const { id } = (req.params as Record<string, string>);
         await storage.deleteInterviewTemplate(id);
         res.json({ success: true });
       } catch (error) {
@@ -1575,7 +1575,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get invite with responses (for review)
   app.get("/api/interviews/invites/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInvite(id);
       if (!invite) {
         return res.status(404).json({ error: "Invite not found" });
@@ -1683,7 +1683,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       try {
         const tenantId = (req as any).tenantId;
         const userId = (req as any).userId;
-        const { inviteId } = req.params;
+        const { inviteId } = (req.params as Record<string, string>);
         
         // Verify the invite belongs to this tenant
         const invite = await storage.getInterviewInvite(inviteId);
@@ -1942,7 +1942,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get interview by token (public - for candidates)
   app.get("/api/public/interview/:token", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2012,7 +2012,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Accept consent for interview
   app.post("/api/public/interview/:token/consent", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2037,7 +2037,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Record system check passed
   app.post("/api/public/interview/:token/system-check", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2062,7 +2062,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Start interview (update status to IN_PROGRESS)
   app.post("/api/public/interview/:token/start", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2086,7 +2086,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get upload URL for video response
   app.post("/api/public/interview/:token/upload-url", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2110,7 +2110,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Submit response to a question
   app.post("/api/public/interview/:token/respond", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const { questionId, type, videoPath, text } = req.body;
       
       const invite = await storage.getInterviewInviteByToken(token);
@@ -2154,7 +2154,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Complete interview
   app.post("/api/public/interview/:token/complete", async (req, res) => {
     try {
-      const { token } = req.params;
+      const { token } = (req.params as Record<string, string>);
       const invite = await storage.getInterviewInviteByToken(token);
       
       if (!invite) {
@@ -2353,7 +2353,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { jobId } = req.params;
+      const { jobId } = (req.params as Record<string, string>);
       await storage.unsaveJob(userId, jobId);
       res.json({ success: true });
     } catch (error) {
@@ -2425,7 +2425,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Update integration connection
   app.patch("/api/integrations/:id", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN"), async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const { credentials, status } = req.body;
 
       const updateData: any = {};
@@ -2454,7 +2454,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Delete integration connection
   app.delete("/api/integrations/:id", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN"), async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteIntegrationConnection(id);
       res.json({ success: true });
     } catch (error) {
@@ -2469,7 +2469,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.get("/api/jobs/:jobId/distribution", isAuthenticated, requireTenant, async (req, res) => {
     try {
       const tenantId = (req as any).tenantId;
-      const { jobId } = req.params;
+      const { jobId } = (req.params as Record<string, string>);
       
       // Verify job belongs to tenant
       const job = await storage.getJob(jobId as string);
@@ -2489,7 +2489,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.post("/api/jobs/:jobId/distribute", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
     try {
       const tenantId = (req as any).tenantId;
-      const { jobId } = req.params;
+      const { jobId } = (req.params as Record<string, string>);
       const { provider } = req.body;
 
       if (!provider) {
@@ -2549,7 +2549,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.patch("/api/jobs/:jobId/distribution/:channelId", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
     try {
       const tenantId = (req as any).tenantId;
-      const { jobId, channelId } = req.params;
+      const { jobId, channelId } = (req.params as Record<string, string>);
       const { status } = req.body;
 
       // Verify job belongs to tenant
@@ -2578,7 +2578,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.delete("/api/jobs/:jobId/distribution/:channelId", isAuthenticated, requireTenant, requireRole("OWNER", "ADMIN", "HIRING_MANAGER"), async (req, res) => {
     try {
       const tenantId = (req as any).tenantId;
-      const { jobId, channelId } = req.params;
+      const { jobId, channelId } = (req.params as Record<string, string>);
 
       // Verify job belongs to tenant
       const job = await storage.getJob(jobId as string);
@@ -2690,7 +2690,9 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       return res.status(401).json({ error: "Unauthorized" });
     }
 
-    const userProfile = await storage.getUserProfile(userId);
+    // checkIsSuperAdmin's signature accepts `... | null` but storage.getUserProfile
+    // returns `... | undefined` — coalesce here so the call typechecks.
+    const userProfile = (await storage.getUserProfile(userId)) ?? null;
     if (checkIsSuperAdmin(userProfile)) return next();
 
     // No profile — check session email
@@ -2783,7 +2785,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Update tenant (e.g., plan type, suspend)
   app.patch("/api/admin/tenants/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const tenant = await storage.updateTenant(id, req.body);
       if (!tenant) {
         return res.status(404).json({ error: "Tenant not found" });
@@ -2809,7 +2811,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Update user (e.g., grant/revoke super admin)
   app.patch("/api/admin/users/:userId", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { userId } = req.params;
+      const { userId } = (req.params as Record<string, string>);
       const userProfile = await storage.updateUserProfile(userId, req.body);
       if (!userProfile) {
         return res.status(404).json({ error: "User not found" });
@@ -3145,7 +3147,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/admin/feature-flags/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const flag = await storage.updateFeatureFlag(id, req.body);
       if (!flag) return res.status(404).json({ error: "Feature flag not found" });
       res.json(flag);
@@ -3157,7 +3159,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.delete("/api/admin/feature-flags/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteFeatureFlag(id);
       res.status(204).send();
     } catch (error) {
@@ -3190,7 +3192,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/admin/coupons/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const coupon = await storage.updateCoupon(id, req.body);
       if (!coupon) return res.status(404).json({ error: "Coupon not found" });
       res.json(coupon);
@@ -3202,7 +3204,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.delete("/api/admin/coupons/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteCoupon(id);
       res.status(204).send();
     } catch (error) {
@@ -3281,7 +3283,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const adminUserId = getUserId(req);
       if (!adminUserId) return res.status(401).json({ error: "Unauthorized" });
 
-      const { userId } = req.params;
+      const { userId } = (req.params as Record<string, string>);
       const targetUser = await storage.getUserProfile(userId);
       if (!targetUser) return res.status(404).json({ error: "User not found" });
 
@@ -3387,7 +3389,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/scheduling/slots/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const slot = await storage.updateInterviewSlot(id, req.body);
       if (!slot) return res.status(404).json({ error: "Slot not found" });
       res.json(slot);
@@ -3399,7 +3401,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.delete("/api/scheduling/slots/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteInterviewSlot(id);
       res.status(204).send();
     } catch (error) {
@@ -3468,7 +3470,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/templates/jobs/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const template = await storage.updateJobTemplate(id, req.body);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
@@ -3480,7 +3482,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.delete("/api/templates/jobs/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteJobTemplate(id);
       res.status(204).send();
     } catch (error) {
@@ -3522,7 +3524,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/templates/messages/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const template = await storage.updateMessageTemplate(id, req.body);
       if (!template) return res.status(404).json({ error: "Template not found" });
       res.json(template);
@@ -3534,7 +3536,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.delete("/api/templates/messages/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await storage.deleteMessageTemplate(id);
       res.status(204).send();
     } catch (error) {
@@ -3577,7 +3579,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/background-checks/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const check = await storage.updateBackgroundCheck(id, req.body);
       if (!check) return res.status(404).json({ error: "Background check not found" });
       res.json(check);
@@ -3591,7 +3593,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.get("/api/onboarding/documents/:applicationId", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { applicationId } = req.params;
+      const { applicationId } = (req.params as Record<string, string>);
       const documents = await storage.getOnboardingDocumentsByApplication(applicationId);
       res.json(documents);
     } catch (error) {
@@ -3616,7 +3618,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/onboarding/documents/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const document = await storage.updateOnboardingDocument(id, req.body);
       if (!document) return res.status(404).json({ error: "Document not found" });
       res.json(document);
@@ -3628,7 +3630,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.get("/api/onboarding/checklists/:applicationId", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { applicationId } = req.params;
+      const { applicationId } = (req.params as Record<string, string>);
       const checklists = await storage.getOnboardingChecklistsByApplication(applicationId);
       res.json(checklists);
     } catch (error) {
@@ -3653,7 +3655,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.patch("/api/onboarding/checklists/:id", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const checklist = await storage.updateOnboardingChecklist(id, req.body);
       if (!checklist) return res.status(404).json({ error: "Checklist not found" });
       res.json(checklist);
@@ -3668,7 +3670,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.get("/api/features/:featureName", isAuthenticated, requireTenant, async (req, res) => {
     try {
       const tenantId = (req as any).tenantId;
-      const { featureName } = req.params;
+      const { featureName } = (req.params as Record<string, string>);
       const tenant = await storage.getTenant(tenantId);
       const enabled = await storage.isFeatureEnabled(featureName, tenantId, tenant?.planType || undefined);
       res.json({ enabled });
@@ -3777,7 +3779,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get single talent profile (sanitized — no email/phone for employers)
   app.get("/api/talent/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const id = Array.isArray((req.params as Record<string, string>).id) ? (req.params as Record<string, string>).id[0] : (req.params as Record<string, string>).id;
       const [talent] = await talentDb
         .select({
           id: talentPoolTable.id,
@@ -3813,7 +3815,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Contact a talent (sends message, logs attempt)
   app.post("/api/talent/:id/contact", isAuthenticated, requireTenant, async (req, res) => {
     try {
-      const id = Array.isArray(req.params.id) ? req.params.id[0] : req.params.id;
+      const id = Array.isArray((req.params as Record<string, string>).id) ? (req.params as Record<string, string>).id[0] : (req.params as Record<string, string>).id;
       const { message } = req.body;
       if (!message) return res.status(400).json({ error: "Message is required" });
 
@@ -4045,7 +4047,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId as string;
-        const id = paramStr(req.params.id);
+        const id = paramStr((req.params as Record<string, string>).id);
 
         const [campaign] = await db
           .select()
@@ -4083,7 +4085,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId as string;
-        const id = paramStr(req.params.id);
+        const id = paramStr((req.params as Record<string, string>).id);
 
         const [campaign] = await db
           .select()
@@ -4121,7 +4123,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId as string;
-        const id = paramStr(req.params.id);
+        const id = paramStr((req.params as Record<string, string>).id);
 
         const [campaign] = await db
           .select()
@@ -4158,7 +4160,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     async (req, res) => {
       try {
         const tenantId = (req as any).tenantId as string;
-        const id = paramStr(req.params.id);
+        const id = paramStr((req.params as Record<string, string>).id);
 
         const [campaign] = await db
           .select()
@@ -4396,7 +4398,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // PATCH /api/admin/announcements/:id — toggle active
   app.patch("/api/admin/announcements/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       const { isActive } = req.body;
       const [updated] = await db.update(announcements)
         .set({ isActive })
@@ -4411,7 +4413,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // DELETE /api/admin/announcements/:id
   app.delete("/api/admin/announcements/:id", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { id } = req.params;
+      const { id } = (req.params as Record<string, string>);
       await db.delete(announcements).where(eq(announcements.id, id as string));
       res.json({ success: true });
     } catch (error) {
@@ -4811,7 +4813,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // POST /api/admin/meta/campaigns/:id/pause — admin force pause
   app.post("/api/admin/meta/campaigns/:id/pause", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const id = req.params.id as string;
+      const id = (req.params as Record<string, string>).id as string;
       await db.update(campaigns).set({ status: "paused" } as any).where(eq(campaigns.id, id));
       res.json({ success: true });
     } catch (error) {
@@ -4823,7 +4825,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // POST /api/admin/meta/campaigns/:id/resume — admin resume
   app.post("/api/admin/meta/campaigns/:id/resume", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const id = req.params.id as string;
+      const id = (req.params as Record<string, string>).id as string;
       await db.update(campaigns).set({ status: "active" } as any).where(eq(campaigns.id, id));
       res.json({ success: true });
     } catch (error) {
