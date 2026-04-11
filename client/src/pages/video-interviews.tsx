@@ -287,21 +287,19 @@ export default function VideoInterviews() {
         </div>
       </section>
 
-      {/* Trusted By Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" data-testid="section-trusted-by">
-        <div className="mx-auto max-w-7xl">
-          <p className="text-center text-sm text-muted-foreground mb-8">
-            TRUSTED BY LEADING HOSPITALITY BRANDS
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-60">
-            <div className="text-xl font-bold text-muted-foreground">Marriott Hotels</div>
-            <div className="text-xl font-bold text-muted-foreground">Darden Restaurants</div>
-            <div className="text-xl font-bold text-muted-foreground">Hilton</div>
-            <div className="text-xl font-bold text-muted-foreground">Chipotle</div>
-            <div className="text-xl font-bold text-muted-foreground">Hyatt</div>
-          </div>
-        </div>
-      </section>
+      {/* "Trusted by" section REMOVED.
+       *
+       * Previously listed Marriott, Darden Restaurants, Hilton, Chipotle,
+       * and Hyatt under the heading "TRUSTED BY LEADING HOSPITALITY
+       * BRANDS" as if they were customers. These are real major
+       * corporations. Implying they are Krew Recruiter customers without
+       * actual partnerships is trademark misuse and false endorsement —
+       * a real legal risk, not just a trust/credibility issue.
+       *
+       * Removed the entire section. Restore only when real, written
+       * permission from an actual customer exists to use their name,
+       * and only list customers who have given explicit consent.
+       */}
 
       {/* Benefits Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30" data-testid="section-benefits">
