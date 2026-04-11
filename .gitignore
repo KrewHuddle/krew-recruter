@@ -4,5 +4,20 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Environment files — never commit any variant. .env.example is the
+# only env-related file that should be in version control.
 .env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.staging
+.env.test
+
 .local/
+
+# Backup files written by server/scripts/rotatePlatformSettingsKey.ts
+# during encryption key rotation. These contain the current encrypted
+# row values (useless without the old key, but safer to never commit).
+platform-settings-backup-*.json
