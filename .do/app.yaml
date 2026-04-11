@@ -13,6 +13,14 @@ services:
   - key: PORT
     value: "8080"
     scope: RUN_TIME
+  # Canonical public URL of the deployed app. Used by server-side code that
+  # builds outbound links — most notably the Meta ads service which embeds
+  # the apply URL in ad creatives. Was previously relying on the hardcoded
+  # fallback in server/routes.ts; promoted here so it's explicit and
+  # version-controlled. Update this if the production domain ever changes.
+  - key: PUBLIC_URL
+    value: "https://krewrecruiter.com"
+    scope: RUN_TIME
   - key: npm_config_prefix
     value: ""
     scope: BUILD_TIME
