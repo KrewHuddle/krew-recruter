@@ -8,7 +8,19 @@ import { eq, and } from "drizzle-orm";
 const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = "7d";
 
-function getJwtSecret(): string {
+/**
+ * Returns the JWT signing/verifying secret. Throws if neither JWT_SECRET
+ * nor SESSION_SECRET is set in the environment — exported so other files
+ * (customAuth, routes) can use the same fail-loud behavior instead of
+ * falling back to a hardcoded literal that turns missing env vars into
+ * a critical auth bypass.
+ *
+ * Note: the SESSION_SECRET fallback violates cryptographic domain
+ * separation (one secret per use case) and is preserved here only for
+ * backward compatibility. Setting JWT_SECRET explicitly is strongly
+ * preferred. Removing the fallback is a separate audit item.
+ */
+export function getJwtSecret(): string {
   const secret = process.env.JWT_SECRET || process.env.SESSION_SECRET;
   if (!secret) throw new Error("JWT_SECRET or SESSION_SECRET must be set");
   return secret;

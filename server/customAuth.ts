@@ -8,6 +8,7 @@ import { pool } from "./db";
 import { users, passwordResetTokens } from "@shared/schema";
 import { eq } from "drizzle-orm";
 import connectPg from "connect-pg-simple";
+import { getJwtSecret } from "./jwtAuth";
 
 const SALT_ROUNDS = 12;
 
@@ -139,11 +140,16 @@ export async function setupCustomAuth(app: Express) {
       req.session.lastName = user.lastName ?? undefined;
       req.session.profileImageUrl = user.profileImageUrl ?? undefined;
 
-      // Also generate JWT for API compatibility
-      const jwtSecret = process.env.JWT_SECRET || "krew-jwt-secret";
+      // Also generate JWT for API compatibility. getJwtSecret() throws
+      // if JWT_SECRET (and SESSION_SECRET) is unset — that throw is
+      // caught by the surrounding try/catch and surfaces as a 500
+      // "Login failed" with the underlying error in logs. The previous
+      // hardcoded fallback "krew-jwt-secret" turned a missing env var
+      // into a critical auth bypass: anyone reading the source could
+      // mint valid tokens for any user.
       const token = jwt.sign(
         { userId: user.id, email: user.email },
-        jwtSecret,
+        getJwtSecret(),
         { expiresIn: "7d" }
       );
 

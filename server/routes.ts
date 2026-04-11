@@ -2,6 +2,7 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUserClaims as getCustomUserClaims } from "./customAuth";
+import { getJwtSecret } from "./jwtAuth";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
@@ -2655,14 +2656,16 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     // Try session auth first
     let userId = getUserId(req);
 
-    // Fall back to JWT
+    // Fall back to JWT. getJwtSecret() throws if no secret is configured;
+    // that throw is intentional — it's caught by the empty catch below
+    // and degrades to the session check, never to a hardcoded fallback.
     if (!userId) {
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith("Bearer ")) {
         try {
           const jwt = await import("jsonwebtoken");
           const token = authHeader.slice(7);
-          const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "krew-jwt-secret") as any;
+          const decoded = jwt.default.verify(token, getJwtSecret()) as any;
           userId = decoded.userId;
         } catch {}
       }
@@ -2700,14 +2703,16 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       // Try session auth first
       let userId = getUserId(req);
 
-      // Fall back to JWT
+      // Fall back to JWT. Same fail-safe pattern as requireSuperAdmin
+      // above: getJwtSecret() throws on missing env, the empty catch
+      // swallows it, and the flow falls through to the session check.
       if (!userId) {
         const authHeader = req.headers.authorization;
         if (authHeader?.startsWith("Bearer ")) {
           try {
             const jwt = await import("jsonwebtoken");
             const token = authHeader.slice(7);
-            const decoded = jwt.default.verify(token, process.env.JWT_SECRET || "krew-jwt-secret") as any;
+            const decoded = jwt.default.verify(token, getJwtSecret()) as any;
             userId = decoded.userId;
           } catch {}
         }
