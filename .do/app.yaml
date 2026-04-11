@@ -46,12 +46,13 @@ services:
   - key: DO_SPACES_REGION
     value: "nyc3"
     scope: RUN_TIME
-  # Optional: CDN endpoint for faster public file delivery. Format:
-  # https://<cdn-id>.cdn.digitaloceanspaces.com (find in the Space
-  # settings after enabling CDN). Leave blank to use the direct
-  # Spaces hostname.
+  # CDN endpoint for faster public file delivery. Format:
+  # https://<bucket>.<region>.cdn.digitaloceanspaces.com (or a
+  # custom domain if one is configured). Verified by HTTP probe to
+  # exist for this bucket. Leave blank to use the direct Spaces
+  # hostname instead.
   - key: DO_SPACES_CDN_ENDPOINT
-    value: ""
+    value: "https://krew-recruiter.nyc3.cdn.digitaloceanspaces.com"
     scope: RUN_TIME
   - key: npm_config_prefix
     value: ""
