@@ -89,8 +89,8 @@ export default function JobsByLocation() {
         {/* CTA for employers */}
         <Card className="mb-8 border-primary/20 bg-primary/5">
           <CardContent className="p-4 flex items-center justify-between">
-            <p className="text-sm font-medium">Hiring in {city}? Reach thousands of hospitality workers.</p>
-            <Link href="/login"><Button size="sm">Post a Job <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></Link>
+            <p className="text-sm font-medium">Hiring in {city}? Reach hospitality workers in your area.</p>
+            <Link href="/employers"><Button size="sm">Post a Job <ArrowRight className="ml-1 h-3.5 w-3.5" /></Button></Link>
           </CardContent>
         </Card>
 

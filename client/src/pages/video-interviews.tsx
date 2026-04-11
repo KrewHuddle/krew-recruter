@@ -154,11 +154,16 @@ const faqs = [
   },
 ];
 
+// Previously specific unverifiable metrics (90% less scheduling,
+// 5x more screened, 48hrs avg response, 4.9/5 satisfaction). Replaced
+// with short qualitative labels that fit the existing big-number
+// rendering (text-3xl font-bold). When real product metrics exist,
+// promote them back here.
 const stats = [
-  { value: "90%", label: "Less time scheduling" },
-  { value: "5x", label: "More candidates screened" },
-  { value: "48hrs", label: "Avg. time to first response" },
-  { value: "4.9/5", label: "Candidate satisfaction" },
+  { value: "0 min", label: "Scheduling time needed" },
+  { value: "Bulk", label: "Review candidates in one sitting" },
+  { value: "Async", label: "Candidates respond on their own time" },
+  { value: "Team", label: "Share videos with your whole team" },
 ];
 
 export default function VideoInterviews() {
@@ -282,21 +287,19 @@ export default function VideoInterviews() {
         </div>
       </section>
 
-      {/* Trusted By Section */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8" data-testid="section-trusted-by">
-        <div className="mx-auto max-w-7xl">
-          <p className="text-center text-sm text-muted-foreground mb-8">
-            TRUSTED BY LEADING HOSPITALITY BRANDS
-          </p>
-          <div className="flex flex-wrap items-center justify-center gap-8 md:gap-12 opacity-60">
-            <div className="text-xl font-bold text-muted-foreground">Marriott Hotels</div>
-            <div className="text-xl font-bold text-muted-foreground">Darden Restaurants</div>
-            <div className="text-xl font-bold text-muted-foreground">Hilton</div>
-            <div className="text-xl font-bold text-muted-foreground">Chipotle</div>
-            <div className="text-xl font-bold text-muted-foreground">Hyatt</div>
-          </div>
-        </div>
-      </section>
+      {/* "Trusted by" section REMOVED.
+       *
+       * Previously listed Marriott, Darden Restaurants, Hilton, Chipotle,
+       * and Hyatt under the heading "TRUSTED BY LEADING HOSPITALITY
+       * BRANDS" as if they were customers. These are real major
+       * corporations. Implying they are Krew Recruiter customers without
+       * actual partnerships is trademark misuse and false endorsement —
+       * a real legal risk, not just a trust/credibility issue.
+       *
+       * Removed the entire section. Restore only when real, written
+       * permission from an actual customer exists to use their name,
+       * and only list customers who have given explicit consent.
+       */}
 
       {/* Benefits Section */}
       <section className="py-20 px-4 sm:px-6 lg:px-8 bg-muted/30" data-testid="section-benefits">
