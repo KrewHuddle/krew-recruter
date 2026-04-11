@@ -10,6 +10,11 @@ import { getStripePublishableKey, getStripeClient } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
 import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
 import { requirePlan } from "./middleware/requirePlan";
+// Tenant-scoped auth middleware — extracted to server/middleware/tenantAuth.ts
+// so server/metaAdsRoutes.ts (and any future route module) can reuse the
+// same implementation instead of duplicating or taking dependency-injection
+// shortcuts. Re-imported here and used exactly as before.
+import { getTenantIdFromCookie, requireTenant, requireRole } from "./middleware/tenantAuth";
 import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
 
 // Single ObjectStorageService instance reused by every route that touches
@@ -17,13 +22,13 @@ import { ObjectStorageService } from "./replit_integrations/object_storage/objec
 // empty constructor with no side effects, so module-level instantiation is
 // safe. Previously this was referenced as a bare `objectStorageService`
 // identifier without ever being declared, producing 6 "Cannot find name"
-// errors at lines 1586, 1693, 2088, 2089, 2375, 2376.
+// errors — fixed in fix/typecheck-cleanup.
 const objectStorageService = new ObjectStorageService();
 import { db } from "./db";
 import {
   organizations, campaigns, jobs, applications, interviewInvites,
   campaignSpend, paymentHistory, aggregatedJobs, announcements,
-  auditEvents,
+  auditEvents, jobAdCampaigns,
 } from "@shared/schema";
 import { eq, desc, sql, sum, count, and } from "drizzle-orm";
 
@@ -35,59 +40,6 @@ function getUserId(req: Request): string | undefined {
 // Helper to safely get user claims from session
 function getUserClaims(req: Request): { sub?: string; email?: string; first_name?: string; last_name?: string } {
   return getCustomUserClaims(req);
-}
-
-// Utility to get tenant ID from cookie
-function getTenantIdFromCookie(req: Request): string | undefined {
-  return req.cookies?.tenantId;
-}
-
-// Middleware to require tenant context
-async function requireTenant(req: Request, res: Response, next: NextFunction) {
-  const tenantId = getTenantIdFromCookie(req);
-  if (!tenantId) {
-    return res.status(400).json({ error: "Tenant context required" });
-  }
-
-  const userId = getUserId(req);
-  if (!userId) {
-    return res.status(401).json({ error: "Unauthorized" });
-  }
-
-  const membership = await storage.getMembership(tenantId, userId);
-  if (!membership) {
-    return res.status(403).json({ error: "Not a member of this organization" });
-  }
-
-  // Attach tenant and membership to request
-  (req as any).tenantId = tenantId;
-  (req as any).membership = membership;
-  next();
-}
-
-// Role-based access control
-const roleHierarchy: Record<string, number> = {
-  OWNER: 100,
-  ADMIN: 80,
-  HIRING_MANAGER: 60,
-  LOCATION_MANAGER: 40,
-  REVIEWER: 20,
-  VIEWER: 10,
-};
-
-function requireRole(...allowedRoles: string[]) {
-  return (req: Request, res: Response, next: NextFunction) => {
-    const membership = (req as any).membership;
-    if (!membership) {
-      return res.status(403).json({ error: "No membership context" });
-    }
-
-    if (!allowedRoles.includes(membership.role)) {
-      return res.status(403).json({ error: "Insufficient permissions" });
-    }
-
-    next();
-  };
 }
 
 export async function registerRoutes(
@@ -3996,402 +3948,15 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   });
 
   // ============ META ADS CAMPAIGN ROUTES ============
-
-  const metaAds = await import("./services/meta-ads");
-  const { jobAdCampaigns } = await import("@shared/schema");
-  const { eq, and } = await import("drizzle-orm");
-  const { db } = await import("./db");
-
-  // Helper to safely extract string param from Express 5 params
-  const paramStr = (val: string | string[]): string =>
-    Array.isArray(val) ? val[0] : val;
-
-  // Budget validation has three precedence layers:
-  //   1. Zod ceiling (this schema): guards against garbage / negative /
-  //      typo input. $1-$10,000/day absolute range. Catches obvious abuse
-  //      and type errors regardless of platform configuration.
-  //   2. Platform default (meta_default_daily_budget_cents): used when
-  //      the client omits dailyBudgetUSD entirely. Configurable by the
-  //      platform admin via the admin UI.
-  //   3. Per-deployment policy ceiling (meta_max_daily_budget_cents):
-  //      enforced in the route handler below against the resolved value.
-  //      Configurable by the platform admin, defaults to $100/day.
   //
-  // dailyBudgetUSD is OPTIONAL — when omitted, the handler falls back to
-  // the platform default. When provided, it must satisfy the Zod range
-  // constraints. This wires the previously dead `defaultDailyBudgetCents`
-  // config (settable in admin UI but never read at runtime).
-  const createMetaCampaignBodySchema = z.object({
-    jobId: z.string().min(1, "jobId is required"),
-    dailyBudgetUSD: z
-      .number({ invalid_type_error: "dailyBudgetUSD must be a number" })
-      .positive("dailyBudgetUSD must be greater than zero")
-      .min(1, "dailyBudgetUSD must be at least $1/day")
-      .max(10000, "dailyBudgetUSD exceeds the $10,000/day absolute ceiling")
-      .optional(),
-    radius: z
-      .number()
-      .int()
-      .positive()
-      .max(50, "radius cannot exceed 50 miles (Meta maximum)")
-      .optional(),
-  });
+  // All Meta (Facebook/Instagram) ad routes now live in
+  // server/metaAdsRoutes.ts as an express Router. Same paths, same
+  // middleware chains, same behavior — extracted for discoverability
+  // and to shorten this file. Mounting at /api so the router's internal
+  // paths like /meta/campaign become /api/meta/campaign.
+  const { default: metaAdsRouter } = await import("./metaAdsRoutes");
+  app.use("/api", metaAdsRouter);
 
-  // Create a Meta ad campaign for a job
-  app.post(
-    "/api/meta/campaign",
-    isAuthenticated,
-    requireTenant,
-    requirePlan("PRO", "ENTERPRISE"),
-    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId;
-
-        // Validate request shape. The previous truthy-only check let strings,
-        // negatives, and astronomical numbers pass straight through to the
-        // Meta API, which would happily accept e.g. dailyBudgetUSD: 999999
-        // and create a $999,999/day ad set.
-        const parsed = createMetaCampaignBodySchema.safeParse(req.body);
-        if (!parsed.success) {
-          return res.status(400).json({
-            error: "Invalid request",
-            details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
-          });
-        }
-        const { jobId } = parsed.data;
-        const radiusOverride = parsed.data.radius;
-
-        // Fetch the job
-        const job = await storage.getJob(jobId);
-        if (!job || job.tenantId !== tenantId) {
-          return res.status(404).json({ error: "Job not found" });
-        }
-
-        // Pre-fetch Meta credentials ONCE — used for both the default-
-        // budget fallback below and the per-deployment max enforcement
-        // further down. Replaces the previous pattern of calling
-        // isMetaConfigured() (which itself calls getMetaCredentials())
-        // and then making a second getMetaCredentials() call. Single
-        // structural type avoids a top-level type-only import.
-        let metaCreds: { defaultDailyBudgetCents: number; maxDailyBudgetCents: number } | null = null;
-        try {
-          const { getMetaCredentials } = await import("./services/platformSettings");
-          metaCreds = await getMetaCredentials();
-        } catch {
-          // Meta not configured — credentials throw, we just save a draft
-          metaCreds = null;
-        }
-
-        // Resolve the daily budget. Precedence:
-        //   1. Explicit client value (already Zod-validated above)
-        //   2. Platform admin default (meta_default_daily_budget_cents)
-        //   3. Schema column default ($10/day) when Meta isn't configured
-        //      at all and there are no credentials to read a default from
-        // This wires up `defaultDailyBudgetCents` which was previously
-        // dead config — settable via the admin UI but never read.
-        let dailyBudgetUSD = parsed.data.dailyBudgetUSD;
-        if (dailyBudgetUSD === undefined) {
-          dailyBudgetUSD = metaCreds
-            ? metaCreds.defaultDailyBudgetCents / 100
-            : 10;
-        }
-
-        // Re-validate the resolved value. Zod's constraints applied only
-        // to the explicit-value path; the fallback bypassed them, so we
-        // defensively re-check the same $1-$10,000/day range here. In
-        // practice this only fires if the platform admin has configured
-        // an out-of-range default, which the admin UI should prevent
-        // but we don't trust unilaterally.
-        if (dailyBudgetUSD < 1 || dailyBudgetUSD > 10000) {
-          return res.status(400).json({
-            error: `Resolved daily budget of $${dailyBudgetUSD.toFixed(
-              2
-            )} is outside the $1-$10,000/day range. Check the meta_default_daily_budget_cents setting in the admin UI.`,
-          });
-        }
-
-        const tenant = await storage.getTenant(tenantId);
-        const location = job.locationId ? await storage.getLocation(job.locationId) : null;
-        const baseUrl = process.env.PUBLIC_URL || "https://krewrecruiter.com";
-
-        // Geocode location if we have city/state
-        const locationStr = location?.city && location?.state
-          ? `${location.city}, ${location.state}`
-          : "Local";
-        let lat: number | undefined;
-        let lng: number | undefined;
-
-        if (location?.city && location?.state) {
-          const coords = await geocodeAddress(`${location.city}, ${location.state}`);
-          if (coords) {
-            lat = coords.lat;
-            lng = coords.lng;
-          }
-        }
-
-        // Smart radius based on city size
-        const smartRadius = location?.city && location?.state
-          ? getSmartRadius(location.city, location.state)
-          : 25;
-
-        let metaResult = null;
-
-        if (metaCreds) {
-          // Per-deployment policy ceiling using the credentials we
-          // already fetched above (no second DB call).
-          const requestedCents = Math.round(dailyBudgetUSD * 100);
-          if (requestedCents > metaCreds.maxDailyBudgetCents) {
-            return res.status(400).json({
-              error: `Daily budget of $${dailyBudgetUSD} exceeds the platform maximum of $${(
-                metaCreds.maxDailyBudgetCents / 100
-              ).toFixed(2)}/day. Contact support if you need a higher cap.`,
-            });
-          }
-
-          metaResult = await metaAds.createJobCampaign(
-            {
-              jobId: job.id,
-              jobTitle: job.title,
-              companyName: tenant?.name || "Restaurant",
-              location: locationStr,
-              latitude: lat,
-              longitude: lng,
-              radius: radiusOverride || smartRadius,
-              pay: job.payRangeMin && job.payRangeMax
-                ? `$${job.payRangeMin}-$${job.payRangeMax}/hr`
-                : job.payRangeMin ? `$${job.payRangeMin}/hr` : undefined,
-              // Public landing page (registered in App.tsx as /jobs/:id).
-              // UTM params let analytics distinguish Meta-driven traffic from
-              // organic. Don't change without also updating job-public.tsx.
-              applyUrl: `${baseUrl}/jobs/${job.id}?utm_source=meta&utm_medium=cpc&utm_campaign=krew-boost`,
-            },
-            dailyBudgetUSD
-          );
-        }
-
-        // Save to database
-        const [campaign] = await db
-          .insert(jobAdCampaigns)
-          .values({
-            jobId,
-            tenantId,
-            metaCampaignId: metaResult?.metaCampaignId || null,
-            metaAdSetId: metaResult?.metaAdSetId || null,
-            metaAdId: metaResult?.metaAdId || null,
-            metaCreativeId: metaResult?.metaCreativeId || null,
-            status: metaResult ? "paused" : "draft",
-            dailyBudgetUSD,
-          })
-          .returning();
-
-        res.json(campaign);
-      } catch (error: any) {
-        console.error("Error creating Meta campaign:", error);
-        res.status(500).json({ error: error.message || "Failed to create campaign" });
-      }
-    }
-  );
-
-  // Activate a Meta campaign
-  // NOTE: plan-gated like create — preventing a downgraded tenant from
-  // resuming an old paused campaign and accruing fresh ad spend. Pause and
-  // delete are intentionally NOT plan-gated so users can always stop spending.
-  app.post(
-    "/api/meta/campaign/:id/activate",
-    isAuthenticated,
-    requireTenant,
-    requirePlan("PRO", "ENTERPRISE"),
-    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId as string;
-        const id = paramStr((req.params as Record<string, string>).id);
-
-        const [campaign] = await db
-          .select()
-          .from(jobAdCampaigns)
-          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
-
-        if (!campaign) {
-          return res.status(404).json({ error: "Campaign not found" });
-        }
-
-        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
-          await metaAds.activateCampaign(campaign.metaCampaignId);
-        }
-
-        const [updated] = await db
-          .update(jobAdCampaigns)
-          .set({ status: "active" as const, updatedAt: new Date() })
-          .where(eq(jobAdCampaigns.id, id))
-          .returning();
-
-        res.json(updated);
-      } catch (error: any) {
-        console.error("Error activating campaign:", error);
-        res.status(500).json({ error: error.message || "Failed to activate campaign" });
-      }
-    }
-  );
-
-  // Pause a Meta campaign
-  app.post(
-    "/api/meta/campaign/:id/pause",
-    isAuthenticated,
-    requireTenant,
-    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId as string;
-        const id = paramStr((req.params as Record<string, string>).id);
-
-        const [campaign] = await db
-          .select()
-          .from(jobAdCampaigns)
-          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
-
-        if (!campaign) {
-          return res.status(404).json({ error: "Campaign not found" });
-        }
-
-        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
-          await metaAds.pauseCampaign(campaign.metaCampaignId);
-        }
-
-        const [updated] = await db
-          .update(jobAdCampaigns)
-          .set({ status: "paused" as const, updatedAt: new Date() })
-          .where(eq(jobAdCampaigns.id, id))
-          .returning();
-
-        res.json(updated);
-      } catch (error: any) {
-        console.error("Error pausing campaign:", error);
-        res.status(500).json({ error: error.message || "Failed to pause campaign" });
-      }
-    }
-  );
-
-  // Delete a Meta campaign
-  app.delete(
-    "/api/meta/campaign/:id",
-    isAuthenticated,
-    requireTenant,
-    requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId as string;
-        const id = paramStr((req.params as Record<string, string>).id);
-
-        const [campaign] = await db
-          .select()
-          .from(jobAdCampaigns)
-          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
-
-        if (!campaign) {
-          return res.status(404).json({ error: "Campaign not found" });
-        }
-
-        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
-          await metaAds.deleteCampaign(campaign.metaCampaignId);
-        }
-
-        const [updated] = await db
-          .update(jobAdCampaigns)
-          .set({ status: "deleted" as const, updatedAt: new Date() })
-          .where(eq(jobAdCampaigns.id, id))
-          .returning();
-
-        res.json(updated);
-      } catch (error: any) {
-        console.error("Error deleting campaign:", error);
-        res.status(500).json({ error: error.message || "Failed to delete campaign" });
-      }
-    }
-  );
-
-  // Get campaign stats (fetches from Meta + updates db)
-  app.get(
-    "/api/meta/campaign/:id/stats",
-    isAuthenticated,
-    requireTenant,
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId as string;
-        const id = paramStr((req.params as Record<string, string>).id);
-
-        const [campaign] = await db
-          .select()
-          .from(jobAdCampaigns)
-          .where(and(eq(jobAdCampaigns.id, id), eq(jobAdCampaigns.tenantId, tenantId))!);
-
-        if (!campaign) {
-          return res.status(404).json({ error: "Campaign not found" });
-        }
-
-        let stats = {
-          impressions: campaign.impressions,
-          clicks: campaign.clicks,
-          spendCents: campaign.totalSpendCents,
-          cpc: campaign.clicks > 0 ? campaign.totalSpendCents / campaign.clicks / 100 : 0,
-        };
-
-        // Fetch live stats from Meta if configured
-        if (campaign.metaCampaignId && await metaAds.isMetaConfigured()) {
-          stats = await metaAds.getCampaignStats(campaign.metaCampaignId);
-
-          // Persist latest stats
-          await db
-            .update(jobAdCampaigns)
-            .set({
-              impressions: stats.impressions,
-              clicks: stats.clicks,
-              totalSpendCents: stats.spendCents,
-              updatedAt: new Date(),
-            })
-            .where(eq(jobAdCampaigns.id, id));
-        }
-
-        res.json({ ...campaign, ...stats });
-      } catch (error: any) {
-        console.error("Error getting campaign stats:", error);
-        res.status(500).json({ error: error.message || "Failed to get stats" });
-      }
-    }
-  );
-
-  // List all campaigns for a job (or all for tenant)
-  app.get(
-    "/api/meta/campaigns",
-    isAuthenticated,
-    requireTenant,
-    async (req, res) => {
-      try {
-        const tenantId = (req as any).tenantId as string;
-        const jobId = req.query.jobId as string | undefined;
-
-        const conditions = jobId
-          ? and(eq(jobAdCampaigns.tenantId, tenantId), eq(jobAdCampaigns.jobId, jobId))!
-          : eq(jobAdCampaigns.tenantId, tenantId);
-
-        const campaigns = await db
-          .select()
-          .from(jobAdCampaigns)
-          .where(conditions);
-
-        res.json(campaigns);
-      } catch (error: any) {
-        console.error("Error listing campaigns:", error);
-        res.status(500).json({ error: "Failed to list campaigns" });
-      }
-    }
-  );
-
-  // Check if Meta API is configured
-  app.get("/api/meta/status", isAuthenticated, async (_req, res) => {
-    res.json({ configured: await metaAds.isMetaConfigured() });
-  });
 
   // ============ AD IMAGE GENERATION ============
 
@@ -5007,16 +4572,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     }
   });
 
-  // GET /api/meta/configured — public check for employers (no credentials exposed)
-  app.get("/api/meta/configured", requireAuth, async (req, res) => {
-    try {
-      const { isMetaConfiguredFromDB } = await import("./services/platformSettings");
-      const configured = await isMetaConfiguredFromDB();
-      res.json({ configured });
-    } catch {
-      res.json({ configured: false });
-    }
-  });
 
   return httpServer;
 }
