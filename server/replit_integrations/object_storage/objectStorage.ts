@@ -154,6 +154,23 @@ export class ObjectStorageService {
     });
   }
 
+  // Deletes an object entity by its /objects/<id> path. Used by GDPR
+  // data-deletion flows in routes.ts where interview videos and other
+  // uploaded files must be purged on request. Silently succeeds if the
+  // file is already gone (idempotent delete) so repeated deletion
+  // requests don't fail.
+  async deleteObject(objectPath: string): Promise<void> {
+    try {
+      const file = await this.getObjectEntityFile(objectPath);
+      await file.delete({ ignoreNotFound: true });
+    } catch (err) {
+      // getObjectEntityFile throws ObjectNotFoundError for already-gone
+      // files — treat that as success for idempotent delete semantics.
+      if (err instanceof ObjectNotFoundError) return;
+      throw err;
+    }
+  }
+
   // Gets the object entity file from the object path.
   async getObjectEntityFile(objectPath: string): Promise<File> {
     if (!objectPath.startsWith("/objects/")) {

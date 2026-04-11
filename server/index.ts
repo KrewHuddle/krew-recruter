@@ -86,9 +86,21 @@ const stripeWebhookHandler = async (req: Request, res: Response) => {
         const sub = event.data.object as Stripe.Subscription;
         const customerId = sub.customer as string;
 
+        // Stripe SDK v20 removed `current_period_end` from the top-level
+        // Subscription type — it now lives on SubscriptionItem.
+        // (node_modules/stripe/types/SubscriptionItems.d.ts:53). The
+        // wire format still includes both during the deprecation window,
+        // so we read the item's copy when available and fall back to the
+        // legacy top-level field via an `any` cast. When the account's
+        // API version fully drops the top-level field, the fallback
+        // becomes a no-op and only the item path remains. Proper fix is
+        // a Stripe API version upgrade + webhook migration, deferred.
+        const periodEndSeconds =
+          sub.items?.data?.[0]?.current_period_end ??
+          (sub as any).current_period_end;
         await storage.updateTenantBillingByStripeCustomer(customerId, {
           subscriptionStatus: sub.status.toUpperCase() as any,
-          currentPeriodEnd: new Date(sub.current_period_end * 1000),
+          currentPeriodEnd: new Date(periodEndSeconds * 1000),
         });
 
         console.log(`Subscription updated for customer ${customerId}: ${sub.status}`);
@@ -130,10 +142,15 @@ const stripeWebhookHandler = async (req: Request, res: Response) => {
 
         const tenant = await storage.getTenantByStripeCustomer(customerId);
         if (tenant) {
+          // Stripe SDK v20 removed `payment_intent` from the top-level
+          // Invoice type. The wire format still includes it during the
+          // deprecation window, so we cast to any to read it. Proper
+          // fix is a Stripe API migration that uses invoice.payments
+          // or follows the new recommended access path — deferred.
           await storage.createPaymentHistory({
             tenantId: tenant.id,
             stripeInvoiceId: invoice.id,
-            stripePaymentIntentId: invoice.payment_intent as string,
+            stripePaymentIntentId: (invoice as any).payment_intent as string,
             // Schema field is amountCents, not amount. Stripe returns
             // amount_paid in the smallest currency unit (cents for USD)
             // so the units already match — just renaming the field key.

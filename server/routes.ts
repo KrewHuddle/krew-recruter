@@ -1917,15 +1917,21 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
           return res.status(404).json({ error: "Response not found or access denied" });
         }
         
-        // Get user name for the comment
-        const user = await storage.getUser(userId);
-        
+        // Get user name for the comment. storage exposes getUserProfile
+        // (not getUser), and UserProfile has firstName/lastName rather
+        // than a computed displayName, so we build the name here.
+        const user = await storage.getUserProfile(userId);
+        const displayName =
+          [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim() ||
+          user?.email ||
+          "Unknown";
+
         // Use storage method which enforces tenant scoping
         await storage.createResponseComment({
           tenantId,
           responseId,
           userId,
-          userName: user?.displayName || user?.email || "Unknown",
+          userName: displayName,
           comment,
         });
         
@@ -2874,31 +2880,28 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.get("/api/billing/plans", async (req, res) => {
     try {
       const products = await stripeService.listProductsWithPrices();
-      
-      const productsMap = new Map();
-      for (const row of products) {
-        if (!productsMap.has(row.product_id)) {
-          productsMap.set(row.product_id, {
-            id: row.product_id,
-            name: row.product_name,
-            description: row.product_description,
-            active: row.product_active,
-            metadata: row.product_metadata,
-            prices: []
-          });
-        }
-        if (row.price_id) {
-          productsMap.get(row.product_id).prices.push({
-            id: row.price_id,
-            unitAmount: row.unit_amount,
-            currency: row.currency,
-            recurring: row.recurring,
-            active: row.price_active,
-          });
-        }
-      }
 
-      res.json({ plans: Array.from(productsMap.values()) });
+      // listProductsWithPrices already returns one entry per product with
+      // a nested `prices` array — no grouping needed. The previous code
+      // treated the result as a flat join of (product × price) rows and
+      // accessed nonexistent top-level fields (price_id, unit_amount,
+      // etc.) directly on each product object, producing 5 TS2339 errors.
+      const plans = products.map((product) => ({
+        id: product.product_id,
+        name: product.product_name,
+        description: product.product_description,
+        active: product.product_active,
+        metadata: product.product_metadata,
+        prices: product.prices.map((price) => ({
+          id: price.price_id,
+          unitAmount: price.unit_amount,
+          currency: price.currency,
+          recurring: price.recurring,
+          active: price.price_active,
+        })),
+      }));
+
+      res.json({ plans });
     } catch (error) {
       console.error("Error fetching plans:", error);
       res.status(500).json({ error: "Failed to fetch plans" });
