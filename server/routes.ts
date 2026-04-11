@@ -1,8 +1,23 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
+import fs from "fs/promises";
+import path from "path";
+import jwt from "jsonwebtoken";
 import { storage } from "./storage";
 import { setupCustomAuth, isAuthenticated, getUserId as getCustomUserId, getUserClaims as getCustomUserClaims } from "./customAuth";
-import { getJwtSecret } from "./jwtAuth";
+import {
+  getJwtSecret,
+  registerHandler, loginHandler, meHandler, logoutHandler,
+  requireAuth, requireOrg,
+} from "./jwtAuth";
+import campaignRouter from "./campaignRoutes";
+import * as adImageGen from "./services/ad-image-generator";
+import {
+  getMaskedPlatformSettings,
+  getMetaCredentials,
+  setPlatformSetting,
+} from "./services/platformSettings";
+import { runAggregation } from "./services/job-aggregator";
 import { z } from "zod";
 import { randomBytes } from "crypto";
 import { stripeService } from "./stripeService";
@@ -28,9 +43,9 @@ import { db } from "./db";
 import {
   organizations, campaigns, jobs, applications, interviewInvites,
   campaignSpend, paymentHistory, aggregatedJobs, announcements,
-  auditEvents, jobAdCampaigns,
+  auditEvents, jobAdCampaigns, users, talentPool, talentPoolApplications,
 } from "@shared/schema";
-import { eq, desc, sql, sum, count, and } from "drizzle-orm";
+import { eq, desc, sql, sum, count, and, or } from "drizzle-orm";
 
 // Helper to safely get user ID from session
 function getUserId(req: Request): string | undefined {
@@ -49,9 +64,9 @@ export async function registerRoutes(
   // Setup custom auth
   await setupCustomAuth(app);
 
-  // Setup campaign engine routes (JWT-based)
-  const { default: campaignRouter } = await import("./campaignRoutes");
-  const { registerHandler, loginHandler, meHandler, logoutHandler, requireAuth, requireOrg } = await import("./jwtAuth");
+  // Setup campaign engine routes (JWT-based). campaignRouter and the
+  // jwtAuth handlers are now imported top-level — previously they were
+  // lazy-imported inside registerRoutes via `await import(...)`.
   app.post("/api/v2/auth/register", registerHandler);
   app.post("/api/v2/auth/login", loginHandler);
   app.get("/api/v2/auth/me", requireAuth, meHandler);
@@ -2683,9 +2698,8 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const authHeader = req.headers.authorization;
       if (authHeader?.startsWith("Bearer ")) {
         try {
-          const jwt = await import("jsonwebtoken");
           const token = authHeader.slice(7);
-          const decoded = jwt.default.verify(token, getJwtSecret()) as any;
+          const decoded = jwt.verify(token, getJwtSecret()) as any;
           userId = decoded.userId;
         } catch {}
       }
@@ -2710,9 +2724,8 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     const sessionEmail = (req.session as any)?.email?.toLowerCase();
     if (sessionEmail && SUPER_ADMIN_EMAILS.includes(sessionEmail)) return next();
 
-    // Check users table
-    const { users: usersTable } = await import("@shared/schema");
-    const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+    // Check users table (imported top-level as `users`)
+    const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
     if (user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) return next();
 
     return res.status(403).json({ error: "Super admin access required" });
@@ -2732,9 +2745,8 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         const authHeader = req.headers.authorization;
         if (authHeader?.startsWith("Bearer ")) {
           try {
-            const jwt = await import("jsonwebtoken");
             const token = authHeader.slice(7);
-            const decoded = jwt.default.verify(token, getJwtSecret()) as any;
+            const decoded = jwt.verify(token, getJwtSecret()) as any;
             userId = decoded.userId;
           } catch {}
         }
@@ -2759,9 +2771,8 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         return res.json({ isSuperAdmin: true });
       }
 
-      // Check users table as last resort
-      const { users: usersTable } = await import("@shared/schema");
-      const [user] = await db.select({ email: usersTable.email }).from(usersTable).where(eq(usersTable.id, userId));
+      // Check users table as last resort (imported top-level as `users`)
+      const [user] = await db.select({ email: users.email }).from(users).where(eq(users.id, userId));
       if (user?.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
         return res.json({ isSuperAdmin: true });
       }
@@ -3692,9 +3703,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   // ============ TALENT POOL ROUTES ============
 
-  const { talentPool: talentPoolTable, talentPoolApplications: talentAppTable } = await import("@shared/schema");
-  const talentOrm = await import("drizzle-orm");
-  const talentDb = (await import("./db")).db;
+  // talentPool, talentPoolApplications, db, and drizzle-orm helpers are
+  // now imported top-level. Previously they were lazy-imported into
+  // aliased locals (talentPool, talentPoolApplications, talentOrm, db)
+  // inside registerRoutes.
 
   // Search talent pool
   app.get("/api/talent/search", isAuthenticated, requireTenant, requirePlan("PRO", "ENTERPRISE"), async (req, res) => {
@@ -3706,72 +3718,72 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       } = req.query as Record<string, string>;
 
       const offset = (parseInt(page) - 1) * parseInt(limit);
-      const conditions: any[] = [talentOrm.eq(talentPoolTable.isPublic, true)];
+      const conditions: any[] = [eq(talentPool.isPublic, true)];
 
       if (q) {
         const searchTerm = `%${q}%`;
         conditions.push(
-          talentOrm.or(
-            talentOrm.sql`${talentPoolTable.firstName} ILIKE ${searchTerm}`,
-            talentOrm.sql`${talentPoolTable.lastName} ILIKE ${searchTerm}`,
-            talentOrm.sql`array_to_string(${talentPoolTable.jobTitles}, ',') ILIKE ${searchTerm}`,
-            talentOrm.sql`array_to_string(${talentPoolTable.skills}, ',') ILIKE ${searchTerm}`
+          or(
+            sql`${talentPool.firstName} ILIKE ${searchTerm}`,
+            sql`${talentPool.lastName} ILIKE ${searchTerm}`,
+            sql`array_to_string(${talentPool.jobTitles}, ',') ILIKE ${searchTerm}`,
+            sql`array_to_string(${talentPool.skills}, ',') ILIKE ${searchTerm}`
           )
         );
       }
 
       if (jobTitle) {
-        conditions.push(talentOrm.sql`${jobTitle} = ANY(${talentPoolTable.jobTitles})`);
+        conditions.push(sql`${jobTitle} = ANY(${talentPool.jobTitles})`);
       }
 
       if (availability && availability !== "any") {
-        conditions.push(talentOrm.eq(talentPoolTable.availability, availability as any));
+        conditions.push(eq(talentPool.availability, availability as any));
       }
 
       if (isGigAvailable === "true") {
-        conditions.push(talentOrm.eq(talentPoolTable.isGigAvailable, true));
+        conditions.push(eq(talentPool.isGigAvailable, true));
       }
 
       if (experienceYears) {
-        conditions.push(talentOrm.sql`${talentPoolTable.experienceYears} >= ${parseInt(experienceYears)}`);
+        conditions.push(sql`${talentPool.experienceYears} >= ${parseInt(experienceYears)}`);
       }
 
       if (city && state) {
-        conditions.push(talentOrm.eq(talentPoolTable.state, state));
+        conditions.push(eq(talentPool.state, state));
       }
 
       const where = conditions.length > 1
-        ? talentOrm.and(...conditions)!
+        ? and(...conditions)!
         : conditions[0];
 
-      const results = await talentDb
+      const results = await db
         .select({
-          id: talentPoolTable.id,
-          firstName: talentPoolTable.firstName,
-          lastName: talentPoolTable.lastName,
-          city: talentPoolTable.city,
-          state: talentPoolTable.state,
-          lat: talentPoolTable.lat,
-          lng: talentPoolTable.lng,
-          jobTitles: talentPoolTable.jobTitles,
-          skills: talentPoolTable.skills,
-          experienceYears: talentPoolTable.experienceYears,
-          availability: talentPoolTable.availability,
-          isGigAvailable: talentPoolTable.isGigAvailable,
-          avgRating: talentPoolTable.avgRating,
-          totalGigsCompleted: talentPoolTable.totalGigsCompleted,
-          videoIntroUrl: talentPoolTable.videoIntroUrl,
-          lastActiveAt: talentPoolTable.lastActiveAt,
+          id: talentPool.id,
+          firstName: talentPool.firstName,
+          lastName: talentPool.lastName,
+          city: talentPool.city,
+          state: talentPool.state,
+          lat: talentPool.lat,
+          lng: talentPool.lng,
+          jobTitles: talentPool.jobTitles,
+          skills: talentPool.skills,
+          experienceYears: talentPool.experienceYears,
+          availability: talentPool.availability,
+          isGigAvailable: talentPool.isGigAvailable,
+          avgRating: talentPool.avgRating,
+          totalGigsCompleted: talentPool.totalGigsCompleted,
+          videoIntroUrl: talentPool.videoIntroUrl,
+          lastActiveAt: talentPool.lastActiveAt,
         })
-        .from(talentPoolTable)
+        .from(talentPool)
         .where(where)
         .limit(parseInt(limit))
         .offset(offset);
 
       // Get total count
-      const [countResult] = await talentDb
-        .select({ count: talentOrm.sql<number>`count(*)` })
-        .from(talentPoolTable)
+      const [countResult] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(talentPool)
         .where(where);
 
       res.json({
@@ -3789,29 +3801,34 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get single talent profile (sanitized — no email/phone for employers)
   app.get("/api/talent/:id", isAuthenticated, async (req, res) => {
     try {
-      const id = Array.isArray((req.params as Record<string, string>).id) ? (req.params as Record<string, string>).id[0] : (req.params as Record<string, string>).id;
-      const [talent] = await talentDb
+      // Combined: req.params cast from fix/typecheck-express5-params
+      // (string | string[] → Record<string, string>) + the hoisted db
+      // identifier from refactor/routes-lazy-imports (was talentDb
+      // locally). Array.isArray check dropped — after the cast,
+      // (req.params as Record<string, string>).id is always string.
+      const id = (req.params as Record<string, string>).id;
+      const [talent] = await db
         .select({
-          id: talentPoolTable.id,
-          firstName: talentPoolTable.firstName,
-          lastName: talentPoolTable.lastName,
-          city: talentPoolTable.city,
-          state: talentPoolTable.state,
-          jobTitles: talentPoolTable.jobTitles,
-          skills: talentPoolTable.skills,
-          experienceYears: talentPoolTable.experienceYears,
-          availability: talentPoolTable.availability,
-          isGigAvailable: talentPoolTable.isGigAvailable,
-          avgRating: talentPoolTable.avgRating,
-          totalGigsCompleted: talentPoolTable.totalGigsCompleted,
-          videoIntroUrl: talentPoolTable.videoIntroUrl,
-          lastActiveAt: talentPoolTable.lastActiveAt,
-          resumeUrl: talentPoolTable.resumeUrl,
+          id: talentPool.id,
+          firstName: talentPool.firstName,
+          lastName: talentPool.lastName,
+          city: talentPool.city,
+          state: talentPool.state,
+          jobTitles: talentPool.jobTitles,
+          skills: talentPool.skills,
+          experienceYears: talentPool.experienceYears,
+          availability: talentPool.availability,
+          isGigAvailable: talentPool.isGigAvailable,
+          avgRating: talentPool.avgRating,
+          totalGigsCompleted: talentPool.totalGigsCompleted,
+          videoIntroUrl: talentPool.videoIntroUrl,
+          lastActiveAt: talentPool.lastActiveAt,
+          resumeUrl: talentPool.resumeUrl,
         })
-        .from(talentPoolTable)
-        .where(talentOrm.and(
-          talentOrm.eq(talentPoolTable.id, id),
-          talentOrm.eq(talentPoolTable.isPublic, true)
+        .from(talentPool)
+        .where(and(
+          eq(talentPool.id, id),
+          eq(talentPool.isPublic, true)
         )!);
 
       if (!talent) return res.status(404).json({ error: "Talent not found" });
@@ -3829,10 +3846,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const { message } = req.body;
       if (!message) return res.status(400).json({ error: "Message is required" });
 
-      const [talent] = await talentDb
+      const [talent] = await db
         .select()
-        .from(talentPoolTable)
-        .where(talentOrm.eq(talentPoolTable.id, id));
+        .from(talentPool)
+        .where(eq(talentPool.id, id));
 
       if (!talent) return res.status(404).json({ error: "Talent not found" });
 
@@ -3853,10 +3870,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const [existing] = await talentDb
+      const [existing] = await db
         .select()
-        .from(talentPoolTable)
-        .where(talentOrm.eq(talentPoolTable.userId, userId));
+        .from(talentPool)
+        .where(eq(talentPool.userId, userId));
 
       if (!existing) {
         return res.json(null);
@@ -3877,10 +3894,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
       const { isGigAvailable, availability, skills, experienceYears, videoIntroUrl } = req.body;
 
-      const [existing] = await talentDb
+      const [existing] = await db
         .select()
-        .from(talentPoolTable)
-        .where(talentOrm.eq(talentPoolTable.userId, userId));
+        .from(talentPool)
+        .where(eq(talentPool.userId, userId));
 
       if (!existing) {
         return res.status(404).json({ error: "No talent pool record found. Apply to a job first." });
@@ -3893,10 +3910,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       if (experienceYears !== undefined) updates.experienceYears = experienceYears;
       if (videoIntroUrl !== undefined) updates.videoIntroUrl = videoIntroUrl;
 
-      const [updated] = await talentDb
-        .update(talentPoolTable)
+      const [updated] = await db
+        .update(talentPool)
         .set(updates)
-        .where(talentOrm.eq(talentPoolTable.id, existing.id))
+        .where(eq(talentPool.id, existing.id))
         .returning();
 
       res.json(updated);
@@ -3912,19 +3929,19 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
-      const [existing] = await talentDb
+      const [existing] = await db
         .select()
-        .from(talentPoolTable)
-        .where(talentOrm.eq(talentPoolTable.userId, userId));
+        .from(talentPool)
+        .where(eq(talentPool.userId, userId));
 
       if (!existing) {
         return res.status(404).json({ error: "No talent pool record found" });
       }
 
-      const [updated] = await talentDb
-        .update(talentPoolTable)
+      const [updated] = await db
+        .update(talentPool)
         .set({ isGigAvailable: true, lastActiveAt: new Date() })
-        .where(talentOrm.eq(talentPoolTable.id, existing.id))
+        .where(eq(talentPool.id, existing.id))
         .returning();
 
       res.json(updated);
@@ -3937,10 +3954,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // Get talent pool count (for display)
   app.get("/api/talent/count", async (_req, res) => {
     try {
-      const [result] = await talentDb
-        .select({ count: talentOrm.sql<number>`count(*)` })
-        .from(talentPoolTable)
-        .where(talentOrm.eq(talentPoolTable.isPublic, true));
+      const [result] = await db
+        .select({ count: sql<number>`count(*)` })
+        .from(talentPool)
+        .where(eq(talentPool.isPublic, true));
       res.json({ count: Number(result?.count || 0) });
     } catch {
       res.json({ count: 0 });
@@ -3959,10 +3976,7 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
 
   // ============ AD IMAGE GENERATION ============
-
-  const adImageGen = await import("./services/ad-image-generator");
-  const fs = await import("fs/promises");
-  const path = await import("path");
+  // adImageGen, fs/promises, and path are now imported top-level.
 
   // Preview ad image (returns base64 PNG)
   app.post(
@@ -4175,7 +4189,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
   app.get("/api/admin/platform-settings", isAuthenticated, requireSuperAdmin, async (_req, res) => {
     try {
-      const { getMaskedPlatformSettings } = await import("./services/platformSettings");
       const settings = await getMaskedPlatformSettings();
       res.json(settings);
     } catch (error) {
@@ -4192,7 +4205,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   app.post("/api/admin/billing/process-daily-spend", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
       const today = new Date().toISOString().slice(0, 10);
-      const { getMetaCredentials } = await import("./services/platformSettings");
 
       let markupPercent = 20;
       try {
@@ -4325,7 +4337,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // POST /api/admin/aggregation/run — trigger a full aggregation cycle
   app.post("/api/admin/aggregation/run", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { runAggregation } = await import("./services/job-aggregator");
       const { skipAiFilter, sources } = req.body || {};
 
       const { jobs: aggregatedJobsList, stats } = await runAggregation({
@@ -4418,7 +4429,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // GET /api/admin/meta/settings — return masked platform settings
   app.get("/api/admin/meta/settings", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { getMaskedPlatformSettings } = await import("./services/platformSettings");
       const settings = await getMaskedPlatformSettings();
       res.json(settings);
     } catch (error) {
@@ -4430,7 +4440,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // PUT /api/admin/meta/settings — save platform settings
   app.put("/api/admin/meta/settings", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { setPlatformSetting } = await import("./services/platformSettings");
       const userId = getUserId(req) || "admin";
       const {
         appId, appSecret, accessToken, adAccountId,
@@ -4464,7 +4473,6 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   // GET /api/admin/meta/test — verify Meta API connection
   app.get("/api/admin/meta/test", isAuthenticated, requireSuperAdmin, async (req, res) => {
     try {
-      const { getMetaCredentials } = await import("./services/platformSettings");
       const creds = await getMetaCredentials();
 
       // Test the token by calling the Graph API
