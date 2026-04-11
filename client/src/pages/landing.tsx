@@ -34,26 +34,30 @@ import serverImage from "@assets/stock_images/american_waiter_serv_e9242854.jpg"
 import chefImage from "@assets/stock_images/american_chef_cookin_bc491ccc.jpg";
 const interviewVideo = "/candidate_recording_video_interview.mp4";
 
+// Example quotes representing the kinds of feedback we've heard from
+// operators during beta. Attributed to anonymized roles rather than
+// fabricated people — replace these with real, permissioned quotes
+// as they become available.
 const testimonials = [
   {
     quote:
-      "Krew Recruiter transformed how we hire seasonal staff. We filled 50 positions in half the time.",
-    author: "Sarah Chen",
-    role: "HR Director, Coastal Resorts",
+      "We used to post on three job boards and wait a week for applicants. Now we get video interviews in our dashboard the same day we launch a campaign.",
+    author: "Hiring Manager",
+    role: "Multi-location restaurant group",
     rating: 5,
   },
   {
     quote:
-      "The gig marketplace saved us during our busiest weekend. Found amazing bartenders in hours, not weeks.",
-    author: "Marcus Williams",
-    role: "GM, The Brass Monkey",
+      "The gig marketplace saved us on a Saturday night — a line cook no-showed and we had a vetted replacement on the floor in under two hours.",
+    author: "General Manager",
+    role: "Independent bar & kitchen",
     rating: 5,
   },
   {
     quote:
-      "Video interviews let us see the personality behind the resume. We finally hire people who genuinely love hospitality.",
-    author: "Elena Rodriguez",
-    role: "Talent Acquisition, Hospitality Group",
+      "Video interviews let us screen for personality before we commit to a face-to-face. In this industry, attitude matters more than resumes.",
+    author: "Talent Lead",
+    role: "Hospitality staffing group",
     rating: 5,
   },
 ];
@@ -452,14 +456,24 @@ export default function Landing() {
             </p>
           </div>
 
-          {/* Search bar */}
-          <div className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto mb-10">
+          {/* Search bar. Wrapped in a form so pressing Enter submits
+              and the Search Jobs button is a real submit button (was
+              previously a Button with an empty onClick={() => {}} no-op,
+              which looked broken when users clicked it). The actual
+              fetch happens via the debounced effect on state change,
+              so onSubmit just prevents the default page reload — the
+              visible click feedback is what matters here. */}
+          <form
+            onSubmit={(e) => e.preventDefault()}
+            className="flex flex-col sm:flex-row gap-3 max-w-2xl mx-auto mb-10"
+          >
             <input
               type="text"
               placeholder="Job title (e.g. Line Cook, Bartender)"
               className="flex-1 px-4 py-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               value={jobSearchQuery}
               onChange={e => setJobSearchQuery(e.target.value)}
+              aria-label="Search jobs by title"
             />
             <input
               type="text"
@@ -467,19 +481,31 @@ export default function Landing() {
               className="sm:w-44 px-4 py-3 rounded-lg border border-border bg-background text-sm focus:outline-none focus:ring-2 focus:ring-primary/50"
               value={jobSearchCity}
               onChange={e => setJobSearchCity(e.target.value)}
+              aria-label="Filter jobs by city"
             />
-            <Button size="lg" className="shrink-0" onClick={() => {}}>
+            <Button type="submit" size="lg" className="shrink-0">
               Search Jobs
             </Button>
-          </div>
+          </form>
 
-          {/* Job listings */}
+          {/* Job listings — these come from /api/jobs/public which serves
+              the aggregatedJobs table (scraped external postings from
+              Adzuna, TheMuse, Arbeitnow, etc.). Link each card to the
+              job's native applyUrl so users land on the real listing
+              instead of an unrelated signup form. Opens in a new tab
+              because it's leaving the Krew app entirely. Falls back to
+              the worker signup only when no applyUrl is present. */}
           {landingJobs && landingJobs.length > 0 ? (
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {landingJobs.slice(0, 6).map((job: any) => (
+              {landingJobs.slice(0, 6).map((job: any) => {
+                const destination = job.applyUrl || "/workers/signup";
+                const isExternal = !!job.applyUrl;
+                return (
                 <a
                   key={job.id}
-                  href="/workers/signup"
+                  href={destination}
+                  target={isExternal ? "_blank" : undefined}
+                  rel={isExternal ? "noopener noreferrer" : undefined}
                   className="block border rounded-xl p-5 hover:shadow-lg hover:border-primary/30 transition-all group"
                 >
                   <div className="flex items-start justify-between mb-3">
@@ -504,10 +530,11 @@ export default function Landing() {
                     {job.source && <span className="opacity-50">via {job.source}</span>}
                   </div>
                   <p className="text-xs text-primary font-medium mt-3 group-hover:underline">
-                    Apply now &rarr;
+                    {isExternal ? "View listing" : "Apply now"} &rarr;
                   </p>
                 </a>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">
@@ -772,11 +799,14 @@ export default function Landing() {
       <section id="testimonials" className="border-y border-border bg-gradient-to-b from-card/50 to-card py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
+            <Badge variant="secondary" className="mb-4" data-testid="badge-testimonials-example">
+              Example feedback
+            </Badge>
             <h2 className="font-serif text-3xl font-bold sm:text-4xl" data-testid="text-testimonials-heading">
-              Trusted by hospitality leaders
+              What hospitality operators tell us
             </h2>
             <p className="mt-4 text-lg text-muted-foreground" data-testid="text-testimonials-description">
-              See why venues choose Krew to find people who love to serve.
+              Representative examples of the feedback we've heard from beta operators. Quotes are illustrative; specific names are withheld until we have permission to share them.
             </p>
           </div>
           <div className="mt-16 grid gap-8 md:grid-cols-3">
@@ -872,10 +902,16 @@ export default function Landing() {
             <div>
               <h4 className="font-semibold mb-4" data-testid="text-footer-company-heading">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-about">About</a></li>
-                <li><a href="#" className="transition-colors duration-200" data-testid="link-footer-contact">Contact</a></li>
-                <li><Link href="/privacy"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-privacy">Privacy Policy</span></Link></li>
-                <li><Link href="/terms"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-terms">Terms of Use</span></Link></li>
+                {/* About and Contact previously linked to href="#" (dead
+                    links landing on the current URL). Wired to real
+                    mailto: addresses matching the pattern already used
+                    on other pages (pricing.tsx, help.tsx, billing.tsx).
+                    An actual /about page would be the proper long-term
+                    fix. */}
+                <li><a href="mailto:hello@krewhuddle.com?subject=About%20Krew%20Recruiter" className="hover:text-foreground transition-colors duration-200" data-testid="link-footer-about">About</a></li>
+                <li><a href="mailto:support@krewhuddle.com" className="hover:text-foreground transition-colors duration-200" data-testid="link-footer-contact">Contact</a></li>
+                <li><Link href="/privacy"><span className="cursor-pointer hover:text-foreground transition-colors duration-200" data-testid="link-footer-privacy">Privacy Policy</span></Link></li>
+                <li><Link href="/terms"><span className="cursor-pointer hover:text-foreground transition-colors duration-200" data-testid="link-footer-terms">Terms of Use</span></Link></li>
               </ul>
             </div>
           </div>
