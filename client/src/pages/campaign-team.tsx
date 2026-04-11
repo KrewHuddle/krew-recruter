@@ -312,7 +312,11 @@ function BrandingForm({ apiFetch, branding, orgName, toast, queryClient, orgId }
       setName(branding.name || "");
       setWebsite(branding.website || "");
       setLogoUrl(branding.logoUrl || "");
-      setCoverUrl(branding.coverUrl || "");
+      // DB column is cover_photo_url → drizzle returns coverPhotoUrl, NOT
+      // coverUrl. Reading branding.coverUrl here used to always return
+      // undefined, so the cover image went blank on every refetch even
+      // after a successful upload.
+      setCoverUrl(branding.coverPhotoUrl || "");
       setPrimaryColor(branding.primaryColor || "#8B33D4");
       setAccentColor(branding.accentColor || "#CC2B7F");
       setGlassdoorRating(branding.glassdoorRating?.toString() || "");
@@ -326,16 +330,30 @@ function BrandingForm({ apiFetch, branding, orgName, toast, queryClient, orgId }
       formData.append("file", file);
       const res = await apiFetch(`/api/org/${type}`, {
         method: "POST",
-        headers: {},
         body: formData,
       });
       if (res.ok) {
         const data = await res.json();
         if (type === "logo") setLogoUrl(data.url);
         else setCoverUrl(data.url);
+      } else {
+        // Surface the server's error message instead of silently falling
+        // through. Previously any non-2xx response (e.g. 400 "No file
+        // uploaded", 503 "uploads not configured") left the UI blank
+        // with no feedback.
+        const errBody = await res.json().catch(() => ({}));
+        toast({
+          title: "Upload failed",
+          description: errBody?.error || `Could not upload ${type}. Please try again.`,
+          variant: "destructive",
+        });
       }
     } catch {
-      toast({ title: "Upload failed", variant: "destructive" });
+      toast({
+        title: "Upload failed",
+        description: "Network error. Please try again.",
+        variant: "destructive",
+      });
     } finally {
       setUploading(null);
     }
@@ -346,8 +364,14 @@ function BrandingForm({ apiFetch, branding, orgName, toast, queryClient, orgId }
       const res = await apiFetch("/api/org/branding", {
         method: "PUT",
         body: JSON.stringify({
-          name, website, logoUrl, coverUrl,
-          primaryColor, accentColor,
+          name,
+          website,
+          logoUrl,
+          // Send the canonical field name matching the DB column so the
+          // server doesn't need its coverUrl→coverPhotoUrl alias.
+          coverPhotoUrl: coverUrl,
+          primaryColor,
+          accentColor,
           glassdoorRating: glassdoorRating ? parseFloat(glassdoorRating) : null,
         }),
       });

@@ -682,13 +682,26 @@ export default function CampaignWizard() {
                     const formData = new FormData();
                     formData.append("file", file);
                     try {
-                      const res = await apiFetch("/api/org/logo", { method: "POST", headers: {}, body: formData });
+                      const res = await apiFetch("/api/org/logo", { method: "POST", body: formData });
                       if (res.ok) {
-                        const data = await res.json();
+                        await res.json();
                         localStorage.setItem("krew_logo_prompt_shown", "1");
                         toast({ title: "Logo uploaded!", description: "Your logo will appear in ad previews." });
+                      } else {
+                        const errBody = await res.json().catch(() => ({}));
+                        toast({
+                          title: "Upload failed",
+                          description: errBody?.error || "Could not upload logo. Please try again.",
+                          variant: "destructive",
+                        });
                       }
-                    } catch {}
+                    } catch {
+                      toast({
+                        title: "Upload failed",
+                        description: "Network error. Please try again.",
+                        variant: "destructive",
+                      });
+                    }
                   }} />
                 </label>
                 <Button variant="ghost" size="sm" onClick={() => {

@@ -78,18 +78,26 @@ export default function CampaignSettings() {
       const formData = new FormData();
       formData.append("file", file);
 
+      // apiFetch detects FormData and skips the JSON Content-Type header
+      // so the browser can set the multipart boundary itself.
       const res = await apiFetch("/api/org/logo", {
         method: "POST",
-        headers: {}, // let browser set content-type for FormData
         body: formData,
       });
 
       if (res.ok) {
         const data = await res.json();
         setLogoUrl(data.url);
+      } else {
+        const errBody = await res.json().catch(() => ({}));
+        toast({
+          title: "Upload failed",
+          description: errBody?.error || "Could not upload logo. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch {
-      toast({ title: "Upload failed", description: "Could not upload logo. Please try again.", variant: "destructive" });
+      toast({ title: "Upload failed", description: "Network error. Please try again.", variant: "destructive" });
     } finally {
       setUploading(false);
     }

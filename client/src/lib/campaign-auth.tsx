@@ -60,8 +60,14 @@ export function CampaignAuthProvider({ children }: { children: ReactNode }) {
     const token = localStorage.getItem(TOKEN_KEY);
     const orgId = localStorage.getItem(ORG_KEY) || getTenantIdFromCookie();
 
+    // Do NOT set Content-Type when the body is FormData — the browser needs
+    // to set it itself so it can include the multipart boundary. Forcing
+    // application/json here would silently break every file upload (the
+    // server's multer parser gets a multipart body with no boundary, sees
+    // req.file as undefined, and returns 400 "No file uploaded").
+    const isFormData = options.body instanceof FormData;
     const headers: Record<string, string> = {
-      "Content-Type": "application/json",
+      ...(!isFormData && { "Content-Type": "application/json" }),
       ...(options.headers as Record<string, string> || {}),
     };
 
