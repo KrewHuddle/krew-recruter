@@ -19,6 +19,7 @@ import NotFound from "@/pages/not-found";
 import Landing from "@/pages/landing";
 import Employers from "@/pages/employers";
 import JobSearch from "@/pages/job-search";
+import JobPublic from "@/pages/job-public";
 import Dashboard from "@/pages/dashboard";
 import Locations from "@/pages/locations";
 import Jobs from "@/pages/jobs";
@@ -405,6 +406,10 @@ function AppRouter() {
       <Route path="/terms" component={Terms} />
       <Route path="/jobs/location/:cityState" component={JobsByLocation} />
       <Route path="/jobs/role/:role" component={JobsByRole} />
+      {/* Public single-job landing — destination for Meta ads and shared
+          links. Must come AFTER the more-specific /jobs/location/* and
+          /jobs/role/* patterns so wouter doesn't shadow them. */}
+      <Route path="/jobs/:id" component={JobPublic} />
 
       {/* Worker signup & onboarding (public entry, protected onboarding) */}
       <Route path="/workers/signup" component={WorkerSignup} />

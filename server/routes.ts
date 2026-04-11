@@ -450,6 +450,38 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
     }
   });
 
+  // Public single-tenant job lookup — used by the public /jobs/:id landing
+  // page that Meta ads (and any shared link) point at. PUBLISHED jobs only,
+  // and only the fields that are safe to expose without auth (no internal
+  // tenant plan info, no application list, no draft content).
+  app.get("/api/jobs/public/tenant/:id", async (req, res) => {
+    try {
+      const { id } = req.params;
+      const job = await storage.getJob(id);
+      if (!job || job.status !== "PUBLISHED") {
+        return res.status(404).json({ error: "Job not found" });
+      }
+      const tenant = await storage.getTenant(job.tenantId);
+      const location = job.locationId ? await storage.getLocation(job.locationId) : null;
+      res.json({
+        id: job.id,
+        title: job.title,
+        role: job.role,
+        description: job.description,
+        jobType: job.jobType,
+        payRangeMin: job.payRangeMin,
+        payRangeMax: job.payRangeMax,
+        scheduleTags: job.scheduleTags,
+        createdAt: job.createdAt,
+        tenant: tenant ? { id: tenant.id, name: tenant.name, slug: tenant.slug } : null,
+        location: location ? { name: location.name, city: location.city, state: location.state } : null,
+      });
+    } catch (error) {
+      console.error("Public tenant job error:", error);
+      res.status(500).json({ error: "Failed to fetch job" });
+    }
+  });
+
   // ============ JOB ROUTES ============
 
   app.get("/api/jobs", isAuthenticated, requireTenant, async (req, res) => {
@@ -4035,7 +4067,10 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
               pay: job.payRangeMin && job.payRangeMax
                 ? `$${job.payRangeMin}-$${job.payRangeMax}/hr`
                 : job.payRangeMin ? `$${job.payRangeMin}/hr` : undefined,
-              applyUrl: `${baseUrl}/jobs/${job.id}`,
+              // Public landing page (registered in App.tsx as /jobs/:id).
+              // UTM params let analytics distinguish Meta-driven traffic from
+              // organic. Don't change without also updating job-public.tsx.
+              applyUrl: `${baseUrl}/jobs/${job.id}?utm_source=meta&utm_medium=cpc&utm_campaign=krew-boost`,
             },
             dailyBudgetUSD
           );
@@ -4065,10 +4100,14 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   );
 
   // Activate a Meta campaign
+  // NOTE: plan-gated like create — preventing a downgraded tenant from
+  // resuming an old paused campaign and accruing fresh ad spend. Pause and
+  // delete are intentionally NOT plan-gated so users can always stop spending.
   app.post(
     "/api/meta/campaign/:id/activate",
     isAuthenticated,
     requireTenant,
+    requirePlan("PRO", "ENTERPRISE"),
     requireRole("OWNER", "ADMIN", "HIRING_MANAGER"),
     async (req, res) => {
       try {
