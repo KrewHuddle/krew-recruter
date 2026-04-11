@@ -2238,6 +2238,24 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
       const userId = getUserId(req);
       if (!userId) return res.status(401).json({ error: "Unauthorized" });
 
+      // Verify the authenticated user is actually a job seeker — not an
+      // employer who happens to also be signed in. Without this check, a
+      // PRO/ENTERPRISE employer with a valid session could hit this API
+      // directly and create worker-side applications against jobs in any
+      // tenant, which would then show up in that tenant's applicants
+      // list as if a real candidate had applied. The route is wired
+      // behind isAuthenticated but that middleware doesn't know about
+      // userType — it just verifies session/token validity.
+      //
+      // This fetch is reused below for the talent pool upsert so no
+      // extra DB round trip is introduced.
+      const userProfile = await storage.getUserProfile(userId);
+      if (!userProfile || userProfile.userType !== "JOB_SEEKER") {
+        return res.status(403).json({
+          error: "Only job seeker accounts can apply to jobs",
+        });
+      }
+
       const { jobId, coverLetter, resumeUrl } = req.body;
       if (!jobId) return res.status(400).json({ error: "Job ID required" });
 
@@ -2262,9 +2280,9 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
         stage: "APPLIED",
       });
 
-      // Auto-upsert applicant into talent pool
+      // Auto-upsert applicant into talent pool (reusing the userProfile
+      // fetched above for the userType check)
       try {
-        const userProfile = await storage.getUserProfile(userId);
         const claims = getUserClaims(req);
         if (userProfile || claims.email) {
           const talentId = await upsertToTalentPool({
