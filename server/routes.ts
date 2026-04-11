@@ -4006,21 +4006,29 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
   const paramStr = (val: string | string[]): string =>
     Array.isArray(val) ? val[0] : val;
 
-  // Two-layer budget validation: a hardcoded Zod ceiling guards against
-  // garbage / negative / typo input regardless of platform configuration,
-  // and the per-deployment policy ceiling from platform_settings is
-  // enforced separately below. The Zod ceiling is intentionally generous
-  // ($10k/day) — its job is to catch obvious abuse and type errors, not
-  // to enforce business policy. The platform admin sets the real cap via
-  // meta_max_daily_budget_cents, defaulting to $100/day in
-  // getMetaCredentials() if unset.
+  // Budget validation has three precedence layers:
+  //   1. Zod ceiling (this schema): guards against garbage / negative /
+  //      typo input. $1-$10,000/day absolute range. Catches obvious abuse
+  //      and type errors regardless of platform configuration.
+  //   2. Platform default (meta_default_daily_budget_cents): used when
+  //      the client omits dailyBudgetUSD entirely. Configurable by the
+  //      platform admin via the admin UI.
+  //   3. Per-deployment policy ceiling (meta_max_daily_budget_cents):
+  //      enforced in the route handler below against the resolved value.
+  //      Configurable by the platform admin, defaults to $100/day.
+  //
+  // dailyBudgetUSD is OPTIONAL — when omitted, the handler falls back to
+  // the platform default. When provided, it must satisfy the Zod range
+  // constraints. This wires the previously dead `defaultDailyBudgetCents`
+  // config (settable in admin UI but never read at runtime).
   const createMetaCampaignBodySchema = z.object({
     jobId: z.string().min(1, "jobId is required"),
     dailyBudgetUSD: z
       .number({ invalid_type_error: "dailyBudgetUSD must be a number" })
       .positive("dailyBudgetUSD must be greater than zero")
       .min(1, "dailyBudgetUSD must be at least $1/day")
-      .max(10000, "dailyBudgetUSD exceeds the $10,000/day absolute ceiling"),
+      .max(10000, "dailyBudgetUSD exceeds the $10,000/day absolute ceiling")
+      .optional(),
     radius: z
       .number()
       .int()
@@ -4051,13 +4059,56 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
             details: parsed.error.issues.map((i) => `${i.path.join(".")}: ${i.message}`),
           });
         }
-        const { jobId, dailyBudgetUSD } = parsed.data;
+        const { jobId } = parsed.data;
         const radiusOverride = parsed.data.radius;
 
         // Fetch the job
         const job = await storage.getJob(jobId);
         if (!job || job.tenantId !== tenantId) {
           return res.status(404).json({ error: "Job not found" });
+        }
+
+        // Pre-fetch Meta credentials ONCE — used for both the default-
+        // budget fallback below and the per-deployment max enforcement
+        // further down. Replaces the previous pattern of calling
+        // isMetaConfigured() (which itself calls getMetaCredentials())
+        // and then making a second getMetaCredentials() call. Single
+        // structural type avoids a top-level type-only import.
+        let metaCreds: { defaultDailyBudgetCents: number; maxDailyBudgetCents: number } | null = null;
+        try {
+          const { getMetaCredentials } = await import("./services/platformSettings");
+          metaCreds = await getMetaCredentials();
+        } catch {
+          // Meta not configured — credentials throw, we just save a draft
+          metaCreds = null;
+        }
+
+        // Resolve the daily budget. Precedence:
+        //   1. Explicit client value (already Zod-validated above)
+        //   2. Platform admin default (meta_default_daily_budget_cents)
+        //   3. Schema column default ($10/day) when Meta isn't configured
+        //      at all and there are no credentials to read a default from
+        // This wires up `defaultDailyBudgetCents` which was previously
+        // dead config — settable via the admin UI but never read.
+        let dailyBudgetUSD = parsed.data.dailyBudgetUSD;
+        if (dailyBudgetUSD === undefined) {
+          dailyBudgetUSD = metaCreds
+            ? metaCreds.defaultDailyBudgetCents / 100
+            : 10;
+        }
+
+        // Re-validate the resolved value. Zod's constraints applied only
+        // to the explicit-value path; the fallback bypassed them, so we
+        // defensively re-check the same $1-$10,000/day range here. In
+        // practice this only fires if the platform admin has configured
+        // an out-of-range default, which the admin UI should prevent
+        // but we don't trust unilaterally.
+        if (dailyBudgetUSD < 1 || dailyBudgetUSD > 10000) {
+          return res.status(400).json({
+            error: `Resolved daily budget of $${dailyBudgetUSD.toFixed(
+              2
+            )} is outside the $1-$10,000/day range. Check the meta_default_daily_budget_cents setting in the admin UI.`,
+          });
         }
 
         const tenant = await storage.getTenant(tenantId);
@@ -4086,17 +4137,14 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
 
         let metaResult = null;
 
-        if (await metaAds.isMetaConfigured()) {
-          // Per-deployment policy ceiling. Reads the same credentials object
-          // the meta-ads service uses, so the cap stays in sync with whatever
-          // the platform admin has configured via the admin UI.
-          const { getMetaCredentials } = await import("./services/platformSettings");
-          const creds = await getMetaCredentials();
+        if (metaCreds) {
+          // Per-deployment policy ceiling using the credentials we
+          // already fetched above (no second DB call).
           const requestedCents = Math.round(dailyBudgetUSD * 100);
-          if (requestedCents > creds.maxDailyBudgetCents) {
+          if (requestedCents > metaCreds.maxDailyBudgetCents) {
             return res.status(400).json({
               error: `Daily budget of $${dailyBudgetUSD} exceeds the platform maximum of $${(
-                creds.maxDailyBudgetCents / 100
+                metaCreds.maxDailyBudgetCents / 100
               ).toFixed(2)}/day. Contact support if you need a higher cap.`,
             });
           }
