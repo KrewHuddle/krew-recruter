@@ -176,19 +176,19 @@ export default function Landing() {
       <nav className="fixed top-0 left-0 right-0 z-50 border-b border-border/40 bg-background/80 backdrop-blur-lg">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-2">
-            <img src={logoImage} alt="Krew Recruiter" className="h-9 w-9 rounded-lg object-contain" data-testid="img-logo-nav" />
-            <span className="text-xl font-semibold" data-testid="text-brand-nav">Krew Recruiter</span>
+            <img src={logoImage} alt="Krew Recruiter" className="h-9 w-9 rounded-lg object-contain" />
+            <span className="text-xl font-semibold">Krew Recruiter</span>
           </div>
           <div className="hidden md:flex items-center gap-8">
-            <a href="#gigs" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-gigs">Krew Gigs</a>
-            <a href="/video-interviews" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-interviews">Video Interviews</a>
-            <a href="#testimonials" className="text-sm text-muted-foreground transition-colors duration-200" data-testid="link-nav-testimonials">Testimonials</a>
-            <Link href="/gigs"><span className="text-sm text-muted-foreground cursor-pointer transition-colors duration-200" data-testid="link-nav-find-gigs">Find Gigs</span></Link>
+            <a href="#gigs" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Krew Gigs</a>
+            <a href="/video-interviews" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Video Interviews</a>
+            <a href="#testimonials" className="text-sm text-muted-foreground hover:text-foreground transition-colors duration-200">Testimonials</a>
+            <Link href="/gigs"><span className="text-sm text-muted-foreground hover:text-foreground cursor-pointer transition-colors duration-200">Find Gigs</span></Link>
           </div>
           <div className="hidden md:flex items-center gap-3">
             <ThemeToggle />
-            <a href="/login"><Button variant="ghost" data-testid="button-login">Sign in</Button></a>
-            <a href="/login"><Button data-testid="button-get-started">Get Started</Button></a>
+            <a href="/login"><Button variant="ghost">Sign in</Button></a>
+            <a href="/login"><Button>Get Started</Button></a>
           </div>
           {/* Mobile: CTA + hamburger */}
           <div className="flex md:hidden items-center gap-2">
@@ -212,7 +212,7 @@ export default function Landing() {
             ))}
             <div className="border-t border-border my-2" />
             <a href="/login"><Button variant="outline" className="w-full mb-2">Sign In</Button></a>
-            <a href="/workers/signup"><Button className="w-full">I Want to Work</Button></a>
+            <a href="/workers/signup"><Button className="w-full">Get Started</Button></a>
           </div>
         )}
       </nav>
@@ -220,18 +220,18 @@ export default function Landing() {
       <section className="relative pt-24 pb-12 sm:pt-32 sm:pb-20 lg:pt-40 lg:pb-32 overflow-hidden">
         <div className="absolute inset-0 -z-10">
           <div className="absolute top-0 left-0 right-0 h-full bg-gradient-to-br from-primary/5 via-transparent to-secondary/5" />
-          <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/8 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
-          <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-secondary/10 blur-3xl animate-pulse" style={{ animationDuration: '5s' }} />
+          <div className="absolute top-1/4 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/8 blur-3xl animate-pulse motion-reduce:animate-none" style={{ animationDuration: '4s' }} />
+          <div className="absolute bottom-1/4 right-1/4 h-[400px] w-[400px] rounded-full bg-secondary/10 blur-3xl animate-pulse motion-reduce:animate-none" style={{ animationDuration: '5s' }} />
         </div>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 items-center">
             <div className="text-center lg:text-left">
-              <div className="mb-6 inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary" data-testid="text-hero-tagline">
+              <div className="mb-6 inline-flex flex-wrap items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm text-primary">
                 <Heart className="h-4 w-4" />
-                <span data-testid="text-hero-tagline-text">Built for hospitality, by hospitality</span>
+                <span>Built for hospitality, by hospitality</span>
               </div>
-              <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl" data-testid="text-hero-heading">
-                Find people who{" "}
+              <h1 className="font-serif text-3xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+                Find hospitality people who{" "}
                 <span className="text-primary relative">
                   love to serve
                   <svg className="absolute -bottom-2 left-0 w-full h-3 text-primary/30" viewBox="0 0 200 12" preserveAspectRatio="none">
@@ -239,18 +239,18 @@ export default function Landing() {
                   </svg>
                 </span>
               </h1>
-              <p className="mt-4 sm:mt-6 text-base sm:text-xl text-muted-foreground leading-relaxed" data-testid="text-hero-description">
+              <p className="mt-4 sm:mt-6 text-base sm:text-xl text-muted-foreground leading-relaxed">
                 Great hospitality starts with great people. Krew Recruiter helps you discover passionate talent through video interviews, and fills last-minute shifts with our gig worker marketplace.
               </p>
               <div className="mt-8 sm:mt-10 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center justify-center lg:justify-start gap-3 sm:gap-4">
                 <a href="/login" className="w-full sm:w-auto">
-                  <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-primary/25" data-testid="button-hero-employer">
+                  <Button size="lg" className="w-full sm:w-auto gap-2 shadow-lg shadow-primary/25">
                     I'm Hiring
                     <Briefcase className="h-4 w-4" />
                   </Button>
                 </a>
                 <Link href="/workers/signup" className="w-full sm:w-auto">
-                  <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2" data-testid="button-hero-worker">
+                  <Button variant="outline" size="lg" className="w-full sm:w-auto gap-2">
                     I Want to Work
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -261,15 +261,15 @@ export default function Landing() {
                 <Link href="/login" className="text-primary hover:underline">Sign in</Link>
               </p>
               <div className="mt-4 flex flex-wrap items-center justify-center lg:justify-start gap-6 text-sm text-muted-foreground">
-                <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-free">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-secondary" />
                   Free to start
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-video">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-secondary" />
                   Video interviews included
                 </div>
-                <div className="flex flex-wrap items-center gap-1.5" data-testid="text-hero-gigs">
+                <div className="flex flex-wrap items-center gap-1.5">
                   <CheckCircle2 className="h-4 w-4 text-secondary" />
                   Access gig workers instantly
                 </div>
@@ -284,13 +284,13 @@ export default function Landing() {
                       src={bartenderImage} 
                       alt="Professional bartender" 
                       className="rounded-2xl shadow-2xl object-cover h-48 w-full"
-                      data-testid="img-hero-bartender"
+                     
                     />
                     <img 
                       src={chefImage} 
                       alt="Professional chef" 
                       className="rounded-2xl shadow-2xl object-cover h-32 w-full"
-                      data-testid="img-hero-chef"
+                     
                     />
                   </div>
                   <div className="pt-8">
@@ -298,11 +298,11 @@ export default function Landing() {
                       src={serverImage} 
                       alt="Friendly server" 
                       className="rounded-2xl shadow-2xl object-cover h-72 w-full"
-                      data-testid="img-hero-server"
+                     
                     />
                   </div>
                 </div>
-                <div className="absolute -bottom-4 -right-4 bg-card border border-border rounded-xl p-4 shadow-xl" data-testid="card-hero-stat">
+                <div className="absolute -bottom-4 -right-4 bg-card border border-border rounded-xl p-4 shadow-xl">
                   <div className="flex flex-wrap items-center gap-3">
                     <div className="h-10 w-10 rounded-full bg-secondary flex flex-wrap items-center justify-center">
                       <Users className="h-5 w-5 text-secondary-foreground" />
@@ -319,19 +319,26 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ═══════ HOW IT WORKS SECTION ═══════ */}
-      <section className="py-24 px-6 relative overflow-hidden" style={{ background: "hsl(270 25% 6%)" }}>
-        {/* Dot pattern */}
-        <div className="absolute inset-0 opacity-5" style={{ backgroundImage: "radial-gradient(circle, #7C3AED 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
+      {/* ═══════ HOW IT WORKS SECTION ═══════
+          Previously this section hardcoded hsl(270 25% 6%) backgrounds
+          and text-white/* everywhere, which looked like a jarring dark
+          band in light mode. Now uses design-system tokens (bg-card,
+          text-foreground, border, muted-foreground) so it adapts to
+          both light and dark modes, while keeping the same visual
+          rhythm and dot-pattern overlay. */}
+      <section className="py-24 px-6 relative overflow-hidden bg-card border-y border-border">
+        {/* Dot pattern — uses currentColor via primary tint so it reads
+            correctly in both modes instead of a hardcoded hex. */}
+        <div className="absolute inset-0 opacity-[0.04] text-primary" style={{ backgroundImage: "radial-gradient(circle, currentColor 1px, transparent 1px)", backgroundSize: "32px 32px" }} />
 
         <div className="max-w-6xl mx-auto relative">
           {/* Header */}
           <div className="text-center mb-16">
             <span className="text-primary text-xs font-semibold tracking-[0.2em] uppercase mb-4 block">How It Works</span>
-            <h2 className="text-white text-4xl md:text-5xl font-bold mb-6">
+            <h2 className="font-serif text-4xl md:text-5xl font-bold mb-6">
               Hire smarter. <span className="text-primary">Fill shifts faster.</span>
             </h2>
-            <p className="text-white/60 text-lg max-w-2xl mx-auto">
+            <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
               Krew Recruiter runs targeted ads for your open positions on Facebook & Instagram — reaching hospitality workers who aren't on job boards.
             </p>
           </div>
@@ -341,30 +348,30 @@ export default function Landing() {
             <div className="hidden md:block absolute top-10 left-[12.5%] right-[12.5%] h-px border-t-2 border-dashed border-primary/30 z-0" />
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
               {[
-                { num: "01", icon: <Briefcase className="h-6 w-6 text-white" />, title: "Post Your Job", desc: "Add job details in minutes. Import directly from Indeed or ZipRecruiter with a single link." },
-                { num: "02", icon: <Wand2 className="h-6 w-6 text-white" />, title: "We Build Your Ad", desc: "We auto-generate a high-converting ad with your logo and branding. No design skills needed." },
-                { num: "03", icon: <Radio className="h-6 w-6 text-white" />, title: "Ad Goes Live", desc: "Your job ad reaches hospitality workers within miles of your restaurant. Set your own daily budget." },
-                { num: "04", icon: <Users className="h-6 w-6 text-white" />, title: "Candidates Come to You", desc: "Review video interviews and shortlist candidates — all inside your Krew Recruiter dashboard." },
+                { num: "01", icon: <Briefcase className="h-6 w-6 text-primary-foreground" />, title: "Post Your Job", desc: "Add job details in minutes. Import directly from Indeed or ZipRecruiter with a single link." },
+                { num: "02", icon: <Wand2 className="h-6 w-6 text-primary-foreground" />, title: "We Build Your Ad", desc: "We auto-generate a high-converting ad with your logo and branding. No design skills needed." },
+                { num: "03", icon: <Radio className="h-6 w-6 text-primary-foreground" />, title: "Ad Goes Live", desc: "Your job ad reaches hospitality workers within miles of your restaurant. Set your own daily budget." },
+                { num: "04", icon: <Users className="h-6 w-6 text-primary-foreground" />, title: "Candidates Come to You", desc: "Review video interviews and shortlist candidates — all inside your Krew Recruiter dashboard." },
               ].map((step, i) => (
                 <div key={i} className="flex flex-col items-center text-center relative z-10">
                   <div className="relative mb-6">
-                    <div className="w-20 h-20 rounded-full p-[2px]" style={{ background: "linear-gradient(135deg, hsl(280 70% 52%), hsl(320 65% 48%))" }}>
-                      <div className="w-full h-full rounded-full flex flex-col items-center justify-center" style={{ background: "hsl(270 25% 10%)" }}>
+                    <div className="w-20 h-20 rounded-full p-[2px] bg-gradient-to-br from-primary to-secondary">
+                      <div className="w-full h-full rounded-full flex flex-col items-center justify-center bg-primary">
                         {step.icon}
-                        <span className="text-primary text-xs font-bold mt-0.5">{step.num}</span>
+                        <span className="text-primary-foreground/90 text-xs font-bold mt-0.5">{step.num}</span>
                       </div>
                     </div>
                   </div>
-                  <h3 className="text-white font-semibold text-lg mb-2">{step.title}</h3>
-                  <p className="text-white/50 text-sm leading-relaxed">{step.desc}</p>
+                  <h3 className="font-semibold text-lg mb-2">{step.title}</h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">{step.desc}</p>
                 </div>
               ))}
             </div>
           </div>
 
           {/* Social Media Platforms Bar */}
-          <div className="mt-16 rounded-2xl border border-white/10 bg-white/5 px-8 py-8">
-            <p className="text-center text-white/40 text-xs font-semibold tracking-[0.15em] uppercase mb-8">
+          <div className="mt-16 rounded-2xl border border-border bg-background/50 px-8 py-8">
+            <p className="text-center text-muted-foreground text-xs font-semibold tracking-[0.15em] uppercase mb-8">
               Your job ads appear across these platforms — reaching the 97% of workers not on job boards
             </p>
             <div className="flex flex-wrap items-center justify-center gap-10">
@@ -372,42 +379,42 @@ export default function Landing() {
               <div className="flex flex-col items-center gap-2">
                 <div className="relative">
                   <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><circle cx="24" cy="24" r="24" fill="#1877F2"/><path d="M28.5 25H25.5V36H21V25H18.5V21H21V18.5C21 15.5 22.5 13 26 13H29V17H27C25.9 17 25.5 17.5 25.5 18.5V21H29L28.5 25Z" fill="white"/></svg>
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-background" />
                 </div>
-                <span className="text-white font-medium text-sm">Facebook</span>
-                <span className="text-white/40 text-xs">2.9B+ users</span>
+                <span className="font-medium text-sm">Facebook</span>
+                <span className="text-muted-foreground text-xs">2.9B+ users</span>
               </div>
               {/* Instagram */}
               <div className="flex flex-col items-center gap-2">
                 <div className="relative">
                   <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><defs><radialGradient id="ig-grad" cx="30%" cy="107%" r="150%"><stop offset="0%" stopColor="#fdf497"/><stop offset="5%" stopColor="#fdf497"/><stop offset="45%" stopColor="#fd5949"/><stop offset="60%" stopColor="#d6249f"/><stop offset="90%" stopColor="#285AEB"/></radialGradient></defs><rect width="48" height="48" rx="12" fill="url(#ig-grad)"/><rect x="13" y="13" width="22" height="22" rx="6" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="24" cy="24" r="5.5" stroke="white" strokeWidth="2.5" fill="none"/><circle cx="31.5" cy="16.5" r="1.5" fill="white"/></svg>
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-background" />
                 </div>
-                <span className="text-white font-medium text-sm">Instagram</span>
-                <span className="text-white/40 text-xs">2B+ users</span>
+                <span className="font-medium text-sm">Instagram</span>
+                <span className="text-muted-foreground text-xs">2B+ users</span>
               </div>
               {/* Messenger */}
               <div className="flex flex-col items-center gap-2">
                 <div className="relative">
                   <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><defs><linearGradient id="msg-grad" x1="0%" y1="100%" x2="100%" y2="0%"><stop offset="0%" stopColor="#00B2FF"/><stop offset="100%" stopColor="#006AFF"/></linearGradient></defs><circle cx="24" cy="24" r="24" fill="url(#msg-grad)"/><path d="M24 10C16.27 10 10 15.9 10 23.2C10 27.32 11.98 31 15.2 33.44V38L19.84 35.4C21.16 35.76 22.56 36 24 36C31.73 36 38 30.1 38 22.8C38 15.5 31.73 10 24 10ZM25.2 27L22 23.6L15.8 27L22.6 19.6L25.8 23L32 19.6L25.2 27Z" fill="white"/></svg>
-                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-400 rounded-full border-2" style={{ borderColor: "hsl(270 25% 6%)" }} />
+                  <span className="absolute -top-1 -right-1 w-3 h-3 bg-green-500 rounded-full ring-2 ring-background" />
                 </div>
-                <span className="text-white font-medium text-sm">Messenger</span>
-                <span className="text-white/40 text-xs">1B+ users</span>
+                <span className="font-medium text-sm">Messenger</span>
+                <span className="text-muted-foreground text-xs">1B+ users</span>
               </div>
               {/* Divider */}
-              <div className="hidden md:block w-px h-16 bg-white/10" />
+              <div className="hidden md:block w-px h-16 bg-border" />
               {/* TikTok — Coming Soon */}
-              <div className="flex flex-col items-center gap-2 opacity-50">
+              <div className="flex flex-col items-center gap-2 opacity-60">
                 <svg width="48" height="48" viewBox="0 0 48 48" fill="none"><rect width="48" height="48" rx="12" fill="#010101"/><path d="M31 16.5C29.9 15.3 29.2 13.7 29 12H25.4V29C25.3 30.7 23.9 32 22.2 32C20.4 32 19 30.6 19 28.8C19 26.7 20.9 25.1 23 25.5V21.8C18.8 21.4 15.5 24.7 15.5 28.8C15.5 32.9 18.5 36 22.2 36C26.1 36 29.2 32.9 29.2 29V20.1C30.7 21.2 32.5 21.8 34.5 21.8V18.2C32.9 18.2 31.8 17.5 31 16.5Z" fill="white"/></svg>
-                <span className="text-white font-medium text-sm">TikTok</span>
-                <span className="bg-white/10 text-white/50 text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
+                <span className="font-medium text-sm">TikTok</span>
+                <span className="bg-muted text-muted-foreground text-xs px-2 py-0.5 rounded-full">Coming Soon</span>
               </div>
             </div>
           </div>
 
           {/* Stats Bar */}
-          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-white/10 rounded-2xl border border-white/10 bg-white/5 overflow-hidden">
+          <div className="mt-10 grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-border rounded-2xl border border-border bg-background/50 overflow-hidden">
             {[
               { icon: "\uD83C\uDF7D\uFE0F", number: "50K+", label: "Hospitality professionals in our network" },
               { icon: "\u26A1", number: "48 hrs", label: "Average time to first qualified candidate" },
@@ -416,7 +423,7 @@ export default function Landing() {
               <div key={i} className="flex flex-col items-center justify-center py-8 px-6 text-center">
                 <span className="text-2xl mb-2">{stat.icon}</span>
                 <span className="text-primary text-3xl font-bold mb-1">{stat.number}</span>
-                <span className="text-white/50 text-sm">{stat.label}</span>
+                <span className="text-muted-foreground text-sm">{stat.label}</span>
               </div>
             ))}
           </div>
@@ -425,20 +432,20 @@ export default function Landing() {
 
       <section className="border-y border-border bg-gradient-to-r from-card via-card/80 to-card py-12">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 gap-8 md:grid-cols-4" data-testid="stats-container">
-            <div className="text-center group" data-testid="stat-hospitality-pros">
+          <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
+            <div className="text-center group">
               <div className="text-3xl font-bold text-primary transition-transform duration-300">50K+</div>
               <div className="mt-1 text-sm text-muted-foreground">Hospitality Pros</div>
             </div>
-            <div className="text-center group" data-testid="stat-video-interviews">
+            <div className="text-center group">
               <div className="text-3xl font-bold text-primary transition-transform duration-300">10K+</div>
               <div className="mt-1 text-sm text-muted-foreground">Video Interviews</div>
             </div>
-            <div className="text-center group" data-testid="stat-venues-served">
+            <div className="text-center group">
               <div className="text-3xl font-bold text-primary transition-transform duration-300">2K+</div>
               <div className="mt-1 text-sm text-muted-foreground">Venues Served</div>
             </div>
-            <div className="text-center group" data-testid="stat-time-to-fill">
+            <div className="text-center group">
               <div className="text-3xl font-bold text-primary transition-transform duration-300">4hrs</div>
               <div className="mt-1 text-sm text-muted-foreground">Avg. Time to Fill Gig</div>
             </div>
@@ -450,7 +457,7 @@ export default function Landing() {
       <section className="py-20 lg:py-28">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold sm:text-4xl mb-3">Browse Hospitality Jobs</h2>
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl mb-3">Browse Hospitality Jobs</h2>
             <p className="text-muted-foreground max-w-xl mx-auto">
               Find restaurant, hotel, and food service positions near you.
             </p>
@@ -556,14 +563,14 @@ export default function Landing() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div>
-              <Badge variant="secondary" className="mb-4" data-testid="badge-gigs-marketplace">
+              <Badge variant="secondary" className="mb-4">
                 <Clock className="h-3 w-3 mr-1" />
                 Krew Gigs Marketplace
               </Badge>
-              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl" data-testid="text-gigs-heading">
+              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl">
                 Fill shifts in hours, not weeks
               </h2>
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed" data-testid="text-gigs-description">
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
                 Short-staffed for tonight's rush? Access a pool of pre-vetted hospitality professionals ready to work on your schedule. From bartenders to line cooks, find reliable gig workers who know the industry.
               </p>
               <div className="mt-8 space-y-4">
@@ -572,8 +579,8 @@ export default function Landing() {
                     <Zap className="h-4 w-4 text-secondary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-instant-booking">Instant Booking</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-instant-booking-desc">Post a shift and get confirmed workers within hours</p>
+                    <h4 className="font-semibold">Instant Booking</h4>
+                    <p className="text-sm text-muted-foreground">Post a shift and get confirmed workers within hours</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-start gap-3">
@@ -581,8 +588,8 @@ export default function Landing() {
                     <Star className="h-4 w-4 text-secondary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-reliability">Reliability Scores</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-reliability-desc">Every worker rated by venues. No more no-shows.</p>
+                    <h4 className="font-semibold">Reliability Scores</h4>
+                    <p className="text-sm text-muted-foreground">Every worker rated by venues. No more no-shows.</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-start gap-3">
@@ -590,20 +597,20 @@ export default function Landing() {
                     <DollarSign className="h-4 w-4 text-secondary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-pricing">Transparent Pricing</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-pricing-desc">Set your rate. Workers see what they'll earn upfront.</p>
+                    <h4 className="font-semibold">Transparent Pricing</h4>
+                    <p className="text-sm text-muted-foreground">Set your rate. Workers see what they'll earn upfront.</p>
                   </div>
                 </div>
               </div>
               <div className="mt-10 flex flex-wrap gap-4">
-                <a href="/login" data-testid="link-post-gig">
-                  <Button className="gap-2 shadow-lg shadow-primary/25" data-testid="button-post-gig">
+                <a href="/login">
+                  <Button className="gap-2 shadow-lg shadow-primary/25">
                     Post a Gig Shift
                     <ArrowRight className="h-4 w-4" />
                   </Button>
                 </a>
                 <Link href="/gigs">
-                  <Button variant="outline" className="gap-2" data-testid="button-browse-shifts">
+                  <Button variant="outline" className="gap-2">
                     Browse Available Shifts
                   </Button>
                 </Link>
@@ -611,38 +618,38 @@ export default function Landing() {
             </div>
             <div className="relative">
               <div className="absolute -inset-4 bg-gradient-to-br from-secondary/10 to-primary/10 rounded-3xl blur-xl" />
-              <Card className="relative p-6 space-y-4 border-secondary/20" data-testid="card-gig-mockup">
+              <Card className="relative p-6 space-y-4 border-secondary/20">
                 <div className="flex flex-wrap items-center justify-between gap-2">
-                  <Badge className="bg-primary/10 text-primary border-primary/20" data-testid="badge-open-shift">Open Shift</Badge>
-                  <span className="text-sm text-muted-foreground" data-testid="text-posted-time">Posted 2h ago</span>
+                  <Badge className="bg-primary/10 text-primary border-primary/20">Open Shift</Badge>
+                  <span className="text-sm text-muted-foreground">Posted 2h ago</span>
                 </div>
                 <div>
-                  <h3 className="text-xl font-semibold" data-testid="text-gig-title">Bartender Needed Tonight</h3>
-                  <p className="text-muted-foreground mt-1" data-testid="text-gig-location">The Brass Monkey - Downtown</p>
+                  <h3 className="text-xl font-semibold">Bartender Needed Tonight</h3>
+                  <p className="text-muted-foreground mt-1">The Brass Monkey - Downtown</p>
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm">
-                  <div className="flex flex-wrap items-center gap-1.5" data-testid="text-gig-time">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <Calendar className="h-4 w-4 text-secondary" />
                     Tonight, 6PM - 2AM
                   </div>
-                  <div className="flex flex-wrap items-center gap-1.5" data-testid="text-gig-pay">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <DollarSign className="h-4 w-4 text-secondary" />
                     $28/hr + tips
                   </div>
                 </div>
                 <div className="pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground mb-3" data-testid="text-workers-interested">3 workers interested</p>
-                  <div className="flex flex-wrap -space-x-2" data-testid="avatars-workers">
-                    <div className="h-8 w-8 rounded-full bg-primary flex flex-wrap items-center justify-center text-xs font-medium text-primary-foreground ring-2 ring-background" data-testid="avatar-jm">JM</div>
-                    <div className="h-8 w-8 rounded-full bg-secondary flex flex-wrap items-center justify-center text-xs font-medium text-secondary-foreground ring-2 ring-background" data-testid="avatar-ak">AK</div>
-                    <div className="h-8 w-8 rounded-full bg-muted flex flex-wrap items-center justify-center text-xs font-medium text-muted-foreground ring-2 ring-background" data-testid="avatar-more">+1</div>
+                  <p className="text-sm text-muted-foreground mb-3">3 workers interested</p>
+                  <div className="flex flex-wrap -space-x-2">
+                    <div className="h-8 w-8 rounded-full bg-primary flex flex-wrap items-center justify-center text-xs font-medium text-primary-foreground ring-2 ring-background">JM</div>
+                    <div className="h-8 w-8 rounded-full bg-secondary flex flex-wrap items-center justify-center text-xs font-medium text-secondary-foreground ring-2 ring-background">AK</div>
+                    <div className="h-8 w-8 rounded-full bg-muted flex flex-wrap items-center justify-center text-xs font-medium text-muted-foreground ring-2 ring-background">+1</div>
                   </div>
                 </div>
                 <img 
                   src={bartenderImage} 
                   alt="Bartender at work" 
                   className="rounded-lg object-cover h-32 w-full mt-4"
-                  data-testid="img-gig-bartender"
+                 
                 />
               </Card>
             </div>
@@ -655,15 +662,15 @@ export default function Landing() {
           <div className="grid lg:grid-cols-2 gap-12 lg:gap-20 items-center">
             <div className="order-2 lg:order-1 relative">
               <div className="absolute -inset-4 bg-gradient-to-br from-primary/10 to-secondary/10 rounded-3xl blur-xl" />
-              <Card className="relative p-6 border-primary/20" data-testid="card-interview-mockup">
+              <Card className="relative p-6 border-primary/20">
                 <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <div className="h-10 w-10 rounded-full bg-primary flex flex-wrap items-center justify-center text-sm font-medium text-primary-foreground" data-testid="avatar-candidate">SR</div>
+                  <div className="h-10 w-10 rounded-full bg-primary flex flex-wrap items-center justify-center text-sm font-medium text-primary-foreground">SR</div>
                   <div>
-                    <p className="font-semibold" data-testid="text-candidate-name">Sofia Rodriguez</p>
-                    <p className="text-sm text-muted-foreground" data-testid="text-candidate-role">Applying for Server</p>
+                    <p className="font-semibold">Sofia Rodriguez</p>
+                    <p className="text-sm text-muted-foreground">Applying for Server</p>
                   </div>
                 </div>
-                <div className="aspect-video rounded-lg flex flex-wrap items-center justify-center mb-4 relative overflow-hidden bg-muted" data-testid="video-container">
+                <div className="aspect-video rounded-lg flex flex-wrap items-center justify-center mb-4 relative overflow-hidden bg-muted">
                   {!videoError && (
                     <video 
                       ref={videoRef}
@@ -675,7 +682,7 @@ export default function Landing() {
                       playsInline
                       preload="auto"
                       className="absolute inset-0 w-full h-full object-cover"
-                      data-testid="video-interview-demo"
+                     
                       onError={() => setVideoError(true)}
                     />
                   )}
@@ -684,14 +691,14 @@ export default function Landing() {
                       src={serverImage} 
                       alt="Video interview demo" 
                       className="absolute inset-0 w-full h-full object-cover"
-                      data-testid="img-interview-fallback"
+                     
                     />
                   )}
                   {showPlayButton && !videoError && (
                     <button
                       onClick={handlePlayClick}
                       className="relative z-10 h-16 w-16 rounded-full bg-primary/90 flex items-center justify-center shadow-xl cursor-pointer"
-                      data-testid="button-play-video"
+                     
                     >
                       <Play className="h-8 w-8 text-primary-foreground ml-1" />
                     </button>
@@ -701,29 +708,29 @@ export default function Landing() {
                   <div className="flex flex-wrap items-start gap-3">
                     <MessageSquare className="h-4 w-4 text-primary mt-1 shrink-0" />
                     <div>
-                      <p className="text-sm font-medium" data-testid="text-interview-question">"Tell us about a time you turned an unhappy guest into a regular."</p>
-                      <p className="text-xs text-muted-foreground mt-1" data-testid="text-response-duration">2:34 response</p>
+                      <p className="text-sm font-medium">"Tell us about a time you turned an unhappy guest into a regular."</p>
+                      <p className="text-xs text-muted-foreground mt-1">2:34 response</p>
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <Badge variant="secondary" data-testid="badge-personality">
+                    <Badge variant="secondary">
                       <CheckCircle2 className="h-3 w-3 mr-1" />
                       Great personality
                     </Badge>
-                    <Badge variant="outline" data-testid="badge-experience">5 yrs experience</Badge>
+                    <Badge variant="outline">5 yrs experience</Badge>
                   </div>
                 </div>
               </Card>
             </div>
             <div className="order-1 lg:order-2">
-              <Badge variant="secondary" className="mb-4" data-testid="badge-video-interviews">
+              <Badge variant="secondary" className="mb-4">
                 <Video className="h-3 w-3 mr-1" />
                 Async Video Interviews
               </Badge>
-              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl" data-testid="text-interviews-heading">
+              <h2 className="font-serif text-3xl font-bold sm:text-4xl lg:text-5xl">
                 See the person behind the resume
               </h2>
-              <p className="mt-6 text-lg text-muted-foreground leading-relaxed" data-testid="text-interviews-description">
+              <p className="mt-6 text-lg text-muted-foreground leading-relaxed">
                 In hospitality, personality matters as much as skills. Our async video interviews let candidates show their service mindset, communication style, and passion for the industry - on their time.
               </p>
               <div className="mt-8 space-y-4">
@@ -732,8 +739,8 @@ export default function Landing() {
                     <Clock className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-screening">Screen 10x Faster</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-screening-desc">Review video responses at your pace. No more scheduling phone screens.</p>
+                    <h4 className="font-semibold">Screen 10x Faster</h4>
+                    <p className="text-sm text-muted-foreground">Review video responses at your pace. No more scheduling phone screens.</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-start gap-3">
@@ -741,8 +748,8 @@ export default function Landing() {
                     <Heart className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-questions">Hospitality-Focused Questions</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-questions-desc">Templates designed for service roles. "Tell me about a difficult guest..."</p>
+                    <h4 className="font-semibold">Hospitality-Focused Questions</h4>
+                    <p className="text-sm text-muted-foreground">Templates designed for service roles. "Tell me about a difficult guest..."</p>
                   </div>
                 </div>
                 <div className="flex flex-wrap items-start gap-3">
@@ -750,14 +757,14 @@ export default function Landing() {
                     <Users className="h-4 w-4 text-primary" />
                   </div>
                   <div>
-                    <h4 className="font-semibold" data-testid="text-feature-collaboration">Team Collaboration</h4>
-                    <p className="text-sm text-muted-foreground" data-testid="text-feature-collaboration-desc">Share videos with your management team. Get everyone's input.</p>
+                    <h4 className="font-semibold">Team Collaboration</h4>
+                    <p className="text-sm text-muted-foreground">Share videos with your management team. Get everyone's input.</p>
                   </div>
                 </div>
               </div>
               <div className="mt-10">
-                <a href="/login" data-testid="link-try-interviews">
-                  <Button className="gap-2 shadow-lg shadow-primary/25" data-testid="button-try-interviews">
+                <a href="/login">
+                  <Button className="gap-2 shadow-lg shadow-primary/25">
                     Try Video Interviews Free
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -771,22 +778,22 @@ export default function Landing() {
       <section className="py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center mb-16">
-            <h2 className="font-serif text-3xl font-bold sm:text-4xl" data-testid="text-benefits-heading">
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
               Why hospitality teams love Krew
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground" data-testid="text-benefits-description">
+            <p className="mt-4 text-lg text-muted-foreground">
               Built specifically for the unique challenges of hospitality hiring.
             </p>
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
             {hospitalityBenefits.map((benefit, index) => (
-              <Card key={index} className="relative overflow-visible hover-elevate transition-all duration-300 group" data-testid={`card-benefit-${index}`}>
+              <Card key={index} className="relative overflow-visible hover-elevate transition-all duration-300 group">
                 <CardContent className="p-6">
-                  <div className="mb-4 inline-flex flex-wrap h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 text-primary transition-transform duration-300" data-testid={`icon-benefit-${index}`}>
+                  <div className="mb-4 inline-flex flex-wrap h-12 w-12 items-center justify-center rounded-lg bg-gradient-to-br from-primary/20 to-secondary/20 text-primary transition-transform duration-300">
                     <benefit.icon className="h-6 w-6" />
                   </div>
-                  <h3 className="text-lg font-semibold" data-testid={`text-benefit-title-${index}`}>{benefit.title}</h3>
-                  <p className="mt-2 text-muted-foreground leading-relaxed" data-testid={`text-benefit-desc-${index}`}>
+                  <h3 className="text-lg font-semibold">{benefit.title}</h3>
+                  <p className="mt-2 text-muted-foreground leading-relaxed">
                     {benefit.description}
                   </p>
                 </CardContent>
@@ -799,35 +806,35 @@ export default function Landing() {
       <section id="testimonials" className="border-y border-border bg-gradient-to-b from-card/50 to-card py-20 lg:py-32">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <Badge variant="secondary" className="mb-4" data-testid="badge-testimonials-example">
+            <Badge variant="secondary" className="mb-4">
               Example feedback
             </Badge>
-            <h2 className="font-serif text-3xl font-bold sm:text-4xl" data-testid="text-testimonials-heading">
+            <h2 className="font-serif text-3xl font-bold sm:text-4xl">
               What hospitality operators tell us
             </h2>
-            <p className="mt-4 text-lg text-muted-foreground" data-testid="text-testimonials-description">
+            <p className="mt-4 text-lg text-muted-foreground">
               Representative examples of the feedback we've heard from beta operators. Quotes are illustrative; specific names are withheld until we have permission to share them.
             </p>
           </div>
           <div className="mt-16 grid gap-8 md:grid-cols-3">
             {testimonials.map((testimonial, index) => (
-              <Card key={index} className="overflow-visible hover-elevate transition-all duration-300" data-testid={`card-testimonial-${index}`}>
+              <Card key={index} className="overflow-visible hover-elevate transition-all duration-300">
                 <CardContent className="p-6">
-                  <div className="flex flex-wrap gap-1 text-primary" data-testid={`rating-testimonial-${index}`}>
+                  <div className="flex flex-wrap gap-1 text-primary">
                     {[...Array(testimonial.rating)].map((_, i) => (
                       <Star key={i} className="h-4 w-4 fill-current" />
                     ))}
                   </div>
-                  <blockquote className="mt-4 text-foreground leading-relaxed" data-testid={`quote-testimonial-${index}`}>
+                  <blockquote className="mt-4 text-foreground leading-relaxed">
                     "{testimonial.quote}"
                   </blockquote>
                   <div className="mt-6 flex flex-wrap items-center gap-3">
-                    <div className="flex flex-wrap h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary font-medium text-primary-foreground" data-testid={`avatar-testimonial-${index}`}>
+                    <div className="flex flex-wrap h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-primary to-secondary font-medium text-primary-foreground">
                       {testimonial.author[0]}
                     </div>
                     <div>
-                      <div className="font-medium" data-testid={`author-testimonial-${index}`}>{testimonial.author}</div>
-                      <div className="text-sm text-muted-foreground" data-testid={`role-testimonial-${index}`}>{testimonial.role}</div>
+                      <div className="font-medium">{testimonial.author}</div>
+                      <div className="text-sm text-muted-foreground">{testimonial.role}</div>
                     </div>
                   </div>
                 </CardContent>
@@ -841,25 +848,25 @@ export default function Landing() {
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-secondary px-6 py-16 sm:px-12 lg:px-20">
             <div className="absolute inset-0 -z-10">
-              <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl animate-pulse" style={{ animationDuration: '3s' }} />
-              <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl animate-pulse" style={{ animationDuration: '4s' }} />
+              <div className="absolute -top-24 -right-24 h-96 w-96 rounded-full bg-white/10 blur-3xl animate-pulse motion-reduce:animate-none" style={{ animationDuration: '3s' }} />
+              <div className="absolute -bottom-24 -left-24 h-96 w-96 rounded-full bg-white/10 blur-3xl animate-pulse motion-reduce:animate-none" style={{ animationDuration: '4s' }} />
             </div>
             <div className="mx-auto max-w-3xl text-center">
-              <h2 className="font-serif text-3xl font-bold text-primary-foreground sm:text-4xl" data-testid="text-cta-heading">
+              <h2 className="font-serif text-3xl font-bold text-primary-foreground sm:text-4xl">
                 Ready to find people who love to serve?
               </h2>
-              <p className="mt-4 text-lg text-primary-foreground/90" data-testid="text-cta-subheading">
+              <p className="mt-4 text-lg text-primary-foreground/90">
                 Whether you need full-time staff or gig workers for tonight, Krew Recruiter has you covered.
               </p>
               <div className="mt-8 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-4">
                 <a href="/login">
-                  <Button size="lg" variant="secondary" className="gap-2 shadow-xl" data-testid="button-cta-employer">
+                  <Button size="lg" variant="secondary" className="gap-2 shadow-xl">
                     Start Hiring Free
                     <Briefcase className="h-4 w-4" />
                   </Button>
                 </a>
                 <Link href="/workers/signup">
-                  <Button size="lg" variant="outline" className="gap-2 bg-white/10 border-white/30 text-primary-foreground" data-testid="button-cta-worker">
+                  <Button size="lg" variant="outline" className="gap-2 bg-white/10 border-white/30 text-primary-foreground">
                     Join as a Worker
                     <ArrowRight className="h-4 w-4" />
                   </Button>
@@ -875,32 +882,32 @@ export default function Landing() {
           <div className="grid gap-8 md:grid-cols-4">
             <div>
               <div className="flex flex-wrap items-center gap-2 mb-4">
-                <img src={logoImage} alt="Krew Recruiter" className="h-8 w-8 rounded-lg object-contain" data-testid="img-logo-footer" />
-                <span className="font-semibold" data-testid="text-brand-footer">Krew Recruiter</span>
+                <img src={logoImage} alt="Krew Recruiter" className="h-8 w-8 rounded-lg object-contain" />
+                <span className="font-semibold">Krew Recruiter</span>
               </div>
-              <p className="text-sm text-muted-foreground" data-testid="text-footer-tagline">
+              <p className="text-sm text-muted-foreground">
                 The hiring platform for hospitality teams who care about service.
               </p>
             </div>
             <div>
-              <h4 className="font-semibold mb-4" data-testid="text-footer-employers-heading">For Employers</h4>
+              <h4 className="font-semibold mb-4">For Employers</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><a href="/login" className="transition-colors duration-200" data-testid="link-footer-post-jobs">Post Jobs</a></li>
-                <li><a href="/login" className="transition-colors duration-200" data-testid="link-footer-post-gigs">Post Gig Shifts</a></li>
-                <li><a href="/video-interviews" className="transition-colors duration-200" data-testid="link-footer-video-interviews">Video Interviews</a></li>
-                <li><a href="/employers" className="transition-colors duration-200" data-testid="link-footer-pricing">Pricing</a></li>
+                <li><a href="/login" className="hover:text-foreground transition-colors duration-200">Post Jobs</a></li>
+                <li><a href="/login" className="hover:text-foreground transition-colors duration-200">Post Gig Shifts</a></li>
+                <li><a href="/video-interviews" className="hover:text-foreground transition-colors duration-200">Video Interviews</a></li>
+                <li><a href="/employers" className="hover:text-foreground transition-colors duration-200">Pricing</a></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4" data-testid="text-footer-workers-heading">For Workers</h4>
+              <h4 className="font-semibold mb-4">For Workers</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
-                <li><Link href="/gigs"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-browse-gigs">Browse Gigs</span></Link></li>
-                <li><Link href="/workers/signup"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-join-worker">Join as Worker</span></Link></li>
-                <li><Link href="/jobs"><span className="cursor-pointer transition-colors duration-200" data-testid="link-footer-full-time">Full-Time Jobs</span></Link></li>
+                <li><Link href="/gigs"><span className="cursor-pointer hover:text-foreground transition-colors duration-200">Browse Gigs</span></Link></li>
+                <li><Link href="/workers/signup"><span className="cursor-pointer hover:text-foreground transition-colors duration-200">Join as Worker</span></Link></li>
+                <li><Link href="/jobs"><span className="cursor-pointer hover:text-foreground transition-colors duration-200">Full-Time Jobs</span></Link></li>
               </ul>
             </div>
             <div>
-              <h4 className="font-semibold mb-4" data-testid="text-footer-company-heading">Company</h4>
+              <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-sm text-muted-foreground">
                 {/* About and Contact previously linked to href="#" (dead
                     links landing on the current URL). Wired to real
@@ -908,19 +915,19 @@ export default function Landing() {
                     on other pages (pricing.tsx, help.tsx, billing.tsx).
                     An actual /about page would be the proper long-term
                     fix. */}
-                <li><a href="mailto:hello@krewhuddle.com?subject=About%20Krew%20Recruiter" className="hover:text-foreground transition-colors duration-200" data-testid="link-footer-about">About</a></li>
-                <li><a href="mailto:support@krewhuddle.com" className="hover:text-foreground transition-colors duration-200" data-testid="link-footer-contact">Contact</a></li>
-                <li><Link href="/privacy"><span className="cursor-pointer hover:text-foreground transition-colors duration-200" data-testid="link-footer-privacy">Privacy Policy</span></Link></li>
-                <li><Link href="/terms"><span className="cursor-pointer hover:text-foreground transition-colors duration-200" data-testid="link-footer-terms">Terms of Use</span></Link></li>
+                <li><a href="mailto:hello@krewhuddle.com?subject=About%20Krew%20Recruiter" className="hover:text-foreground transition-colors duration-200">About</a></li>
+                <li><a href="mailto:support@krewhuddle.com" className="hover:text-foreground transition-colors duration-200">Contact</a></li>
+                <li><Link href="/privacy"><span className="cursor-pointer hover:text-foreground transition-colors duration-200">Privacy Policy</span></Link></li>
+                <li><Link href="/terms"><span className="cursor-pointer hover:text-foreground transition-colors duration-200">Terms of Use</span></Link></li>
               </ul>
             </div>
           </div>
           <div className="mt-12 pt-8 border-t border-border flex flex-col md:flex-row flex-wrap items-center justify-between gap-4">
-            <div className="text-sm text-muted-foreground" data-testid="text-footer-copyright">
+            <div className="text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Krew Recruiter. All rights reserved.
             </div>
             <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
-              <span className="flex items-center gap-2" data-testid="text-footer-love">
+              <span className="flex items-center gap-2">
                 <Heart className="h-4 w-4 text-primary" />
                 Built for people who love to serve
               </span>
