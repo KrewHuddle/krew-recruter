@@ -27,11 +27,12 @@ services:
   # See server/services/objectStorage.ts for the provisioning
   # checklist (create Space, generate API key, set CORS).
   #
-  # The values below are PLACEHOLDERS — set the real ones in the DO
-  # dashboard under Settings → Components → krew-recruter →
-  # Environment Variables. DO_SPACES_SECRET should be marked encrypted.
+  # KEY and SECRET must be set in the DO dashboard under
+  # Settings → Components → krew-recruter → Environment Variables.
+  # DO_SPACES_SECRET should be marked encrypted.
   #
-  # Region slugs: nyc3, sfo3, fra1, ams3, sgp1, syd1, blr1
+  # Bucket and region are committed here because they're not secret
+  # (they appear in every public URL the app serves).
   - key: DO_SPACES_KEY
     value: "set-in-do-dashboard"
     scope: RUN_TIME
@@ -40,14 +41,15 @@ services:
     scope: RUN_TIME
     type: SECRET
   - key: DO_SPACES_BUCKET
-    value: "set-in-do-dashboard"
+    value: "krew-recruiter"
     scope: RUN_TIME
   - key: DO_SPACES_REGION
     value: "nyc3"
     scope: RUN_TIME
   # Optional: CDN endpoint for faster public file delivery. Format:
   # https://<cdn-id>.cdn.digitaloceanspaces.com (find in the Space
-  # settings after enabling CDN).
+  # settings after enabling CDN). Leave blank to use the direct
+  # Spaces hostname.
   - key: DO_SPACES_CDN_ENDPOINT
     value: ""
     scope: RUN_TIME
