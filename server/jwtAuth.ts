@@ -9,20 +9,41 @@ const SALT_ROUNDS = 12;
 const JWT_EXPIRES_IN = "7d";
 
 /**
- * Returns the JWT signing/verifying secret. Throws if neither JWT_SECRET
- * nor SESSION_SECRET is set in the environment — exported so other files
- * (customAuth, routes) can use the same fail-loud behavior instead of
- * falling back to a hardcoded literal that turns missing env vars into
- * a critical auth bypass.
+ * Returns the JWT signing/verifying secret. Throws if JWT_SECRET is not
+ * set in the environment — exported so other files (customAuth, routes)
+ * can use the same fail-loud behavior instead of falling back to a
+ * hardcoded literal or an unrelated secret.
  *
- * Note: the SESSION_SECRET fallback violates cryptographic domain
- * separation (one secret per use case) and is preserved here only for
- * backward compatibility. Setting JWT_SECRET explicitly is strongly
- * preferred. Removing the fallback is a separate audit item.
+ * Cryptographic domain separation: the previous implementation fell back
+ * to SESSION_SECRET when JWT_SECRET was missing. That violated the
+ * "one secret per use case" principle:
+ *
+ *   - Rotating SESSION_SECRET (to invalidate all express-session
+ *     cookies) would have silently also invalidated every JWT — a
+ *     surprising side effect that couples two lifecycles that should
+ *     be independent.
+ *
+ *   - Rotating JWT_SECRET (to invalidate JWTs) would be a no-op in any
+ *     environment that also had SESSION_SECRET set, because the
+ *     fallback would silently continue using the session secret.
+ *
+ *   - An attacker who obtained one secret could forge both session
+ *     cookies and API tokens, doubling the blast radius.
+ *
+ * The fallback is removed. If JWT_SECRET is not explicitly set at the
+ * time this function is first called, it throws with a clear operator
+ * message. The throw is already caught safely by the JWT verify paths
+ * in server/routes.ts (requireSuperAdmin and /api/admin/check) via
+ * their empty try/catch blocks, and by the JWT sign path in
+ * server/customAuth.ts (loginHandler) via its surrounding 500 handler.
  */
 export function getJwtSecret(): string {
-  const secret = process.env.JWT_SECRET || process.env.SESSION_SECRET;
-  if (!secret) throw new Error("JWT_SECRET or SESSION_SECRET must be set");
+  const secret = process.env.JWT_SECRET;
+  if (!secret) {
+    throw new Error(
+      "JWT_SECRET must be set. Generate one with: openssl rand -base64 48"
+    );
+  }
   return secret;
 }
 
