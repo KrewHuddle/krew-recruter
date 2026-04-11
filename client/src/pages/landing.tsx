@@ -636,8 +636,16 @@ export default function Landing() {
                   <span className="text-sm text-muted-foreground">Posted 2h ago</span>
                 </div>
                 <div>
+                  {/* Mock gig-shift card for visual demo. Using a
+                      generic restaurant descriptor rather than a
+                      fake restaurant name ("The Brass Monkey") that
+                      was also reused as the company in fake
+                      testimonials on this same page — that
+                      repetition was a tell that the social proof
+                      wasn't real. Generic descriptor is honest as
+                      an obvious example. */}
                   <h3 className="text-xl font-semibold">Bartender Needed Tonight</h3>
-                  <p className="text-muted-foreground mt-1">The Brass Monkey - Downtown</p>
+                  <p className="text-muted-foreground mt-1">Example restaurant · Downtown</p>
                 </div>
                 <div className="flex flex-wrap gap-4 text-sm">
                   <div className="flex flex-wrap items-center gap-1.5">
