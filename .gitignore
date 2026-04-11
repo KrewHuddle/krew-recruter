@@ -21,3 +21,18 @@ vite.config.ts.*
 # during encryption key rotation. These contain the current encrypted
 # row values (useless without the old key, but safer to never commit).
 platform-settings-backup-*.json
+
+# macOS Finder duplicates of package-lock.json (the " 2.json", " 3.json",
+# etc. suffixes that Finder adds when you copy-paste or drag-duplicate a
+# file). npm ignores them; they're stale cruft and must never be
+# committed, because they'd confuse reviewers looking at dependency diffs.
+package-lock [0-9]*.json
+
+# The foodgeekssocial Remotion video project lives as an untracked
+# directory inside this repo (~858MB including node_modules, ~311MB
+# without). It is NOT part of Krew Recruiter — it's a separate
+# standalone project that was placed here. Ignoring it protects against
+# `git add .` accidentally committing 311MB of unrelated source files.
+# The long-term fix is to move it out to its own repo or a sibling
+# directory outside krew-recruiter/. Flagged in audit item #14.
+foodgeekssocial/
