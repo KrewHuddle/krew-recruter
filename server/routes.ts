@@ -9,6 +9,15 @@ import { getStripePublishableKey, getStripeClient } from "./stripeUtils";
 import { adzunaService } from "./services/adzuna";
 import { upsertToTalentPool, recordTalentApplication, geocodeAddress, getSmartRadius } from "./services/talent-pool";
 import { requirePlan } from "./middleware/requirePlan";
+import { ObjectStorageService } from "./replit_integrations/object_storage/objectStorage";
+
+// Single ObjectStorageService instance reused by every route that touches
+// uploaded files (interview videos, generated ad images). The class has an
+// empty constructor with no side effects, so module-level instantiation is
+// safe. Previously this was referenced as a bare `objectStorageService`
+// identifier without ever being declared, producing 6 "Cannot find name"
+// errors at lines 1586, 1693, 2088, 2089, 2375, 2376.
+const objectStorageService = new ObjectStorageService();
 import { db } from "./db";
 import {
   organizations, campaigns, jobs, applications, interviewInvites,
@@ -1228,8 +1237,11 @@ Sitemap: https://krewrecruiter.com/sitemap.xml`
           return res.status(403).json({ error: "Not authorized to rate this gig" });
         }
       } else {
-        // Employer must be a member of the tenant that owns the assignment
-        const membership = await storage.getTenantMembership(userId, assignment.tenantId);
+        // Employer must be a member of the tenant that owns the assignment.
+        // Note: storage.getMembership signature is (tenantId, userId) — the
+        // previous getTenantMembership name was wrong AND the args were
+        // passed in the wrong order. Both are corrected here.
+        const membership = await storage.getMembership(assignment.tenantId, userId);
         if (!membership) {
           return res.status(403).json({ error: "Not authorized to rate this gig" });
         }
